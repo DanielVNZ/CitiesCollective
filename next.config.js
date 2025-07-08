@@ -1,12 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Configure body size limit for API routes
-  api: {
-    bodyParser: {
-      sizeLimit: '10mb',
-    },
-  },
-  
   // Enable experimental features if needed
   experimental: {
     serverComponentsExternalPackages: ['adm-zip'],

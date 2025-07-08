@@ -5,6 +5,13 @@ import { cityTable, getUser, db, ensureCityTableExists, generateUniqueId } from 
 import { auth } from 'app/auth';
 import { uploadToR2, generateFileKey } from 'app/utils/r2';
 
+// Configure the maximum body size for this route
+export const maxDuration = 60; // 60 seconds
+export const dynamic = 'force-dynamic';
+
+// Configure body size limit for API routes in App Router
+export const runtime = 'nodejs';
+
 export async function POST(req: NextRequest) {
   console.log('Upload request received');
   
