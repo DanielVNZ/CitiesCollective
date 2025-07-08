@@ -5,6 +5,7 @@ import { isUserAdmin, getAllUsersWithStats, getTotalCityCount, getAllComments } 
 import { AdminUserManagement } from './AdminUserManagement';
 import { CommentModeration } from './CommentModeration';
 import { ModerationSettings } from './ModerationSettings';
+import { UserCityManagement } from './UserCityManagement';
 
 export default async function AdminPage() {
   const session = await auth();
@@ -82,6 +83,11 @@ export default async function AdminPage() {
 
         {/* User Management */}
         <AdminUserManagement users={usersWithStats} />
+
+        {/* User City Management */}
+        <div className="mt-8">
+          <UserCityManagement />
+        </div>
 
         {/* Comment Moderation */}
         <div className="mt-8">

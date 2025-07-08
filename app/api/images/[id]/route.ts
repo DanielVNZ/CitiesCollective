@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from 'app/auth';
 import { getUser, deleteCityImage } from 'app/db';
-import { deleteImageFiles } from 'app/utils/imageProcessing';
 
 export async function DELETE(
   req: NextRequest,
@@ -35,21 +34,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Image not found or access denied' }, { status: 404 });
     }
 
-    // Delete image files from filesystem
-    try {
-      if (result.imagePaths.thumbnailPath && result.imagePaths.mediumPath && 
-          result.imagePaths.largePath && result.imagePaths.originalPath) {
-        await deleteImageFiles({
-          thumbnailPath: result.imagePaths.thumbnailPath,
-          mediumPath: result.imagePaths.mediumPath,
-          largePath: result.imagePaths.largePath,
-          originalPath: result.imagePaths.originalPath,
-        });
-      }
-    } catch (fileError) {
-      console.warn('Failed to delete image files:', fileError);
-      // Don't fail the request if file deletion fails
-    }
+    // Note: Images are stored in R2, so no local file deletion needed
 
     return NextResponse.json({
       message: 'Image deleted successfully',

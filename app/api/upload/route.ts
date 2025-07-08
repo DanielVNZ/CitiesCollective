@@ -6,6 +6,7 @@ import AdmZip from 'adm-zip';
 import { cityTable, getUser, db, ensureCityTableExists, generateUniqueId } from 'app/db';
 import { auth } from 'app/auth';
 import { v4 as uuidv4 } from 'uuid';
+import { uploadToR2, generateFileKey } from 'app/utils/r2';
 
 // Multer setup for handling multipart/form-data
 const upload = multer({ dest: path.join(process.cwd(), 'uploads') });
@@ -27,28 +28,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
     }
 
-    // Save the uploaded file to disk
+    // Get file data
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     const originalName = file.name;
     const baseName = path.parse(originalName).name;
     
-    // Create uploads directory structure
-    const uploadsDir = path.join(process.cwd(), 'uploads');
-    const savesDir = path.join(uploadsDir, 'saves');
-    await fs.mkdir(savesDir, { recursive: true });
+    // Create temporary directory for processing
+    const tempDir = path.join(process.cwd(), 'temp');
+    await fs.mkdir(tempDir, { recursive: true });
     
-    // Generate unique filename for the .cok file
-    const uniqueFileName = `${uuidv4()}-${baseName}.cok`;
-    const kokFilePath = path.join(savesDir, uniqueFileName);
-    const relativePath = `/uploads/saves/${uniqueFileName}`;
-    
-    // Save the original .cok file
-    await fs.writeFile(kokFilePath, buffer);
-    
-    // Also create a temporary zip file for processing
-    const tempZipPath = path.join(uploadsDir, `temp-${uuidv4()}.zip`);
-    await fs.writeFile(tempZipPath, buffer);
+    // Create temporary zip file for processing
+    const tempZipPath = path.join(tempDir, `temp-${uuidv4()}.zip`);
+    await fs.writeFile(tempZipPath, buffer as any);
 
     // Extract the zip to read metadata
     const zip = new AdmZip(tempZipPath);
@@ -74,8 +66,7 @@ export async function POST(req: NextRequest) {
           console.error('JSON parse error:', parseError);
           console.error('Content that failed to parse (first 500 chars):', JSON.stringify(metadataContent.substring(0, 500)));
           
-          // Clean up files on error
-          await fs.unlink(kokFilePath).catch(() => {});
+          // Clean up temporary file on error
           await fs.unlink(tempZipPath).catch(() => {});
           
           return NextResponse.json({ 
@@ -90,8 +81,6 @@ export async function POST(req: NextRequest) {
     await fs.unlink(tempZipPath).catch(() => {});
 
     if (!metadata) {
-      // Clean up .cok file if no metadata found
-      await fs.unlink(kokFilePath).catch(() => {});
       return NextResponse.json({ error: 'No .SaveGameMetadata found in zip' }, { status: 400 });
     }
 
@@ -99,10 +88,12 @@ export async function POST(req: NextRequest) {
     const users = await getUser(userEmail);
     const user = users && users[0];
     if (!user) {
-      // Clean up .cok file if user not found
-      await fs.unlink(kokFilePath).catch(() => {});
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
+
+    // Upload .cok file to R2
+    const fileKey = generateFileKey('saves', originalName, user.id);
+    const uploadResult = await uploadToR2(buffer, fileKey, 'application/octet-stream');
 
     // Ensure City table exists
     await ensureCityTableExists();
@@ -134,7 +125,7 @@ export async function POST(req: NextRequest) {
       contentPrerequisites: metadata.contentPrerequisites,
       modsEnabled: metadata.modsEnabled,
       fileName: originalName,
-      filePath: relativePath, // Store the path to the .cok file
+      filePath: uploadResult.key, // Store the R2 key instead of local path
     };
 
     // Insert city into database

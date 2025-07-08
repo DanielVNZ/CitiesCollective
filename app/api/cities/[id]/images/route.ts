@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from 'app/auth';
 import { getUser, createCityImage, getCityImages } from 'app/db';
-import { processImage, validateImageFile, deleteImageFiles, ImageProcessingResult } from 'app/utils/imageProcessing';
+import { processImageForR2, validateImageFile, R2ImageProcessingResult } from 'app/utils/r2ImageProcessing';
 import multer from 'multer';
 import { promisify } from 'util';
 
@@ -16,7 +16,7 @@ const upload = multer({
 
 const uploadMiddleware = promisify(upload.array('images', 10));
 
-interface ProcessedImageSuccess extends ImageProcessingResult {
+interface ProcessedImageSuccess extends R2ImageProcessingResult {
   index: number;
   success: true;
 }
@@ -96,7 +96,7 @@ export async function POST(
     const processedImages: ProcessedImageResult[] = await Promise.all(
       multerFiles.map(async (file, index): Promise<ProcessedImageResult> => {
         try {
-          const result = await processImage(file);
+          const result = await processImageForR2(file, user.id);
           return { ...result, index, success: true };
         } catch (error) {
           console.error(`Error processing image ${index}:`, error);
@@ -132,10 +132,10 @@ export async function POST(
             mimeType: result.mimeType,
             width: result.width,
             height: result.height,
-            thumbnailPath: result.thumbnailPath,
-            mediumPath: result.mediumPath,
-            largePath: result.largePath,
-            originalPath: result.originalPath,
+            thumbnailPath: result.thumbnailUrl, // Store full URLs instead of keys
+            mediumPath: result.mediumUrl,
+            largePath: result.largeUrl,
+            originalPath: result.originalUrl,
             isPrimary: index === 0, // First image is primary by default
           });
           return { ...imageRecord, success: true };

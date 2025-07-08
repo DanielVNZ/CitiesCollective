@@ -583,6 +583,15 @@ export async function deleteCityById(cityId: number, userId: number) {
   return result[0] || null;
 }
 
+export async function adminDeleteCityById(cityId: number) {
+  await ensureCityTableExists();
+  // Admin can delete any city without ownership check
+  const result = await db.delete(cityTable)
+    .where(eq(cityTable.id, cityId))
+    .returning();
+  return result[0] || null;
+}
+
 export interface SearchFilters {
   query?: string;
   theme?: string;
