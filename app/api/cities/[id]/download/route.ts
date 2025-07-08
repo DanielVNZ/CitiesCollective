@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCityById } from 'app/db';
-import { getDownloadUrl } from 'app/utils/r2';
+import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
+
+// Initialize S3 client for R2
+const s3Client = new S3Client({
+  region: 'auto',
+  endpoint: process.env.R2_ENDPOINT!,
+  credentials: {
+    accessKeyId: process.env.R2_ACCESS_KEY_ID!,
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
+  },
+});
 
 export async function GET(
   req: NextRequest,
@@ -25,15 +35,55 @@ export async function GET(
     }
 
     try {
-      // Generate presigned URL for R2 download
-      const downloadUrl = await getDownloadUrl(city.filePath, 3600); // 1 hour expiry
+      // Fetch file from R2
+      const command = new GetObjectCommand({
+        Bucket: process.env.R2_BUCKET_NAME!,
+        Key: city.filePath,
+      });
+
+      const response = await s3Client.send(command);
+      
+      if (!response.Body) {
+        return NextResponse.json({ error: 'File not found on storage' }, { status: 404 });
+      }
+
+      // Convert stream to buffer
+      const chunks: Uint8Array[] = [];
+      const reader = response.Body.transformToWebStream().getReader();
+      
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          chunks.push(value);
+        }
+      } finally {
+        reader.releaseLock();
+      }
+
+      const buffer = Buffer.concat(chunks);
       
       // Create a safe filename for download
-      const safeFileName = city.fileName || `${city.cityName || 'city'}.cok`;
-      const downloadFileName = safeFileName.replace(/[^a-zA-Z0-9.-]/g, '_');
+      const originalFileName = city.fileName || `${city.cityName || 'city'}.cok`;
+      let safeFileName = originalFileName;
       
-      // Redirect to the presigned URL
-      return NextResponse.redirect(downloadUrl);
+      // Ensure it has .cok extension
+      if (!safeFileName.endsWith('.cok')) {
+        safeFileName = safeFileName.replace(/\.[^.]*$/, '') + '.cok';
+      }
+      
+      // Clean filename for safety
+      safeFileName = safeFileName.replace(/[^a-zA-Z0-9.-]/g, '_');
+      
+      // Return the file with proper headers
+      return new NextResponse(buffer, {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/octet-stream',
+          'Content-Disposition': `attachment; filename="${safeFileName}"`,
+          'Content-Length': buffer.length.toString(),
+        },
+      });
       
     } catch (fileError) {
       console.error('R2 download error:', fileError);

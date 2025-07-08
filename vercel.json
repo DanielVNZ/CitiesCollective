@@ -15,6 +15,10 @@
     "app/api/cities/[id]/images/route.ts": {
       "maxDuration": 30,
       "memory": 512
+    },
+    "app/api/cities/[id]/download/route.ts": {
+      "maxDuration": 120,
+      "memory": 1024
     }
   },
   "regions": ["cle1"],
