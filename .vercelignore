@@ -3,6 +3,11 @@ uploads
 uploads/saves
 uploads/saves/*.cok
 
+# Exclude public uploads (images) from build
+public/uploads
+public/uploads/cities
+public/uploads/cities/*
+
 # Exclude development files
 .env.local
 .env.development.local

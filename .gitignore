@@ -41,6 +41,11 @@ uploads/
 uploads/saves/
 uploads/saves/*.cok
 
+# public uploads (images) - exclude from git and builds
+public/uploads/
+public/uploads/cities/
+public/uploads/cities/*
+
 # package manager conflicts
 package-lock.json
 yarn.lock
