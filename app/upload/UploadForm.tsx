@@ -21,6 +21,7 @@ export function UploadForm() {
   const [imageLoading, setImageLoading] = useState(false);
   const [imageSuccess, setImageSuccess] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  const [copySuccess, setCopySuccess] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -229,15 +230,20 @@ export function UploadForm() {
                         </code>
                         <button
                           type="button"
-                          onClick={() => {
+                          onClick={async () => {
                             const path = '%USERPROFILE%\\AppData\\LocalLow\\Colossal Order\\Cities Skylines II\\Saves\\';
-                            navigator.clipboard.writeText(path);
-                            alert('Path copied to clipboard! You can paste this in File Explorer address bar.');
+                            try {
+                              await navigator.clipboard.writeText(path);
+                              setCopySuccess(true);
+                              setTimeout(() => setCopySuccess(false), 2000);
+                            } catch (err) {
+                              console.error('Failed to copy:', err);
+                            }
                           }}
                           className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-xs"
                           title="Copy path to clipboard"
                         >
-                          📋 Copy
+                          {copySuccess ? '✅ Copied!' : '📋 Copy'}
                         </button>
                       </div>
                       <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
