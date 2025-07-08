@@ -1,76 +1,167 @@
 import Link from 'next/link';
+import { getRecentCities, getTopCitiesByLikes, isUserAdmin } from 'app/db';
+import { CityCard } from 'app/components/CityCard';
+import { QuickSearch } from 'app/components/QuickSearch';
+import { ThemeToggle } from 'app/components/ThemeToggle';
+import { auth } from 'app/auth';
 
-export default function Page() {
+export default async function Page() {
+  const cities = await getRecentCities(12);
+  const topCities = await getTopCitiesByLikes(3);
+  const session = await auth();
+  const isAdmin = session?.user?.email ? await isUserAdmin(session.user.email) : false;
+
   return (
-    <div className="flex h-screen bg-black">
-      <div className="w-screen h-screen flex flex-col justify-center items-center">
-        <svg
-          width="283"
-          height="64"
-          viewBox="0 0 283 64"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          className="w-36 h-36"
-          aria-label="Vercel logo"
-        >
-          <path
-            d="M141.04 16c-11.04 0-19 7.2-19 18s8.96 18 20 18c6.67 0 12.55-2.64 16.19-7.09l-7.65-4.42c-2.02 2.21-5.09 3.5-8.54 3.5-4.79 0-8.86-2.5-10.37-6.5h28.02c.22-1.12.35-2.28.35-3.5 0-10.79-7.96-17.99-19-17.99zm-9.46 14.5c1.25-3.99 4.67-6.5 9.45-6.5 4.79 0 8.21 2.51 9.45 6.5h-18.9zM248.72 16c-11.04 0-19 7.2-19 18s8.96 18 20 18c6.67 0 12.55-2.64 16.19-7.09l-7.65-4.42c-2.02 2.21-5.09 3.5-8.54 3.5-4.79 0-8.86-2.5-10.37-6.5h28.02c.22-1.12.35-2.28.35-3.5 0-10.79-7.96-17.99-19-17.99zm-9.45 14.5c1.25-3.99 4.67-6.5 9.45-6.5 4.79 0 8.21 2.51 9.45 6.5h-18.9zM200.24 34c0 6 3.92 10 10 10 4.12 0 7.21-1.87 8.8-4.92l7.68 4.43c-3.18 5.3-9.14 8.49-16.48 8.49-11.05 0-19-7.2-19-18s7.96-18 19-18c7.34 0 13.29 3.19 16.48 8.49l-7.68 4.43c-1.59-3.05-4.68-4.92-8.8-4.92-6.07 0-10 4-10 10zm82.48-29v46h-9V5h9zM36.95 0L73.9 64H0L36.95 0zm92.38 5l-27.71 48L73.91 5H84.3l17.32 30 17.32-30h10.39zm58.91 12v9.69c-1-.29-2.06-.49-3.2-.49-5.81 0-10 4-10 10V51h-9V17h9v9.2c0-5.08 5.91-9.2 13.2-9.2z"
-            fill="white"
-          />
-        </svg>
-        <div className="text-center max-w-screen-sm mb-10">
-          <h1 className="text-stone-200 font-bold text-2xl">
-            Next.js + Postgres Auth Starter
-          </h1>
-          <p className="text-stone-400 mt-5">
-            This is a{' '}
-            <a
-              href="https://nextjs.org/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-stone-400 underline hover:text-stone-200 transition-all"
-            >
-              Next.js
-            </a>{' '}
-            starter kit that uses{' '}
-            <a
-              href="https://next-auth.js.org/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-stone-400 underline hover:text-stone-200 transition-all"
-            >
-              NextAuth.js
-            </a>{' '}
-            for simple email + password login and a{' '}
-            <a
-              href="https://vercel.com/postgres"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-stone-400 underline hover:text-stone-200 transition-all"
-            >
-              Postgres
-            </a>{' '}
-            database to persist the data.
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      {/* Header */}
+      <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center">
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                Cities: Skylines 2 Showcase
+              </h1>
+            </div>
+            <nav className="flex items-center space-x-4">
+              {session ? (
+                <>
+                  <Link
+                    href="/search"
+                    className="text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
+                  >
+                    Search
+                  </Link>
+                  <Link
+                    href="/favorites"
+                    className="text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
+                  >
+                    Favorites
+                  </Link>
+                  <Link
+                    href="/upload"
+                    className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+                  >
+                    Upload City
+                  </Link>
+                  <Link
+                    href="/protected"
+                    className="text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
+                  >
+                    Dashboard
+                  </Link>
+                  {isAdmin && (
+                    <Link
+                      href="/admin"
+                      className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 font-medium"
+                    >
+                      Admin
+                    </Link>
+                  )}
+                  <ThemeToggle />
+                </>
+              ) : (
+                <>
+                  <Link
+                    href="/search"
+                    className="text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
+                  >
+                    Search
+                  </Link>
+                  <Link
+                    href="/login"
+                    className="text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
+                  >
+                    Login
+                  </Link>
+                  <Link
+                    href="/register"
+                    className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+                  >
+                    Sign Up
+                  </Link>
+                  <ThemeToggle />
+                </>
+              )}
+            </nav>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Quick Search Section */}
+        <QuickSearch />
+
+        {/* Most Liked Cities Section */}
+        {topCities.length > 0 && (
+          <div className="mb-12">
+            <div className="mb-8">
+              <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+                Most Liked Cities
+              </h2>
+              <p className="text-gray-600 dark:text-gray-400">
+                The most beloved cities in our community showcase
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {topCities.map((city, index) => (
+                <CityCard key={city.id} city={city} ranking={index + 1} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="mb-8">
+          <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+            Recently Shared Cities
+          </h2>
+          <p className="text-gray-600 dark:text-gray-400">
+            Discover amazing cities created by the Cities: Skylines 2 community
           </p>
         </div>
-        <div className="flex space-x-3">
-          <Link
-            href="/protected"
-            className="text-stone-400 underline hover:text-stone-200 transition-all"
-          >
-            Protected Page
-          </Link>
-          <p className="text-white">·</p>
-          <a
-            href="https://vercel.com/templates/next.js/prisma-postgres-auth-starter"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-stone-400 underline hover:text-stone-200 transition-all"
-          >
-            Deploy to Vercel
-          </a>
+
+        {cities.length === 0 ? (
+          <div className="text-center py-12">
+            <div className="text-gray-400 dark:text-gray-500 text-6xl mb-4">🏙️</div>
+            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              No cities yet!
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-6">
+              Be the first to share your amazing city with the community.
+            </p>
+            {session ? (
+              <Link
+                href="/upload"
+                className="bg-blue-600 text-white px-6 py-3 rounded-md hover:bg-blue-700 transition-colors"
+              >
+                Upload Your City
+              </Link>
+            ) : (
+              <Link
+                href="/register"
+                className="bg-blue-600 text-white px-6 py-3 rounded-md hover:bg-blue-700 transition-colors"
+              >
+                Get Started
+              </Link>
+            )}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {cities.map((city) => (
+              <CityCard key={city.id} city={city} />
+            ))}
+          </div>
+        )}
+      </main>
+
+      {/* Footer */}
+      <footer className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 mt-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="text-center text-gray-600 dark:text-gray-400">
+            <p>Share your Cities: Skylines 2 creations with the world!</p>
+          </div>
         </div>
-      </div>
+      </footer>
     </div>
   );
 }
