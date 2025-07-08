@@ -1,55 +1,53 @@
 import { NextRequest, NextResponse } from 'next/server';
 import path from 'path';
-import fs from 'fs/promises';
-import multer from 'multer';
 import AdmZip from 'adm-zip';
 import { cityTable, getUser, db, ensureCityTableExists, generateUniqueId } from 'app/db';
 import { auth } from 'app/auth';
-import { v4 as uuidv4 } from 'uuid';
 import { uploadToR2, generateFileKey } from 'app/utils/r2';
 
-// Multer setup for handling multipart/form-data
-const upload = multer({ dest: path.join(process.cwd(), 'uploads') });
-
 export async function POST(req: NextRequest) {
+  console.log('Upload request received');
+  
   try {
     // Authenticate user
     const session = await auth();
     const userEmail = session?.user?.email;
     if (!userEmail) {
+      console.log('Upload failed: No user email');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    console.log('User authenticated:', userEmail);
 
     // Parse the incoming form data
     const formData = await req.formData();
     const file = formData.get('file');
 
     if (!file || typeof file === 'string') {
+      console.log('Upload failed: No file or invalid file type');
       return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
     }
+    
+    console.log('File received:', file.name, 'Size:', file.size, 'Type:', file.type);
 
     // Get file data
+    console.log('Processing file...');
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     const originalName = file.name;
     const baseName = path.parse(originalName).name;
     
-    // Create temporary directory for processing
-    const tempDir = path.join(process.cwd(), 'temp');
-    await fs.mkdir(tempDir, { recursive: true });
-    
-    // Create temporary zip file for processing
-    const tempZipPath = path.join(tempDir, `temp-${uuidv4()}.zip`);
-    await fs.writeFile(tempZipPath, buffer as any);
-
-    // Extract the zip to read metadata
-    const zip = new AdmZip(tempZipPath);
+    // Process the zip directly from memory (no temp files needed)
+    console.log('Creating AdmZip from buffer...');
+    const zip = new AdmZip(buffer);
     const zipEntries = zip.getEntries();
     let metadata = null;
     let metadataContent = '';
     
+    console.log('Found', zipEntries.length, 'entries in zip');
+    
     for (const entry of zipEntries) {
       if (entry.entryName.endsWith('.SaveGameMetadata')) {
+        console.log('Found metadata file:', entry.entryName);
         try {
           metadataContent = entry.getData().toString('utf8');
           console.log('Raw metadata length:', metadataContent.length);
@@ -61,13 +59,11 @@ export async function POST(req: NextRequest) {
           console.log('Cleaned content length:', cleanedContent.length);
           
           metadata = JSON.parse(cleanedContent);
+          console.log('Successfully parsed metadata');
           break;
         } catch (parseError) {
           console.error('JSON parse error:', parseError);
           console.error('Content that failed to parse (first 500 chars):', JSON.stringify(metadataContent.substring(0, 500)));
-          
-          // Clean up temporary file on error
-          await fs.unlink(tempZipPath).catch(() => {});
           
           return NextResponse.json({ 
             error: 'Invalid JSON in SaveGameMetadata file',
@@ -77,29 +73,35 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Clean up temporary zip file
-    await fs.unlink(tempZipPath).catch(() => {});
-
     if (!metadata) {
       return NextResponse.json({ error: 'No .SaveGameMetadata found in zip' }, { status: 400 });
     }
 
     // Find userId from email
+    console.log('Finding user by email...');
     const users = await getUser(userEmail);
     const user = users && users[0];
     if (!user) {
+      console.log('User not found for email:', userEmail);
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
+    console.log('User found:', user.id);
 
     // Upload .cok file to R2
+    console.log('Uploading to R2...');
     const fileKey = generateFileKey('saves', originalName, user.id);
+    console.log('Generated file key:', fileKey);
     const uploadResult = await uploadToR2(buffer, fileKey, 'application/octet-stream');
+    console.log('Upload successful, key:', uploadResult.key);
 
     // Ensure City table exists
+    console.log('Ensuring city table exists...');
     await ensureCityTableExists();
 
     // Generate unique city ID
+    console.log('Generating unique city ID...');
     const cityId = await generateUniqueId(cityTable, cityTable.id);
+    console.log('Generated city ID:', cityId);
 
     // Prepare city data for insertion
     const cityData = {
@@ -129,12 +131,15 @@ export async function POST(req: NextRequest) {
     };
 
     // Insert city into database
+    console.log('Inserting city into database...');
     const inserted = await db.insert(cityTable).values(cityData).returning();
+    console.log('City inserted successfully:', inserted[0].id);
 
     return NextResponse.json({ city: inserted[0] });
     
   } catch (error) {
     console.error('Upload error:', error);
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     return NextResponse.json({ 
       error: 'Upload failed', 
       details: error instanceof Error ? error.message : 'Unknown error'

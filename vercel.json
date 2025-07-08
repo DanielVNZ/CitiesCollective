@@ -1,0 +1,12 @@
+{
+  "functions": {
+    "app/api/upload/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/cities/[id]/images/route.ts": {
+      "maxDuration": 30
+    }
+  },
+  "regions": ["cle1"],
+  "framework": "nextjs"
+} 
