@@ -1,0 +1,17 @@
+# Exclude uploads directory from Vercel builds
+uploads/
+uploads/saves/
+
+# Exclude development files
+.env.local
+.env.development.local
+.env.test.local
+
+# Exclude package-lock.json since we're using pnpm
+package-lock.json
+
+# Exclude git directory
+.git/
+
+# Exclude node_modules (should be installed by Vercel)
+node_modules/ 
