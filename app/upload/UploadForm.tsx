@@ -30,22 +30,85 @@ export function UploadForm() {
     setMetadata(null);
     const form = e.currentTarget;
     const formData = new FormData(form);
-    const res = await fetch('/api/upload', {
-      method: 'POST',
-      body: formData,
-    });
-    setLoading(false);
-    if (!res.ok) {
-      const data = await res.json();
-      setError(data.error || 'Upload failed');
+    const file = formData.get('file') as File;
+    
+    if (!file) {
+      setError('Please select a file');
+      setLoading(false);
       return;
     }
-    const data = await res.json();
-    setMetadata(data.city);
     
-    // If images are selected, upload them automatically
-    if (images.length > 0) {
-      await uploadImages(data.city.id);
+    console.log('Starting upload...', file.name, file.size, 'bytes');
+    
+    try {
+      // Step 1: Get presigned URL
+      console.log('Getting presigned URL...');
+      const presignedResponse = await fetch('/api/upload/presigned-url', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fileName: file.name,
+          fileSize: file.size,
+          fileType: file.type,
+        }),
+      });
+      
+      if (!presignedResponse.ok) {
+        const errorData = await presignedResponse.json();
+        throw new Error(errorData.error || 'Failed to get upload URL');
+      }
+      
+      const { uploadUrl, key, fileName } = await presignedResponse.json();
+      console.log('Got presigned URL, uploading to R2...');
+      
+      // Step 2: Upload file directly to R2
+      const uploadResponse = await fetch(uploadUrl, {
+        method: 'PUT',
+        body: file,
+        headers: {
+          'Content-Type': file.type,
+        },
+      });
+      
+      if (!uploadResponse.ok) {
+        throw new Error(`Upload failed: ${uploadResponse.status} ${uploadResponse.statusText}`);
+      }
+      
+      console.log('File uploaded successfully, processing metadata...');
+      
+      // Step 3: Process metadata
+      const metadataResponse = await fetch('/api/upload/process-metadata', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          key: key,
+          fileName: fileName,
+        }),
+      });
+      
+      if (!metadataResponse.ok) {
+        const errorData = await metadataResponse.json();
+        throw new Error(errorData.error || 'Failed to process metadata');
+      }
+      
+      const data = await metadataResponse.json();
+      console.log('Metadata processed successfully:', data);
+      setMetadata(data.city);
+      
+      // If images are selected, upload them automatically
+      if (images.length > 0) {
+        await uploadImages(data.city.id);
+      }
+      
+    } catch (error) {
+      console.error('Upload error:', error);
+      setError(error instanceof Error ? error.message : 'Upload failed');
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -191,6 +254,9 @@ export function UploadForm() {
                   required 
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                  Maximum file size: 3GB
+                </p>
               </div>
               <button 
                 type="submit" 

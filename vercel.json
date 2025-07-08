@@ -1,10 +1,20 @@
 {
   "functions": {
     "app/api/upload/route.ts": {
-      "maxDuration": 60
+      "maxDuration": 60,
+      "memory": 1024
+    },
+    "app/api/upload/presigned-url/route.ts": {
+      "maxDuration": 30,
+      "memory": 512
+    },
+    "app/api/upload/process-metadata/route.ts": {
+      "maxDuration": 120,
+      "memory": 1024
     },
     "app/api/cities/[id]/images/route.ts": {
-      "maxDuration": 30
+      "maxDuration": 30,
+      "memory": 512
     }
   },
   "regions": ["cle1"],

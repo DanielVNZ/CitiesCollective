@@ -61,6 +61,19 @@ export async function getDownloadUrl(key: string, expiresIn = 3600): Promise<str
 }
 
 /**
+ * Generate a presigned URL for uploading a file
+ */
+export async function generatePresignedUrl(key: string, contentType: string, expiresIn = 3600): Promise<string> {
+  const command = new PutObjectCommand({
+    Bucket: R2_BUCKET_NAME,
+    Key: key,
+    ContentType: contentType,
+  });
+
+  return await getSignedUrl(s3Client, command, { expiresIn });
+}
+
+/**
  * Delete a file from R2
  */
 export async function deleteFromR2(key: string): Promise<void> {
