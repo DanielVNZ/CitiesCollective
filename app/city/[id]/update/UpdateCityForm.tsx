@@ -110,7 +110,7 @@ export function UpdateCityForm({ cityId }: UpdateCityFormProps) {
             bg-white dark:bg-gray-800"
         />
         <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-          Upload your .cok save file to update your city's statistics
+          Upload your .cok save file to update your city&apos;s statistics
         </p>
       </div>
 

@@ -97,7 +97,7 @@ export default async function UpdateCityPage({ params }: UpdateCityPageProps) {
             Upload New Save File
           </h3>
           <p className="text-gray-600 dark:text-gray-400 mb-6">
-            Upload a new save file to update your city's statistics. Your existing images will be preserved.
+            Upload a new save file to update your city&apos;s statistics. Your existing images will be preserved.
           </p>
           <UpdateCityForm cityId={city.id} />
         </div>
@@ -111,7 +111,7 @@ export default async function UpdateCityPage({ params }: UpdateCityPageProps) {
             <p>1. Continue playing your city in Cities: Skylines 2</p>
             <p>2. Save your game (this creates a .cok file)</p>
             <p>3. Find your save file in: <code className="bg-blue-100 dark:bg-blue-900/40 px-1 rounded">%USERPROFILE%\AppData\LocalLow\Colossal Order\Cities Skylines II\Saves\</code></p>
-            <p>4. Upload the .cok file here to update your city's stats</p>
+            <p>4. Upload the .cok file here to update your city&apos;s stats</p>
             <p>5. Your existing screenshots will be preserved</p>
           </div>
         </div>

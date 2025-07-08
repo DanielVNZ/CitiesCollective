@@ -232,7 +232,7 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
               <div className="text-center py-8">
                 <div className="text-4xl mb-4">🎮</div>
                 <p className="text-gray-600 dark:text-gray-400 font-medium">
-                  This city uses no mods - it's completely vanilla!
+                  This city uses no mods - it&apos;s completely vanilla!
                 </p>
                 <p className="text-sm text-gray-500 dark:text-gray-500 mt-2">
                   This save file will work without any additional mods or dependencies.
