@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    const { key, fileName } = await request.json();
+    const { key, fileName, downloadable = true } = await request.json();
 
     if (!key || !fileName) {
       return NextResponse.json({ error: 'Missing key or fileName' }, { status: 400 });
@@ -133,6 +133,7 @@ export async function POST(request: NextRequest) {
       modsEnabled: metadata.modsEnabled,
       fileName: fileName,
       filePath: key, // Store the R2 key
+      downloadable: downloadable,
     };
 
     console.log('Inserting city into database...');

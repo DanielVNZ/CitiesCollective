@@ -22,6 +22,7 @@ export function UploadForm() {
   const [imageSuccess, setImageSuccess] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
+  const [downloadable, setDownloadable] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -88,6 +89,7 @@ export function UploadForm() {
         body: JSON.stringify({
           key: key,
           fileName: fileName,
+          downloadable: downloadable,
         }),
       });
       
@@ -264,6 +266,24 @@ export function UploadForm() {
                   Maximum file size: 3GB
                 </p>
               </div>
+              
+              {/* Downloadable checkbox */}
+              <div className="flex items-center">
+                <input
+                  id="downloadable"
+                  type="checkbox"
+                  checked={downloadable}
+                  onChange={(e) => setDownloadable(e.target.checked)}
+                  className="w-4 h-4 text-blue-600 bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 dark:focus:ring-blue-600 focus:ring-2"
+                />
+                <label htmlFor="downloadable" className="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Allow others to download this city
+                </label>
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                When enabled, other users can download your .cok save file. You can change this later in your dashboard.
+              </p>
+              
               <button 
                 type="submit" 
                 className="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" 
@@ -422,6 +442,7 @@ export function UploadForm() {
                   setImages([]);
                   setImageSuccess(false);
                   setImageError(null);
+                  setDownloadable(true); // Reset to default
                 }}
                 className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
               >

@@ -69,6 +69,7 @@ export const cityTable = pgTable('City', {
   modsEnabled: text('modsEnabled').array(),
   fileName: varchar('fileName', { length: 255 }),
   filePath: varchar('filePath', { length: 500 }),
+  downloadable: boolean('downloadable').default(true),
   uploadedAt: timestamp('uploadedAt', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).defaultNow(),
 });
@@ -358,6 +359,7 @@ async function ensureCityTableExists() {
         "modsEnabled" TEXT[],
         "fileName" VARCHAR(255),
         "filePath" VARCHAR(500),
+        "downloadable" BOOLEAN DEFAULT TRUE,
         "uploadedAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
         "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );`;
@@ -376,6 +378,22 @@ async function ensureCityTableExists() {
       await client`
         ALTER TABLE "City" ADD COLUMN "filePath" VARCHAR(500);`;
       console.log('filePath column added successfully');
+    }
+
+    // Check if downloadable column exists, if not add it
+    const downloadableColumnExists = await client`
+      SELECT EXISTS (
+        SELECT FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = 'City'
+        AND column_name = 'downloadable'
+      );`;
+    
+    if (!downloadableColumnExists[0].exists) {
+      console.log('Adding downloadable column to existing City table...');
+      await client`
+        ALTER TABLE "City" ADD COLUMN "downloadable" BOOLEAN DEFAULT TRUE;`;
+      console.log('downloadable column added successfully');
     }
   }
 
@@ -521,6 +539,7 @@ export async function getCitiesByUser(userId: number) {
     gameMode: cityTable.gameMode,
     fileName: cityTable.fileName,
     filePath: cityTable.filePath,
+    downloadable: cityTable.downloadable,
     uploadedAt: cityTable.uploadedAt,
     primaryImageThumbnail: cityImagesTable.thumbnailPath,
     modsEnabled: cityTable.modsEnabled,
@@ -562,6 +581,7 @@ export async function getCityById(id: number) {
     modsEnabled: cityTable.modsEnabled,
     fileName: cityTable.fileName,
     filePath: cityTable.filePath,
+    downloadable: cityTable.downloadable,
     uploadedAt: cityTable.uploadedAt,
     updatedAt: cityTable.updatedAt,
   }).from(cityTable).where(eq(cityTable.id, id)).limit(1);
@@ -588,6 +608,16 @@ export async function adminDeleteCityById(cityId: number) {
   // Admin can delete any city without ownership check
   const result = await db.delete(cityTable)
     .where(eq(cityTable.id, cityId))
+    .returning();
+  return result[0] || null;
+}
+
+export async function updateCityDownloadable(cityId: number, userId: number, downloadable: boolean) {
+  await ensureCityTableExists();
+  // Only allow users to update their own cities
+  const result = await db.update(cityTable)
+    .set({ downloadable, updatedAt: new Date() })
+    .where(and(eq(cityTable.id, cityId), eq(cityTable.userId, userId)))
     .returning();
   return result[0] || null;
 }

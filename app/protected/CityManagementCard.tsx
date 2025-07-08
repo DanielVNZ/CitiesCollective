@@ -14,6 +14,7 @@ interface City {
   gameMode: string;
   uploadedAt: Date | null;
   fileName: string;
+  downloadable: boolean;
   modsEnabled?: string[] | null;
 }
 
@@ -24,6 +25,8 @@ interface CityManagementCardProps {
 export function CityManagementCard({ city }: CityManagementCardProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [downloadable, setDownloadable] = useState(city.downloadable);
+  const [isUpdatingDownloadable, setIsUpdatingDownloadable] = useState(false);
 
   const formatNumber = (num: number) => {
     // For very large numbers, use abbreviations
@@ -77,6 +80,32 @@ export function CityManagementCard({ city }: CityManagementCardProps) {
     const shareUrl = `${window.location.origin}/city/${city.id}`;
     navigator.clipboard.writeText(shareUrl);
     alert('Share link copied to clipboard!');
+  };
+
+  const toggleDownloadable = async () => {
+    setIsUpdatingDownloadable(true);
+    try {
+      const response = await fetch(`/api/cities/${city.id}/downloadable`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          downloadable: !downloadable,
+        }),
+      });
+
+      if (response.ok) {
+        setDownloadable(!downloadable);
+      } else {
+        const error = await response.json();
+        alert(`Failed to update download setting: ${error.error}`);
+      }
+    } catch (error) {
+      alert('Failed to update download setting. Please try again.');
+    } finally {
+      setIsUpdatingDownloadable(false);
+    }
   };
 
   return (
@@ -138,6 +167,35 @@ export function CityManagementCard({ city }: CityManagementCardProps) {
             <div>
               <span className="font-medium">Uploaded:</span> {formatDate(city.uploadedAt)}
             </div>
+          </div>
+        </div>
+
+        {/* Download Settings */}
+        <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm font-medium text-gray-900 dark:text-white">
+                Allow Downloads
+              </div>
+              <div className="text-xs text-gray-600 dark:text-gray-400">
+                Let others download your .cok save file
+              </div>
+            </div>
+            <button
+              onClick={toggleDownloadable}
+              disabled={isUpdatingDownloadable}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                downloadable
+                  ? 'bg-blue-600'
+                  : 'bg-gray-200 dark:bg-gray-600'
+              } ${isUpdatingDownloadable ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  downloadable ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
           </div>
         </div>
 

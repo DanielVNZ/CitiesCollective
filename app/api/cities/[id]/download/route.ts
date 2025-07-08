@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCityById } from 'app/db';
+import { getCityById, getUser } from 'app/db';
 import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { auth } from 'app/auth';
 
 // Initialize S3 client for R2
 const s3Client = new S3Client({
@@ -32,6 +33,21 @@ export async function GET(
     // Check if city has a file path (R2 key)
     if (!city.filePath) {
       return NextResponse.json({ error: 'No file available for download' }, { status: 404 });
+    }
+
+    // Check if user is authenticated and if they own the city
+    const session = await auth();
+    let isOwner = false;
+    
+    if (session?.user?.email) {
+      const users = await getUser(session.user.email);
+      const user = users && users[0];
+      isOwner = user && user.id === city.userId;
+    }
+
+    // Check if city is downloadable (allow owner to always download)
+    if (!city.downloadable && !isOwner) {
+      return NextResponse.json({ error: 'This city is not available for download' }, { status: 403 });
     }
 
     try {

@@ -1,10 +1,11 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { getCityById, getUserById, getCityImages } from 'app/db';
+import { getCityById, getUserById, getCityImages, getUser } from 'app/db';
 import { ImageGallery } from './ImageGallery';
 import { LikeButton } from 'app/components/LikeButton';
 import { FavoriteButton } from 'app/components/FavoriteButton';
 import { Comments } from 'app/components/Comments';
+import { auth } from 'app/auth';
 
 interface CityDetailPageProps {
   params: {
@@ -29,6 +30,15 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
 
   // Get the user who uploaded this city
   const user = city.userId ? await getUserById(city.userId) : null;
+
+  // Check if current user is the owner
+  const session = await auth();
+  let isOwner = false;
+  if (session?.user?.email) {
+    const currentUserData = await getUser(session.user.email);
+    const currentUser = currentUserData && currentUserData[0];
+    isOwner = currentUser && currentUser.id === city.userId;
+  }
 
   const formatNumber = (num: number | null) => {
     if (!num) return '0';
@@ -109,7 +119,7 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
                 </span>
               </div>
               {/* Download Button */}
-              {city.filePath && (
+              {city.filePath && (city.downloadable || isOwner) && (
                 <div>
                   <a
                     href={`/api/cities/${city.id}/download`}
@@ -120,7 +130,21 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
                     Download Save File
+                    {isOwner && !city.downloadable && (
+                      <span className="ml-2 text-xs bg-green-500 px-2 py-1 rounded">Owner</span>
+                    )}
                   </a>
+                </div>
+              )}
+              {/* Show message when download is disabled */}
+              {city.filePath && !city.downloadable && !isOwner && (
+                <div className="text-right">
+                  <div className="inline-flex items-center px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 text-sm font-medium rounded-lg">
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m0 0v2m0-2h2m-2 0H10m2-10V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Download Disabled
+                  </div>
                 </div>
               )}
             </div>
