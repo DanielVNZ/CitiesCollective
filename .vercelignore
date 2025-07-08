@@ -1,6 +1,7 @@
 # Exclude uploads directory from Vercel builds
-uploads/
-uploads/saves/
+uploads
+uploads/saves
+uploads/saves/*.cok
 
 # Exclude development files
 .env.local
@@ -9,9 +10,13 @@ uploads/saves/
 
 # Exclude package-lock.json since we're using pnpm
 package-lock.json
+yarn.lock
 
 # Exclude git directory
-.git/
+.git
 
 # Exclude node_modules (should be installed by Vercel)
-node_modules/ 
+node_modules
+
+# Exclude any nested directories that might cause recursion
+**/nextjs-typescript-starter 
