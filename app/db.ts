@@ -116,6 +116,13 @@ const favoritesTable = pgTable('favorites', {
   createdAt: timestamp('createdAt').defaultNow(),
 });
 
+const commentLikesTable = pgTable('commentLikes', {
+  id: integer('id').primaryKey(),
+  userId: integer('userId'),
+  commentId: integer('commentId').references(() => commentsTable.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('createdAt').defaultNow(),
+});
+
 const moderationSettingsTable = pgTable('moderationSettings', {
   id: serial('id').primaryKey(),
   key: varchar('key', { length: 100 }).unique().notNull(),
@@ -1234,6 +1241,39 @@ async function ensureFavoritesTableExists() {
   tableInitCache.add(cacheKey);
 }
 
+async function ensureCommentLikesTableExists() {
+  const cacheKey = 'commentLikes';
+  
+  // Return if already initialized
+  if (tableInitCache.has(cacheKey)) {
+    return;
+  }
+  
+  const result = await client`
+    SELECT EXISTS (
+      SELECT FROM information_schema.tables 
+      WHERE table_schema = 'public' 
+      AND table_name = 'commentLikes'
+    );`;
+
+  if (!result[0].exists) {
+    await client`
+      CREATE TABLE "commentLikes" (
+        id SERIAL PRIMARY KEY,
+        "userId" INTEGER,
+        "commentId" INTEGER REFERENCES "comments"(id) ON DELETE CASCADE,
+        "createdAt" TIMESTAMP DEFAULT NOW()
+      );`;
+    
+    // Create unique constraint to prevent duplicate likes
+    await client`
+      CREATE UNIQUE INDEX commentLikes_user_comment_unique ON "commentLikes"("userId", "commentId");`;
+  }
+  
+  // Mark as initialized
+  tableInitCache.add(cacheKey);
+}
+
 // Community features functions
 export async function toggleLike(userId: number, cityId: number) {
   await ensureLikesTableExists();
@@ -1290,8 +1330,9 @@ export async function addComment(userId: number, cityId: number, content: string
   return comment[0];
 }
 
-export async function getCityComments(cityId: number) {
+export async function getCityComments(cityId: number, requestUserId?: number, sortBy: 'recent' | 'likes' = 'likes') {
   await ensureCommentsTableExists();
+  await ensureCommentLikesTableExists();
   await ensureTableExists();
   
   const userTable = await ensureTableExists();
@@ -1304,13 +1345,39 @@ export async function getCityComments(cityId: number) {
     userId: commentsTable.userId,
     username: userTable.username,
     userEmail: userTable.email,
+    likesCount: sql<number>`COALESCE(COUNT(${commentLikesTable.id}), 0)`.as('likesCount'),
   })
     .from(commentsTable)
     .leftJoin(userTable, eq(commentsTable.userId, userTable.id))
+    .leftJoin(commentLikesTable, eq(commentLikesTable.commentId, commentsTable.id))
     .where(eq(commentsTable.cityId, cityId))
-    .orderBy(desc(commentsTable.createdAt));
+    .groupBy(commentsTable.id, userTable.id)
+    .orderBy(
+      sortBy === 'likes' 
+        ? desc(sql<number>`COALESCE(COUNT(${commentLikesTable.id}), 0)`)
+        : desc(commentsTable.createdAt)
+    );
   
-  return comments;
+  // If user is provided, check which comments they've liked
+  if (requestUserId) {
+    const userLikes = await db.select({
+      commentId: commentLikesTable.commentId,
+    })
+      .from(commentLikesTable)
+      .where(eq(commentLikesTable.userId, requestUserId));
+    
+    const likedCommentIds = new Set(userLikes.map(like => like.commentId));
+    
+    return comments.map(comment => ({
+      ...comment,
+      isLikedByUser: likedCommentIds.has(comment.id),
+    }));
+  }
+  
+  return comments.map(comment => ({
+    ...comment,
+    isLikedByUser: false,
+  }));
 }
 
 export async function getAllComments() {
@@ -1359,6 +1426,50 @@ export async function deleteCommentAsAdmin(commentId: number) {
     .returning();
   
   return result[0] || null;
+}
+
+// Comment like functions
+export async function toggleCommentLike(userId: number, commentId: number) {
+  await ensureCommentLikesTableExists();
+  
+  // Check if like already exists
+  const existingLike = await db.select()
+    .from(commentLikesTable)
+    .where(and(eq(commentLikesTable.userId, userId), eq(commentLikesTable.commentId, commentId)))
+    .limit(1);
+  
+  if (existingLike.length > 0) {
+    // Unlike
+    await db.delete(commentLikesTable)
+      .where(and(eq(commentLikesTable.userId, userId), eq(commentLikesTable.commentId, commentId)));
+    return { liked: false };
+  } else {
+    // Like
+    const likeId = await generateUniqueId(commentLikesTable, commentLikesTable.id);
+    await db.insert(commentLikesTable).values({ id: likeId, userId, commentId });
+    return { liked: true };
+  }
+}
+
+export async function getCommentLikes(commentId: number) {
+  await ensureCommentLikesTableExists();
+  
+  const likes = await db.select({ count: sql<number>`count(*)` })
+    .from(commentLikesTable)
+    .where(eq(commentLikesTable.commentId, commentId));
+  
+  return likes[0]?.count || 0;
+}
+
+export async function isCommentLikedByUser(userId: number, commentId: number) {
+  await ensureCommentLikesTableExists();
+  
+  const like = await db.select()
+    .from(commentLikesTable)
+    .where(and(eq(commentLikesTable.userId, userId), eq(commentLikesTable.commentId, commentId)))
+    .limit(1);
+  
+  return like.length > 0;
 }
 
 // Moderation settings functions

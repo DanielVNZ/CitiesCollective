@@ -149,8 +149,17 @@ City (
 - [x] Visual feedback - Drag indicators, hover states, and confirmation dialogs
 - [x] Safety features - Prevent deletion of only primary image, validation checks
 
+### Phase 11: Comment System Enhancement ✅ COMPLETED
+- [x] Comment likes database schema - Add commentLikes table with foreign key to comments
+- [x] Comment like API endpoints - Toggle likes on comments with user authentication
+- [x] Comment sorting functionality - Sort comments by "Most Liked" (default) or "Most Recent"
+- [x] Frontend comment likes - Heart icon buttons with like counts and visual feedback
+- [x] Sorting controls - Toggle buttons to switch between sorting modes
+- [x] Real-time updates - Optimistic UI updates for immediate feedback
+- [x] Authentication integration - Redirect to login if user not authenticated
+
 ### Current Status
-✅ **IMAGE MANAGEMENT SYSTEM COMPLETE!** The Cities: Skylines 2 sharing platform now includes comprehensive image management for city owners.
+✅ **COMMENT SYSTEM ENHANCEMENT COMPLETE!** The Cities: Skylines 2 sharing platform now includes enhanced comment interactions with likes and sorting.
 
 **Core Features:**
 - Complete user authentication with username system
@@ -159,11 +168,14 @@ City (
 - User profiles and dashboards with profile editing
 - Community interactions (likes, comments, favorites)
 - Optional PDX and Discord username display
-- **NEW**: Full image management system for city owners
+- Full image management system for city owners
+- **NEW**: Enhanced comment system with likes and sorting
 
 **Community Features:**
 - **Like System**: Users can like cities with heart icons and real-time counts
 - **Comment System**: Full commenting with user attribution, timestamps, and delete functionality
+- **Comment Likes**: Users can like/unlike individual comments with visual feedback
+- **Comment Sorting**: Sort comments by "Most Liked" (default) or "Most Recent"
 - **Favorites System**: Personal favorites collection with dedicated page
 - **Interactive UI**: Client-side components with proper authentication handling
 - **Social Navigation**: Easy access to community features throughout the app
@@ -185,6 +197,8 @@ City (
 - Secure user authorization for all community actions and profile updates
 - Real-time UI updates without page refreshes
 - Profile editing with form validation and success/error feedback
+- **NEW**: Comment like system with optimistic updates and proper state management
+- **NEW**: Dynamic comment sorting with URL parameter support
 
 **Next Priority:** The platform is now feature-complete with robust community features and enhanced user profiles. Future enhancements could include:
 - Advanced community features (user following, notifications)

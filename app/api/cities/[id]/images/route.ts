@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from 'app/auth';
-import { client } from 'app/db';
-import { writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
-import { v4 as uuidv4 } from 'uuid';
+import { createCityImage, getCityImages } from 'app/db';
+import { uploadToR2, generateImageKeys } from 'app/utils/r2';
 
 export async function POST(
   request: NextRequest,
@@ -20,27 +18,26 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid city ID' }, { status: 400 });
     }
 
-    // Verify user owns this city
-    const cityResult = await client`
-      SELECT "userId" FROM "City" WHERE id = ${cityId}`;
-    
-    if (cityResult.length === 0) {
+    // Get user info and verify ownership using db functions
+    const { getUser, getCityById } = await import('app/db');
+    const users = await getUser(session.user.email);
+    if (users.length === 0) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    const user = users[0];
+    const city = await getCityById(cityId);
+    if (!city) {
       return NextResponse.json({ error: 'City not found' }, { status: 404 });
     }
 
-    const city = cityResult[0];
-    const userResult = await client`
-      SELECT id FROM "User" WHERE email = ${session.user.email}`;
-    
-    if (userResult.length === 0 || userResult[0].id !== city.userId) {
+    if (city.userId !== user.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
     // Check existing image count
-    const existingImagesResult = await client`
-      SELECT COUNT(*) as count FROM "cityImages" WHERE "cityId" = ${cityId}`;
-    
-    const existingImageCount = parseInt(existingImagesResult[0].count);
+    const existingImages = await getCityImages(cityId);
+    const existingImageCount = existingImages.length;
 
     const formData = await request.formData();
     const files = formData.getAll('images') as File[];
@@ -71,51 +68,46 @@ export async function POST(
         continue; // Skip files that are too large
       }
 
-      // Generate unique filename
-      const fileId = uuidv4();
-      const fileExtension = file.name.split('.').pop()?.toLowerCase() || 'jpg';
-      const fileName = `${fileId}-${Date.now()}.${fileExtension}`;
+      try {
+        // Convert File to Buffer
+        const imageBuffer = Buffer.from(await file.arrayBuffer());
+        
+        // Generate unique keys for R2 storage
+        const imageKeys = generateImageKeys(file.name, user.id);
+        
+        // Upload to R2 (using same image for all sizes for now)
+        const [thumbnailResult, mediumResult, largeResult, originalResult] = await Promise.all([
+          uploadToR2(imageBuffer, imageKeys.thumbnail, file.type),
+          uploadToR2(imageBuffer, imageKeys.medium, file.type),
+          uploadToR2(imageBuffer, imageKeys.large, file.type),
+          uploadToR2(imageBuffer, imageKeys.original, file.type),
+        ]);
 
-      // Create directories
-      const uploadDir = join(process.cwd(), 'public', 'uploads', 'cities');
-      const thumbnailDir = join(uploadDir, 'thumbnails');
-      const mediumDir = join(uploadDir, 'medium');
-      const largeDir = join(uploadDir, 'large');
-      const originalDir = join(uploadDir, 'original');
+        // Extract filename from key for database storage
+        const fileName = imageKeys.thumbnail.split('/').pop() || `${Date.now()}.webp`;
 
-      await mkdir(thumbnailDir, { recursive: true });
-      await mkdir(mediumDir, { recursive: true });
-      await mkdir(largeDir, { recursive: true });
-      await mkdir(originalDir, { recursive: true });
+        // Save to database using existing function
+        const imageData = {
+          cityId,
+          fileName,
+          originalName: file.name,
+          fileSize: file.size,
+          mimeType: file.type,
+          width: 800, // Default for now
+          height: 600, // Default for now
+          thumbnailPath: thumbnailResult.url,
+          mediumPath: mediumResult.url,
+          largePath: largeResult.url,
+          originalPath: originalResult.url,
+          isPrimary: false,
+        };
 
-      // Save original file
-      const originalPath = join(originalDir, fileName);
-      const originalBuffer = Buffer.from(await file.arrayBuffer());
-      await writeFile(originalPath, originalBuffer as any);
+        const savedImage = await createCityImage(imageData);
+        uploadedImages.push(savedImage);
 
-      // For now, we'll use the same image for all sizes (you can add image processing later)
-      const thumbnailPath = join(thumbnailDir, fileName);
-      const mediumPath = join(mediumDir, fileName);
-      const largePath = join(largeDir, fileName);
-
-      await writeFile(thumbnailPath, originalBuffer as any);
-      await writeFile(mediumPath, originalBuffer as any);
-      await writeFile(largePath, originalBuffer as any);
-
-      // Save to database
-      const imageResult = await client`
-        INSERT INTO "cityImages" (
-          "cityId", "fileName", "originalName", "fileSize", "mimeType", 
-          "width", "height", "thumbnailPath", "mediumPath", "largePath", "originalPath", "isPrimary"
-        ) VALUES (
-          ${cityId}, ${fileName}, ${file.name}, ${file.size}, ${file.type},
-          ${null}, ${null}, ${`/uploads/cities/thumbnails/${fileName}`}, 
-          ${`/uploads/cities/medium/${fileName}`}, ${`/uploads/cities/large/${fileName}`}, 
-          ${`/uploads/cities/original/${fileName}`}, ${false}
-        ) RETURNING *`;
-
-      if (imageResult.length > 0) {
-        uploadedImages.push(imageResult[0]);
+      } catch (fileError) {
+        console.error('Error processing file:', file.name, fileError);
+        // Continue with other files
       }
     }
 
@@ -141,9 +133,8 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid city ID' }, { status: 400 });
     }
 
-    // Get all images for this city
-    const images = await client`
-      SELECT * FROM "CityImages" WHERE "cityId" = ${cityId}`;
+    // Get all images for this city using existing function
+    const images = await getCityImages(cityId);
 
     return NextResponse.json({
       cityId,

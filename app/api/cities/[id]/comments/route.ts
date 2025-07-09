@@ -13,7 +13,26 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid city ID' }, { status: 400 });
     }
 
-    const comments = await getCityComments(cityId);
+    // Get sort parameter from query string
+    const { searchParams } = new URL(request.url);
+    const sortBy = searchParams.get('sortBy') === 'recent' ? 'recent' : 'likes';
+
+    // Get user ID for like status if authenticated
+    let userId: number | undefined;
+    try {
+      const session = await auth();
+      if (session?.user?.email) {
+        const { getUser } = await import('app/db');
+        const users = await getUser(session.user.email);
+        if (users.length > 0) {
+          userId = users[0].id;
+        }
+      }
+    } catch (error) {
+      // User not authenticated, continue without user ID
+    }
+
+    const comments = await getCityComments(cityId, userId, sortBy);
     
     return NextResponse.json({ comments });
   } catch (error) {
