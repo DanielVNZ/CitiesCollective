@@ -162,7 +162,7 @@ export function UploadForm() {
     
     setImages(prev => {
       const combined = [...prev, ...validFiles];
-      return combined.slice(0, 10); // Maximum 10 images
+      return combined.slice(0, 5); // Maximum 5 images
     });
   };
 
@@ -328,7 +328,7 @@ export function UploadForm() {
                   </button>
                 </p>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Up to 10 images, max 10MB each
+                  Up to 5 images, max 10MB each
                 </p>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
                   Supports JPEG, PNG, WebP, GIF
@@ -348,7 +348,7 @@ export function UploadForm() {
             {images.length > 0 && (
               <div className="mt-4">
                 <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Selected Images ({images.length}/10)
+                  Selected Images ({images.length}/5)
                 </p>
                 <div className="grid grid-cols-2 gap-2">
                   {images.map((image, index) => (

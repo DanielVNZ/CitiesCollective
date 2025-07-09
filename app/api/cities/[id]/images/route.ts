@@ -36,6 +36,12 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
+    // Check existing image count
+    const existingImagesResult = await client`
+      SELECT COUNT(*) as count FROM "cityImages" WHERE "cityId" = ${cityId}`;
+    
+    const existingImageCount = parseInt(existingImagesResult[0].count);
+
     const formData = await request.formData();
     const files = formData.getAll('images') as File[];
 
@@ -43,8 +49,14 @@ export async function POST(
       return NextResponse.json({ error: 'No images provided' }, { status: 400 });
     }
 
-    if (files.length > 10) {
-      return NextResponse.json({ error: 'Maximum 10 images allowed' }, { status: 400 });
+    if (files.length > 5) {
+      return NextResponse.json({ error: 'Maximum 5 images allowed per upload' }, { status: 400 });
+    }
+
+    if (existingImageCount + files.length > 5) {
+      return NextResponse.json({ 
+        error: `Cannot upload ${files.length} images. This city already has ${existingImageCount} images. Maximum 5 images allowed per city.` 
+      }, { status: 400 });
     }
 
     const uploadedImages = [];

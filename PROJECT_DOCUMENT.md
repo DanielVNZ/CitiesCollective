@@ -208,7 +208,7 @@ City (
 - **Formats**: All images converted to WebP for optimization, original format kept as backup
 - **Quality**: 85% for WebP thumbnails/medium/large, 90% for original WebP
 - **Storage**: Organized in `/public/uploads/cities/` with subdirectories for each size
-- **Validation**: Max 10MB per image, up to 10 images per city, supports JPEG/PNG/WebP/GIF
+- **Validation**: Max 10MB per image, up to 5 images per city, supports JPEG/PNG/WebP/GIF
 
 ## File Storage System ✅
 - **Save Files**: Stored in `/uploads/saves/` with UUID-based naming for uniqueness

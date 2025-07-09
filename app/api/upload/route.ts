@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import path from 'path';
 import AdmZip from 'adm-zip';
-import { cityTable, getUser, db, ensureCityTableExists, generateUniqueId } from 'app/db';
+import { cityTable, getUser, db, ensureCityTableExists, generateUniqueId, getCityCountByUser } from 'app/db';
 import { auth } from 'app/auth';
 import { uploadToR2, generateFileKey } from 'app/utils/r2';
 
@@ -93,6 +93,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
     console.log('User found:', user.id);
+
+    // Check city count limit (max 3 cities per user)
+    console.log('Checking city count limit...');
+    const cityCount = await getCityCountByUser(user.id);
+    console.log('User has', cityCount, 'cities');
+    if (cityCount >= 3) {
+      console.log('City limit reached for user:', user.id);
+      return NextResponse.json({ 
+        error: 'City limit reached. You can only upload a maximum of 3 cities.' 
+      }, { status: 400 });
+    }
 
     // Upload .cok file to R2
     console.log('Uploading to R2...');

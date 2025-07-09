@@ -594,6 +594,18 @@ export async function getCitiesByUser(userId: number) {
   return cities;
 }
 
+export async function getCityCountByUser(userId: number) {
+  await ensureCityTableExists();
+  
+  const result = await db.select({
+    count: sql<number>`cast(count(*) as integer)`
+  })
+    .from(cityTable)
+    .where(eq(cityTable.userId, userId));
+  
+  return result[0]?.count || 0;
+}
+
 export async function getCityById(id: number) {
   await ensureCityTableExists();
   const result = await db.select({

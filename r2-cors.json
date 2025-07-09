@@ -2,7 +2,11 @@
   {
     "AllowedOrigins": [
       "http://localhost:3000",
-      "https://*.vercel.app"
+      "https://*.vercel.app",
+      "https://citiescollective.space",
+      "https://www.citiescollective.space",
+      "https://citiescollecive.space",
+      "https://www.citiescollecive.space"
     ],
     "AllowedMethods": [
       "GET",

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from 'app/auth';
-import { cityTable, getUser, db, ensureCityTableExists, generateUniqueId } from 'app/db';
+import { cityTable, getUser, db, ensureCityTableExists, generateUniqueId, getCityCountByUser } from 'app/db';
 import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import AdmZip from 'adm-zip';
 
@@ -31,6 +31,17 @@ export async function POST(request: NextRequest) {
     if (!user) {
       console.log('User not found');
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    // Check city count limit (max 3 cities per user)
+    console.log('Checking city count limit...');
+    const cityCount = await getCityCountByUser(user.id);
+    console.log('User has', cityCount, 'cities');
+    if (cityCount >= 3) {
+      console.log('City limit reached for user:', user.id);
+      return NextResponse.json({ 
+        error: 'City limit reached. You can only upload a maximum of 3 cities.' 
+      }, { status: 400 });
     }
 
     const { key, fileName, downloadable = true } = await request.json();
