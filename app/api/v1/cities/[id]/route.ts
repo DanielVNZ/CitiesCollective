@@ -42,8 +42,9 @@ export async function GET(
     const commentCount = await getCityCommentCount(cityId);
 
     // Create download URL if downloadable
+    const baseUrl = new URL(request.url).origin;
     const downloadUrl = city.downloadable 
-      ? `${process.env.NEXT_PUBLIC_APP_URL}/api/cities/${city.id}/download`
+      ? `${baseUrl}/api/cities/${city.id}/download`
       : null;
 
     // Format images
