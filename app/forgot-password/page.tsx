@@ -44,7 +44,7 @@ export default function ForgotPassword() {
         <div className="flex flex-col items-center justify-center space-y-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-6 pt-8 text-center sm:px-16">
           <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Reset Password</h3>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Enter your email address and we'll send you a link to reset your password
+            Enter your email address and we&apos;ll send you a link to reset your password
           </p>
         </div>
         
