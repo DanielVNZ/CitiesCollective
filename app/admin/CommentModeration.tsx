@@ -71,7 +71,15 @@ export function CommentModeration({ comments }: CommentModerationProps) {
 
   const formatDate = (date: Date | null) => {
     if (!date) return 'Unknown date';
-    return date.toLocaleDateString() + ' at ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const d = new Date(date);
+    const month = (d.getMonth() + 1).toString().padStart(2, '0');
+    const day = d.getDate().toString().padStart(2, '0');
+    const year = d.getFullYear();
+    const hours = d.getHours().toString().padStart(2, '0');
+    const minutes = d.getMinutes().toString().padStart(2, '0');
+    const ampm = d.getHours() >= 12 ? 'PM' : 'AM';
+    const displayHours = (d.getHours() % 12 || 12).toString().padStart(2, '0');
+    return `${month}/${day}/${year} at ${displayHours}:${minutes} ${ampm}`;
   };
 
   const getUserDisplayName = (comment: Comment) => {

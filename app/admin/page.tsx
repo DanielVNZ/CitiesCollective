@@ -6,6 +6,7 @@ import { AdminUserManagement } from './AdminUserManagement';
 import { CommentModeration } from './CommentModeration';
 import { ModerationSettings } from './ModerationSettings';
 import { UserCityManagement } from './UserCityManagement';
+import ApiKeyManagement from './ApiKeyManagement';
 
 export default async function AdminPage() {
   const session = await auth();
@@ -97,6 +98,11 @@ export default async function AdminPage() {
         {/* Moderation Settings */}
         <div className="mt-8">
           <ModerationSettings />
+        </div>
+
+        {/* API Key Management */}
+        <div className="mt-8">
+          <ApiKeyManagement />
         </div>
       </main>
     </div>

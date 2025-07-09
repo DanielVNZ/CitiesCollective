@@ -169,8 +169,18 @@ City (
 - [x] Login page integration - Added "Forgot Password?" link to login page
 - [x] Error handling - Comprehensive error messages and user feedback
 
+### Phase 13: External API System ✅ COMPLETED
+- [x] Database schema for API keys - Add apiKeys table with secure key storage and user association
+- [x] API key authentication middleware - Secure validation with last-used tracking
+- [x] API endpoints for city retrieval - Get cities by username and by city ID with detailed information
+- [x] Admin panel for API key management - Generate, view, activate/deactivate, and delete API keys
+- [x] CORS support - Cross-origin requests enabled with proper headers
+- [x] API documentation page - Comprehensive documentation with examples and error codes
+- [x] Security features - API key validation, rate limiting considerations, and secure key generation
+- [x] Download link integration - Include download URLs for cities when downloadable is enabled
+
 ### Current Status
-✅ **PASSWORD RESET SYSTEM COMPLETE!** The Cities: Skylines 2 sharing platform now includes a complete password reset system with email notifications.
+✅ **EXTERNAL API SYSTEM COMPLETE!** The Cities: Skylines 2 sharing platform now includes a comprehensive external API system with secure API key authentication.
 
 **Core Features:**
 - Complete user authentication with username system
@@ -182,6 +192,15 @@ City (
 - Full image management system for city owners
 - Enhanced comment system with likes and sorting
 - **NEW**: Complete password reset system with email notifications
+
+**External API Features:**
+- **Secure API Key System**: Cryptographically secure API keys with user association and last-used tracking
+- **Comprehensive Endpoints**: Get cities by username and detailed city information by ID
+- **Admin Management**: Full admin panel for generating, managing, and monitoring API keys
+- **CORS Support**: Cross-origin requests enabled for external applications
+- **Complete Documentation**: Comprehensive API documentation with examples and error codes
+- **Security Features**: API key validation, rate limiting considerations, and secure key generation
+- **Download Integration**: Include download URLs for cities when downloadable is enabled
 
 **Password Reset Features:**
 - **Secure Token System**: Cryptographically secure tokens with 1-hour expiration

@@ -138,6 +138,16 @@ const passwordResetTokensTable = pgTable('passwordResetTokens', {
   createdAt: timestamp('createdAt').defaultNow(),
 });
 
+const apiKeysTable = pgTable('apiKeys', {
+  id: serial('id').primaryKey(),
+  userId: integer('userId').notNull(),
+  name: varchar('name', { length: 255 }).notNull(),
+  key: varchar('key', { length: 255 }).unique().notNull(),
+  isActive: boolean('isActive').default(true),
+  lastUsed: timestamp('lastUsed'),
+  createdAt: timestamp('createdAt').defaultNow(),
+});
+
 export async function getUser(email: string) {
   const users = await ensureTableExists();
   return await db.select().from(users).where(eq(users.email, email));
@@ -1968,4 +1978,115 @@ export async function updateUserPassword(userId: number, newPassword: string) {
     .returning();
   
   return result[0];
+}
+
+// API Key Management Functions
+async function ensureApiKeysTableExists() {
+  if (tableInitCache.has('apiKeys')) {
+    return apiKeysTable;
+  }
+
+  const result = await client`
+    SELECT EXISTS (
+      SELECT FROM information_schema.tables 
+      WHERE table_schema = 'public' 
+      AND table_name = 'apiKeys'
+    );`;
+
+  if (!result[0].exists) {
+    await client`
+      CREATE TABLE "apiKeys" (
+        "id" serial PRIMARY KEY,
+        "userId" integer NOT NULL,
+        "name" varchar(255) NOT NULL,
+        "key" varchar(255) UNIQUE NOT NULL,
+        "isActive" boolean DEFAULT true,
+        "lastUsed" timestamp,
+        "createdAt" timestamp DEFAULT now()
+      );`;
+  }
+
+  // Mark as initialized
+  tableInitCache.add('apiKeys');
+
+  return apiKeysTable;
+}
+
+export async function createApiKey(userId: number, name: string) {
+  const apiKeys = await ensureApiKeysTableExists();
+  
+  // Generate a secure API key
+  const crypto = await import('crypto');
+  const key = `cc_${crypto.randomBytes(32).toString('hex')}`;
+  
+  return await db.insert(apiKeys).values({
+    userId,
+    name,
+    key,
+    isActive: true
+  }).returning();
+}
+
+export async function getUserApiKeys(userId: number) {
+  const apiKeys = await ensureApiKeysTableExists();
+  
+  return await db.select({
+    id: apiKeys.id,
+    name: apiKeys.name,
+    key: apiKeys.key,
+    isActive: apiKeys.isActive,
+    lastUsed: apiKeys.lastUsed,
+    createdAt: apiKeys.createdAt
+  }).from(apiKeys).where(eq(apiKeys.userId, userId));
+}
+
+export async function getApiKeyByKey(key: string) {
+  const apiKeys = await ensureApiKeysTableExists();
+  
+  return await db.select().from(apiKeys).where(eq(apiKeys.key, key)).limit(1);
+}
+
+export async function updateApiKeyLastUsed(key: string) {
+  const apiKeys = await ensureApiKeysTableExists();
+  
+  return await db.update(apiKeys)
+    .set({ lastUsed: new Date() })
+    .where(eq(apiKeys.key, key));
+}
+
+export async function toggleApiKeyStatus(keyId: number, userId: number) {
+  const apiKeys = await ensureApiKeysTableExists();
+  
+  // First get current status
+  const currentKey = await db.select().from(apiKeys).where(eq(apiKeys.id, keyId)).limit(1);
+  
+  if (currentKey.length === 0) {
+    throw new Error('API key not found');
+  }
+  
+  const newStatus = !currentKey[0].isActive;
+  
+  // If userId is 0, it's an admin operation (no ownership check)
+  if (userId === 0) {
+    return await db.update(apiKeys)
+      .set({ isActive: newStatus })
+      .where(eq(apiKeys.id, keyId));
+  }
+  
+  return await db.update(apiKeys)
+    .set({ isActive: newStatus })
+    .where(and(eq(apiKeys.id, keyId), eq(apiKeys.userId, userId)));
+}
+
+export async function deleteApiKey(keyId: number, userId: number) {
+  const apiKeys = await ensureApiKeysTableExists();
+  
+  // If userId is 0, it's an admin operation (no ownership check)
+  if (userId === 0) {
+    return await db.delete(apiKeys)
+      .where(eq(apiKeys.id, keyId));
+  }
+  
+  return await db.delete(apiKeys)
+    .where(and(eq(apiKeys.id, keyId), eq(apiKeys.userId, userId)));
 }
