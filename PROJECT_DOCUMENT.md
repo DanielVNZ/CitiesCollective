@@ -158,8 +158,19 @@ City (
 - [x] Real-time updates - Optimistic UI updates for immediate feedback
 - [x] Authentication integration - Redirect to login if user not authenticated
 
+### Phase 12: Password Reset System ✅ COMPLETED
+- [x] Database schema for password reset tokens - Add passwordResetTokens table with secure token storage
+- [x] Email service integration - Nodemailer setup with Google Workspace SMTP for support@citiescollective.space
+- [x] Password reset API endpoints - Forgot password and reset password API routes
+- [x] Email templates - Professional HTML and text email templates with branding
+- [x] Forgot password page - User-friendly form to request password reset
+- [x] Reset password page - Secure token validation and new password form
+- [x] Security features - Token expiration (1 hour), secure token generation, and automatic cleanup
+- [x] Login page integration - Added "Forgot Password?" link to login page
+- [x] Error handling - Comprehensive error messages and user feedback
+
 ### Current Status
-✅ **COMMENT SYSTEM ENHANCEMENT COMPLETE!** The Cities: Skylines 2 sharing platform now includes enhanced comment interactions with likes and sorting.
+✅ **PASSWORD RESET SYSTEM COMPLETE!** The Cities: Skylines 2 sharing platform now includes a complete password reset system with email notifications.
 
 **Core Features:**
 - Complete user authentication with username system
@@ -169,7 +180,17 @@ City (
 - Community interactions (likes, comments, favorites)
 - Optional PDX and Discord username display
 - Full image management system for city owners
-- **NEW**: Enhanced comment system with likes and sorting
+- Enhanced comment system with likes and sorting
+- **NEW**: Complete password reset system with email notifications
+
+**Password Reset Features:**
+- **Secure Token System**: Cryptographically secure tokens with 1-hour expiration
+- **Email Integration**: Professional email templates sent via Google Workspace SMTP
+- **User-Friendly Flow**: Simple forgot password form and secure reset process
+- **Security Best Practices**: Token validation, automatic cleanup, and password strength requirements
+- **Professional Branding**: Cities Collective branded email templates with clear instructions
+- **Error Handling**: Comprehensive error messages and user feedback throughout the process
+- **Login Integration**: "Forgot Password?" link seamlessly integrated into login page
 
 **Community Features:**
 - **Like System**: Users can like cities with heart icons and real-time counts
@@ -197,8 +218,9 @@ City (
 - Secure user authorization for all community actions and profile updates
 - Real-time UI updates without page refreshes
 - Profile editing with form validation and success/error feedback
-- **NEW**: Comment like system with optimistic updates and proper state management
-- **NEW**: Dynamic comment sorting with URL parameter support
+- Comment like system with optimistic updates and proper state management
+- **NEW**: Email service integration with nodemailer and Google Workspace SMTP
+- **NEW**: Password reset token management with automatic expiration and cleanup
 
 **Next Priority:** The platform is now feature-complete with robust community features and enhanced user profiles. Future enhancements could include:
 - Advanced community features (user following, notifications)

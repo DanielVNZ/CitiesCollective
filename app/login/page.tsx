@@ -117,9 +117,21 @@ export default function Login() {
                 id="password"
                 name="password"
                 type="password"
+                placeholder="Enter your password"
+                autoComplete="current-password"
                 required
                 className="mt-1 block w-full appearance-none rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 placeholder-gray-400 dark:placeholder-gray-500 shadow-sm focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none focus:ring-blue-500 dark:focus:ring-blue-400 sm:text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
               />
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <div></div>
+              <Link
+                href="/forgot-password"
+                className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+              >
+                Forgot your password?
+              </Link>
             </div>
             <SubmitButton>Sign in</SubmitButton>
             <p className="text-center text-sm text-gray-600 dark:text-gray-400">

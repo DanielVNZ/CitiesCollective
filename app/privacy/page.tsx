@@ -203,7 +203,7 @@ export default function PrivacyPolicy() {
               </p>
               <ul className="list-disc list-inside text-gray-700 dark:text-gray-300 space-y-1">
                 <li>Website: <Link href="/" className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">citiescollective.space</Link></li>
-                <li>Email: danielv44321@gmail.com</li>
+                <li>Email: support@citiescollective.space</li>
               </ul>
             </section>
           </div>

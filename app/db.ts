@@ -130,6 +130,14 @@ const moderationSettingsTable = pgTable('moderationSettings', {
   updatedAt: timestamp('updatedAt').defaultNow(),
 });
 
+const passwordResetTokensTable = pgTable('passwordResetTokens', {
+  id: serial('id').primaryKey(),
+  userId: integer('userId').notNull(),
+  token: varchar('token', { length: 255 }).unique().notNull(),
+  expiresAt: timestamp('expiresAt').notNull(),
+  createdAt: timestamp('createdAt').defaultNow(),
+});
+
 export async function getUser(email: string) {
   const users = await ensureTableExists();
   return await db.select().from(users).where(eq(users.email, email));
@@ -605,10 +613,11 @@ async function ensureCityTableExists() {
 export async function getRecentCities(limit: number = 12) {
   await ensureCityTableExists();
   await ensureCityImagesTableExists();
+  await ensureCommentsTableExists();
   
   const userTable = await ensureTableExists();
   
-  // Get cities with their primary images and author information
+  // Get cities with their primary images, author information, and comment counts
   const cities = await db.select({
     id: cityTable.id,
     userId: cityTable.userId,
@@ -623,6 +632,7 @@ export async function getRecentCities(limit: number = 12) {
     primaryImageThumbnail: cityImagesTable.thumbnailPath,
     authorUsername: userTable.username,
     modsEnabled: cityTable.modsEnabled,
+    commentCount: sql<number>`COALESCE(COUNT(${commentsTable.id}), 0)`.as('commentCount'),
   })
     .from(cityTable)
     .leftJoin(cityImagesTable, and(
@@ -630,6 +640,22 @@ export async function getRecentCities(limit: number = 12) {
       eq(cityImagesTable.isPrimary, true)
     ))
     .leftJoin(userTable, eq(cityTable.userId, userTable.id))
+    .leftJoin(commentsTable, eq(commentsTable.cityId, cityTable.id))
+    .groupBy(
+      cityTable.id,
+      cityTable.userId,
+      cityTable.cityName,
+      cityTable.mapName,
+      cityTable.population,
+      cityTable.money,
+      cityTable.xp,
+      cityTable.theme,
+      cityTable.gameMode,
+      cityTable.uploadedAt,
+      cityImagesTable.thumbnailPath,
+      userTable.username,
+      cityTable.modsEnabled
+    )
     .orderBy(desc(cityTable.uploadedAt))
     .limit(limit);
   
@@ -674,10 +700,11 @@ export async function getTopCitiesByLikes(limit: number = 3) {
   await ensureCityTableExists();
   await ensureCityImagesTableExists();
   await ensureLikesTableExists();
+  await ensureCommentsTableExists();
   
   const userTable = await ensureTableExists();
   
-  // Get cities with most likes, including their primary images and author information
+  // Get cities with most likes, including their primary images, author information, and comment counts
   const cities = await db.select({
     id: cityTable.id,
     userId: cityTable.userId,
@@ -693,6 +720,7 @@ export async function getTopCitiesByLikes(limit: number = 3) {
     authorUsername: userTable.username,
     modsEnabled: cityTable.modsEnabled,
     likeCount: sql<number>`COUNT(${likesTable.id})`.as('likeCount'),
+    commentCount: sql<number>`COALESCE(COUNT(DISTINCT ${commentsTable.id}), 0)`.as('commentCount'),
   })
     .from(cityTable)
     .leftJoin(cityImagesTable, and(
@@ -701,6 +729,7 @@ export async function getTopCitiesByLikes(limit: number = 3) {
     ))
     .leftJoin(userTable, eq(cityTable.userId, userTable.id))
     .leftJoin(likesTable, eq(likesTable.cityId, cityTable.id))
+    .leftJoin(commentsTable, eq(commentsTable.cityId, cityTable.id))
     .groupBy(
       cityTable.id,
       cityTable.userId,
@@ -725,6 +754,7 @@ export async function getTopCitiesByLikes(limit: number = 3) {
 export async function getCitiesByUser(userId: number) {
   await ensureCityTableExists();
   await ensureCityImagesTableExists();
+  await ensureCommentsTableExists();
   
   const cities = await db.select({
     id: cityTable.id,
@@ -742,13 +772,32 @@ export async function getCitiesByUser(userId: number) {
     uploadedAt: cityTable.uploadedAt,
     primaryImageThumbnail: cityImagesTable.thumbnailPath,
     modsEnabled: cityTable.modsEnabled,
+    commentCount: sql<number>`COALESCE(COUNT(${commentsTable.id}), 0)`.as('commentCount'),
   })
     .from(cityTable)
     .leftJoin(cityImagesTable, and(
       eq(cityImagesTable.cityId, cityTable.id),
       eq(cityImagesTable.isPrimary, true)
     ))
+    .leftJoin(commentsTable, eq(commentsTable.cityId, cityTable.id))
     .where(eq(cityTable.userId, userId))
+    .groupBy(
+      cityTable.id,
+      cityTable.userId,
+      cityTable.cityName,
+      cityTable.mapName,
+      cityTable.population,
+      cityTable.money,
+      cityTable.xp,
+      cityTable.theme,
+      cityTable.gameMode,
+      cityTable.fileName,
+      cityTable.filePath,
+      cityTable.downloadable,
+      cityTable.uploadedAt,
+      cityImagesTable.thumbnailPath,
+      cityTable.modsEnabled
+    )
     .orderBy(desc(cityTable.uploadedAt));
   
   return cities;
@@ -859,6 +908,7 @@ export async function searchCities(
 ) {
   await ensureCityTableExists();
   await ensureCityImagesTableExists();
+  await ensureCommentsTableExists();
   
   const userTable = await ensureTableExists();
   
@@ -943,7 +993,7 @@ export async function searchCities(
       orderByClause = desc(cityTable.uploadedAt);
   }
   
-  // Build and execute the query with image data
+  // Build and execute the query with image data and comment counts
   if (conditions.length > 0) {
     return await db.select({
       id: cityTable.id,
@@ -959,6 +1009,7 @@ export async function searchCities(
       primaryImageThumbnail: cityImagesTable.thumbnailPath,
       authorUsername: userTable.username,
       modsEnabled: cityTable.modsEnabled,
+      commentCount: sql<number>`COALESCE(COUNT(${commentsTable.id}), 0)`.as('commentCount'),
     })
       .from(cityTable)
       .leftJoin(cityImagesTable, and(
@@ -966,7 +1017,23 @@ export async function searchCities(
         eq(cityImagesTable.isPrimary, true)
       ))
       .leftJoin(userTable, eq(cityTable.userId, userTable.id))
+      .leftJoin(commentsTable, eq(commentsTable.cityId, cityTable.id))
       .where(and(...conditions))
+      .groupBy(
+        cityTable.id,
+        cityTable.userId,
+        cityTable.cityName,
+        cityTable.mapName,
+        cityTable.population,
+        cityTable.money,
+        cityTable.xp,
+        cityTable.theme,
+        cityTable.gameMode,
+        cityTable.uploadedAt,
+        cityImagesTable.thumbnailPath,
+        userTable.username,
+        cityTable.modsEnabled
+      )
       .orderBy(orderByClause)
       .limit(limit)
       .offset(offset);
@@ -985,6 +1052,7 @@ export async function searchCities(
       primaryImageThumbnail: cityImagesTable.thumbnailPath,
       authorUsername: userTable.username,
       modsEnabled: cityTable.modsEnabled,
+      commentCount: sql<number>`COALESCE(COUNT(${commentsTable.id}), 0)`.as('commentCount'),
     })
       .from(cityTable)
       .leftJoin(cityImagesTable, and(
@@ -992,6 +1060,22 @@ export async function searchCities(
         eq(cityImagesTable.isPrimary, true)
       ))
       .leftJoin(userTable, eq(cityTable.userId, userTable.id))
+      .leftJoin(commentsTable, eq(commentsTable.cityId, cityTable.id))
+      .groupBy(
+        cityTable.id,
+        cityTable.userId,
+        cityTable.cityName,
+        cityTable.mapName,
+        cityTable.population,
+        cityTable.money,
+        cityTable.xp,
+        cityTable.theme,
+        cityTable.gameMode,
+        cityTable.uploadedAt,
+        cityImagesTable.thumbnailPath,
+        userTable.username,
+        cityTable.modsEnabled
+      )
       .orderBy(orderByClause)
       .limit(limit)
       .offset(offset);
@@ -1625,6 +1709,16 @@ export async function isCommentLikedByUser(userId: number, commentId: number) {
   return like.length > 0;
 }
 
+export async function getCityCommentCount(cityId: number) {
+  await ensureCommentsTableExists();
+  
+  const result = await db.select({ count: sql<number>`count(*)` })
+    .from(commentsTable)
+    .where(eq(commentsTable.cityId, cityId));
+  
+  return result[0]?.count || 0;
+}
+
 // Moderation settings functions
 async function ensureModerationSettingsTableExists() {
   const cacheKey = 'moderationSettings';
@@ -1648,6 +1742,36 @@ async function ensureModerationSettingsTableExists() {
         "key" VARCHAR(100) UNIQUE NOT NULL,
         value JSONB,
         "updatedAt" TIMESTAMP DEFAULT NOW()
+      );`;
+  }
+  
+  // Mark as initialized
+  tableInitCache.add(cacheKey);
+}
+
+async function ensurePasswordResetTokensTableExists() {
+  const cacheKey = 'passwordResetTokens';
+  
+  // Return if already initialized
+  if (tableInitCache.has(cacheKey)) {
+    return;
+  }
+  
+  const result = await client`
+    SELECT EXISTS (
+      SELECT FROM information_schema.tables 
+      WHERE table_schema = 'public' 
+      AND table_name = 'passwordResetTokens'
+    );`;
+
+  if (!result[0].exists) {
+    await client`
+      CREATE TABLE "passwordResetTokens" (
+        id SERIAL PRIMARY KEY,
+        "userId" INTEGER NOT NULL,
+        token VARCHAR(255) UNIQUE NOT NULL,
+        "expiresAt" TIMESTAMP NOT NULL,
+        "createdAt" TIMESTAMP DEFAULT NOW()
       );`;
   }
   
@@ -1727,6 +1851,7 @@ export async function getUserFavorites(userId: number, limit: number = 12, offse
   await ensureFavoritesTableExists();
   await ensureCityTableExists();
   await ensureCityImagesTableExists();
+  await ensureCommentsTableExists();
   
   const favorites = await db.select({
     id: cityTable.id,
@@ -1742,6 +1867,7 @@ export async function getUserFavorites(userId: number, limit: number = 12, offse
     primaryImageThumbnail: cityImagesTable.thumbnailPath,
     favoritedAt: favoritesTable.createdAt,
     modsEnabled: cityTable.modsEnabled,
+    commentCount: sql<number>`COALESCE(COUNT(${commentsTable.id}), 0)`.as('commentCount'),
   })
     .from(favoritesTable)
     .innerJoin(cityTable, eq(favoritesTable.cityId, cityTable.id))
@@ -1749,10 +1875,97 @@ export async function getUserFavorites(userId: number, limit: number = 12, offse
       eq(cityImagesTable.cityId, cityTable.id),
       eq(cityImagesTable.isPrimary, true)
     ))
+    .leftJoin(commentsTable, eq(commentsTable.cityId, cityTable.id))
     .where(eq(favoritesTable.userId, userId))
+    .groupBy(
+      cityTable.id,
+      cityTable.userId,
+      cityTable.cityName,
+      cityTable.mapName,
+      cityTable.population,
+      cityTable.money,
+      cityTable.xp,
+      cityTable.theme,
+      cityTable.gameMode,
+      cityTable.uploadedAt,
+      cityImagesTable.thumbnailPath,
+      favoritesTable.createdAt,
+      cityTable.modsEnabled
+    )
     .orderBy(desc(favoritesTable.createdAt))
     .limit(limit)
     .offset(offset);
   
   return favorites;
+}
+
+// Password reset functions
+export async function createPasswordResetToken(userId: number) {
+  await ensurePasswordResetTokensTableExists();
+  
+  // Generate a secure random token
+  const token = require('crypto').randomBytes(32).toString('hex');
+  
+  // Set expiration to 1 hour from now
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+  
+  // Delete any existing tokens for this user
+  await db.delete(passwordResetTokensTable)
+    .where(eq(passwordResetTokensTable.userId, userId));
+  
+  // Create new token
+  const tokenId = await generateUniqueId(passwordResetTokensTable, passwordResetTokensTable.id);
+  const result = await db.insert(passwordResetTokensTable)
+    .values({ id: tokenId, userId, token, expiresAt })
+    .returning();
+  
+  return result[0];
+}
+
+export async function getPasswordResetToken(token: string) {
+  await ensurePasswordResetTokensTableExists();
+  
+  const result = await db.select()
+    .from(passwordResetTokensTable)
+    .where(eq(passwordResetTokensTable.token, token))
+    .limit(1);
+  
+  if (result.length === 0) {
+    return null;
+  }
+  
+  const resetToken = result[0];
+  
+  // Check if token is expired
+  if (new Date() > resetToken.expiresAt) {
+    // Delete expired token
+    await db.delete(passwordResetTokensTable)
+      .where(eq(passwordResetTokensTable.id, resetToken.id));
+    return null;
+  }
+  
+  return resetToken;
+}
+
+export async function deletePasswordResetToken(token: string) {
+  await ensurePasswordResetTokensTableExists();
+  
+  await db.delete(passwordResetTokensTable)
+    .where(eq(passwordResetTokensTable.token, token));
+}
+
+export async function updateUserPassword(userId: number, newPassword: string) {
+  const users = await ensureTableExists();
+  
+  // Hash the new password
+  const salt = genSaltSync(10);
+  const hash = hashSync(newPassword, salt);
+  
+  // Update user's password
+  const result = await db.update(users)
+    .set({ password: hash })
+    .where(eq(users.id, userId))
+    .returning();
+  
+  return result[0];
 }
