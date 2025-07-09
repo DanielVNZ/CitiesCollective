@@ -77,7 +77,7 @@ export default async function ProtectedPage() {
                 No cities uploaded yet!
               </h3>
               <p className="text-gray-600 dark:text-gray-400 mb-6">
-                Start sharing your amazing Cities: Skylines 2 creations with the community.
+                Start sharing your amazing Cities: Skylines 2 creations with the Cities Collective.
               </p>
               <Link
                 href="/upload"

@@ -1,6 +1,5 @@
-# Cities: Skylines 2 Save File Sharing Website
+# Cities Collective
 
-## Project Overview
 A web platform where users can upload and share Cities: Skylines 2 save files (.cok files) to showcase their cities. The website displays city statistics and information extracted from save files in an attractive card format.
 
 ## Features

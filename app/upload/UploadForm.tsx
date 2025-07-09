@@ -198,7 +198,7 @@ export function UploadForm() {
           </Link>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mt-4">Upload Your City</h1>
           <p className="text-gray-600 dark:text-gray-400 mt-2">
-            Share your Cities: Skylines 2 creation with the community
+            Share your Cities: Skylines 2 creation with the Cities Collective
           </p>
         </div>
 

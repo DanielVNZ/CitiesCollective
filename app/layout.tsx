@@ -3,9 +3,9 @@ import './globals.css';
 import { GeistSans } from 'geist/font/sans';
 import { ThemeProvider } from './components/ThemeProvider';
 
-let title = 'Next.js + Postgres Auth Starter';
+let title = 'Cities Collective';
 let description =
-  'This is a Next.js starter kit that uses NextAuth.js for simple email + password login and a Postgres database to persist the data.';
+  'Share and discover amazing Cities: Skylines 2 creations from builders worldwide. Upload your save files, showcase your cities, and connect with the community.';
 
 export const metadata = {
   title,
@@ -15,7 +15,7 @@ export const metadata = {
     title,
     description,
   },
-  metadataBase: new URL('https://nextjs-postgres-auth.vercel.app'),
+  metadataBase: new URL('https://citiescollective.space'),
 };
 
 export default function RootLayout({

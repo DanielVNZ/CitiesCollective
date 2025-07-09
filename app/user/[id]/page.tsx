@@ -72,7 +72,7 @@ export default async function UserProfilePage({ params }: UserProfilePageProps) 
               </div>
               <div className="ml-6">
                 <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{user.username || user.email || 'Unknown User'}</h1>
-                <p className="text-gray-600 dark:text-gray-400">Cities: Skylines 2 Builder</p>
+                <p className="text-gray-600 dark:text-gray-400">Cities Collective Builder</p>
                 {(user.pdxUsername || user.discordUsername) && (
                   <div className="flex flex-wrap gap-2 mt-2">
                     {user.pdxUsername && (
