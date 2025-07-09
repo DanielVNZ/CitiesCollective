@@ -81,11 +81,11 @@ export function LikeButton({ cityId, initialLiked = false, initialCount = 0, siz
     <button
       onClick={handleLike}
       disabled={loading}
-      className={`flex items-center space-x-1 px-2 py-1 rounded-md transition-colors ${
+      className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg transition-all duration-200 ${
         liked 
-          ? 'text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100' 
-          : 'text-gray-600 hover:text-red-600 hover:bg-red-50'
-      } ${loading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} ${sizeClasses[size]}`}
+          ? 'text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 shadow-sm' 
+          : 'text-gray-700 hover:text-red-600 hover:bg-red-50 bg-white/80 dark:bg-gray-800/80 dark:text-gray-300 dark:hover:text-red-400'
+      } ${loading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:shadow-md'} ${sizeClasses[size]}`}
     >
       <svg 
         className={`${iconSizes[size]} ${liked ? 'fill-current' : 'fill-none'}`}
@@ -95,7 +95,7 @@ export function LikeButton({ cityId, initialLiked = false, initialCount = 0, siz
       >
         <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
       </svg>
-      <span className="font-medium">{count}</span>
+      <span className="font-semibold text-sm">{count}</span>
     </button>
   );
 } 

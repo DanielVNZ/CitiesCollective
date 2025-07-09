@@ -70,7 +70,9 @@ export function CityCard({ city, ranking }: CityCardProps) {
         
         {/* Like Button - Top Left Corner */}
         <div className="absolute top-3 left-3 z-10">
-          <LikeButton cityId={city.id} size="sm" />
+          <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-lg shadow-lg p-1">
+            <LikeButton cityId={city.id} size="sm" />
+          </div>
         </div>
         
         {/* Ranking Badge - Bottom Left Corner */}
@@ -82,7 +84,7 @@ export function CityCard({ city, ranking }: CityCardProps) {
         
         {/* Theme Badge */}
         <div className="absolute top-3 right-3">
-          <span className="px-2 py-1 bg-black bg-opacity-50 text-white text-xs rounded-full">
+          <span className="px-3 py-1 bg-black/80 text-white text-xs font-medium rounded-full shadow-lg backdrop-blur-sm">
             {city.theme || 'Default'}
           </span>
         </div>
@@ -101,10 +103,10 @@ export function CityCard({ city, ranking }: CityCardProps) {
         {/* Author */}
         {city.authorUsername && city.userId && (
           <div className="mb-4">
-            <p className="text-sm text-gray-500 dark:text-gray-400">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
               by <Link 
                 href={`/user/${city.userId}`}
-                className="font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 hover:underline"
+                className="font-semibold text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 hover:underline transition-colors duration-200"
               >
                 {city.authorUsername}
               </Link>
@@ -135,24 +137,26 @@ export function CityCard({ city, ranking }: CityCardProps) {
         </div>
 
         {/* Footer */}
-        <div className="flex justify-between items-center text-sm text-gray-500 dark:text-gray-400">
+        <div className="flex justify-between items-center text-sm text-gray-600 dark:text-gray-400">
           <div className="flex items-center space-x-2">
-            <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs">
+            <span className="px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded-full text-xs font-medium shadow-sm">
               {city.gameMode || 'Normal'}
             </span>
             {city.modsEnabled && city.modsEnabled.length > 0 ? (
-              <span className="px-2 py-1 bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 rounded text-xs font-medium">
+              <span className="px-3 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 rounded-full text-xs font-semibold shadow-sm">
                 Modded
               </span>
             ) : (
-              <span className="px-2 py-1 bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400 rounded text-xs font-medium">
+              <span className="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full text-xs font-semibold shadow-sm">
                 Vanilla
               </span>
             )}
           </div>
-          <div className="flex items-center space-x-2">
-            <span>{formatDate(city.uploadedAt)}</span>
-            <FavoriteButton cityId={city.id} size="sm" />
+          <div className="flex items-center space-x-3">
+            <span className="text-gray-500 dark:text-gray-500 font-medium">{formatDate(city.uploadedAt)}</span>
+            <div className="bg-white/80 dark:bg-gray-700/80 backdrop-blur-sm rounded-lg shadow-sm p-1">
+              <FavoriteButton cityId={city.id} size="sm" />
+            </div>
           </div>
         </div>
       </div>

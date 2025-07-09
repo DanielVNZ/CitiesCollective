@@ -1,61 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from 'app/auth';
-import { getUser, createCityImage, getCityImages } from 'app/db';
-import { processImageForR2, validateImageFile, R2ImageProcessingResult } from 'app/utils/r2ImageProcessing';
-import multer from 'multer';
-import { promisify } from 'util';
-
-// Configure multer for memory storage
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB
-    files: 10, // Maximum 10 files at once
-  },
-});
-
-const uploadMiddleware = promisify(upload.array('images', 10));
-
-interface ProcessedImageSuccess extends R2ImageProcessingResult {
-  index: number;
-  success: true;
-}
-
-interface ProcessedImageError {
-  index: number;
-  success: false;
-  error: string;
-}
-
-type ProcessedImageResult = ProcessedImageSuccess | ProcessedImageError;
+import { client } from 'app/db';
+import { writeFile, mkdir } from 'fs/promises';
+import { join } from 'path';
+import { v4 as uuidv4 } from 'uuid';
 
 export async function POST(
-  req: NextRequest,
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    // Authenticate user
     const session = await auth();
-    const userEmail = session?.user?.email;
-    if (!userEmail) {
+    if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get user ID
-    const users = await getUser(userEmail);
-    const user = users && users[0];
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    }
-
-    // Parse city ID
     const cityId = parseInt(params.id);
     if (isNaN(cityId)) {
       return NextResponse.json({ error: 'Invalid city ID' }, { status: 400 });
     }
 
-    // Convert NextRequest to Express-like request for multer
-    const formData = await req.formData();
+    // Verify user owns this city
+    const cityResult = await client`
+      SELECT "userId" FROM "City" WHERE id = ${cityId}`;
+    
+    if (cityResult.length === 0) {
+      return NextResponse.json({ error: 'City not found' }, { status: 404 });
+    }
+
+    const city = cityResult[0];
+    const userResult = await client`
+      SELECT id FROM "User" WHERE email = ${session.user.email}`;
+    
+    if (userResult.length === 0 || userResult[0].id !== city.userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    }
+
+    const formData = await request.formData();
     const files = formData.getAll('images') as File[];
 
     if (!files || files.length === 0) {
@@ -66,106 +47,74 @@ export async function POST(
       return NextResponse.json({ error: 'Maximum 10 images allowed' }, { status: 400 });
     }
 
-    // Convert File objects to Express.Multer.File format
-    const multerFiles: Express.Multer.File[] = await Promise.all(
-      files.map(async (file) => {
-        const buffer = Buffer.from(await file.arrayBuffer());
-        return {
-          fieldname: 'images',
-          originalname: file.name,
-          encoding: '7bit',
-          mimetype: file.type,
-          size: buffer.length,
-          buffer: buffer,
-        } as Express.Multer.File;
-      })
-    );
+    const uploadedImages = [];
 
-    // Validate all files first
-    const validationResults = multerFiles.map(validateImageFile);
-    const invalidFiles = validationResults.filter(result => !result.isValid);
-    
-    if (invalidFiles.length > 0) {
-      return NextResponse.json({ 
-        error: 'Invalid files detected', 
-        details: invalidFiles.map(result => result.error) 
-      }, { status: 400 });
+    for (const file of files) {
+      // Validate file
+      if (!file.type.startsWith('image/')) {
+        continue; // Skip non-image files
+      }
+
+      if (file.size > 10 * 1024 * 1024) { // 10MB limit
+        continue; // Skip files that are too large
+      }
+
+      // Generate unique filename
+      const fileId = uuidv4();
+      const fileExtension = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+      const fileName = `${fileId}-${Date.now()}.${fileExtension}`;
+
+      // Create directories
+      const uploadDir = join(process.cwd(), 'public', 'uploads', 'cities');
+      const thumbnailDir = join(uploadDir, 'thumbnails');
+      const mediumDir = join(uploadDir, 'medium');
+      const largeDir = join(uploadDir, 'large');
+      const originalDir = join(uploadDir, 'original');
+
+      await mkdir(thumbnailDir, { recursive: true });
+      await mkdir(mediumDir, { recursive: true });
+      await mkdir(largeDir, { recursive: true });
+      await mkdir(originalDir, { recursive: true });
+
+      // Save original file
+      const originalPath = join(originalDir, fileName);
+      const originalBuffer = Buffer.from(await file.arrayBuffer());
+      await writeFile(originalPath, originalBuffer as any);
+
+      // For now, we'll use the same image for all sizes (you can add image processing later)
+      const thumbnailPath = join(thumbnailDir, fileName);
+      const mediumPath = join(mediumDir, fileName);
+      const largePath = join(largeDir, fileName);
+
+      await writeFile(thumbnailPath, originalBuffer as any);
+      await writeFile(mediumPath, originalBuffer as any);
+      await writeFile(largePath, originalBuffer as any);
+
+      // Save to database
+      const imageResult = await client`
+        INSERT INTO "cityImages" (
+          "cityId", "fileName", "originalName", "fileSize", "mimeType", 
+          "width", "height", "thumbnailPath", "mediumPath", "largePath", "originalPath", "isPrimary"
+        ) VALUES (
+          ${cityId}, ${fileName}, ${file.name}, ${file.size}, ${file.type},
+          ${null}, ${null}, ${`/uploads/cities/thumbnails/${fileName}`}, 
+          ${`/uploads/cities/medium/${fileName}`}, ${`/uploads/cities/large/${fileName}`}, 
+          ${`/uploads/cities/original/${fileName}`}, ${false}
+        ) RETURNING *`;
+
+      if (imageResult.length > 0) {
+        uploadedImages.push(imageResult[0]);
+      }
     }
 
-    // Process all images
-    const processedImages: ProcessedImageResult[] = await Promise.all(
-      multerFiles.map(async (file, index): Promise<ProcessedImageResult> => {
-        try {
-          const result = await processImageForR2(file, user.id);
-          return { ...result, index, success: true };
-        } catch (error) {
-          console.error(`Error processing image ${index}:`, error);
-          return { 
-            index, 
-            success: false, 
-            error: error instanceof Error ? error.message : 'Unknown error' 
-          };
-        }
-      })
-    );
-
-    // Check if any processing failed
-    const failedImages = processedImages.filter(result => !result.success);
-    if (failedImages.length > 0) {
-      return NextResponse.json({ 
-        error: 'Some images failed to process', 
-        details: failedImages 
-      }, { status: 500 });
-    }
-
-    // Filter successful results and save to database
-    const successfulImages = processedImages.filter((result): result is ProcessedImageSuccess => result.success);
-    
-    const savedImages = await Promise.all(
-      successfulImages.map(async (result, index) => {
-        try {
-          const imageRecord = await createCityImage({
-            cityId,
-            fileName: result.fileName,
-            originalName: result.originalName,
-            fileSize: result.fileSize,
-            mimeType: result.mimeType,
-            width: result.width,
-            height: result.height,
-            thumbnailPath: result.thumbnailUrl, // Store full URLs instead of keys
-            mediumPath: result.mediumUrl,
-            largePath: result.largeUrl,
-            originalPath: result.originalUrl,
-            isPrimary: index === 0, // First image is primary by default
-          });
-          return { ...imageRecord, success: true };
-        } catch (error) {
-          console.error(`Error saving image record:`, error);
-          return { 
-            success: false, 
-            error: error instanceof Error ? error.message : 'Unknown error' 
-          };
-        }
-      })
-    );
-
-    const successfulUploads = savedImages.filter(result => result.success);
-    const failedUploads = savedImages.filter(result => !result.success);
-
-    return NextResponse.json({
-      message: `Successfully uploaded ${successfulUploads.length} images`,
-      uploaded: successfulUploads.length,
-      failed: failedUploads.length,
-      images: successfulUploads,
-      errors: failedUploads.length > 0 ? failedUploads : undefined,
+    return NextResponse.json({ 
+      success: true, 
+      images: uploadedImages 
     });
 
   } catch (error) {
-    console.error('Image upload error:', error);
-    return NextResponse.json({ 
-      error: 'Failed to upload images', 
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 });
+    console.error('Error uploading images:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
@@ -181,7 +130,8 @@ export async function GET(
     }
 
     // Get all images for this city
-    const images = await getCityImages(cityId);
+    const images = await client`
+      SELECT * FROM "CityImages" WHERE "cityId" = ${cityId}`;
 
     return NextResponse.json({
       cityId,

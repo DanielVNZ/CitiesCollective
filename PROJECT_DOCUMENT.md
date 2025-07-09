@@ -134,15 +134,33 @@ City (
 - [x] Favorites page - Dedicated page for users to view their saved cities
 - [x] Navigation updates - Add favorites links throughout the application
 
+### Phase 9: User Profile Enhancement ✅ COMPLETED
+- [x] Database schema update - Add pdxUsername and discordUsername fields to User table
+- [x] Profile editing API - New endpoint for updating user profile information
+- [x] Profile editor component - Form for users to edit their PDX and Discord usernames
+- [x] Dashboard integration - Add profile editor to the protected dashboard page
+- [x] Public profile display - Show PDX and Discord usernames on user profile pages
+- [x] Privacy protection - Only display usernames, not emails or admin status publicly
+
+### Phase 10: Image Management System ✅ COMPLETED
+- [x] Image management component - Drag-and-drop reordering, deletion, and primary image selection
+- [x] Image reordering API - Endpoint to update image order in database
+- [x] Additional image upload API - Allow adding new images to existing cities
+- [x] Owner-only access - Image management only visible to city owners
+- [x] Visual feedback - Drag indicators, hover states, and confirmation dialogs
+- [x] Safety features - Prevent deletion of only primary image, validation checks
+
 ### Current Status
-✅ **COMMUNITY PLATFORM COMPLETE!** The Cities: Skylines 2 sharing platform now includes full community features.
+✅ **IMAGE MANAGEMENT SYSTEM COMPLETE!** The Cities: Skylines 2 sharing platform now includes comprehensive image management for city owners.
 
 **Core Features:**
 - Complete user authentication with username system
 - File upload and management (save files + images)
 - Advanced search and filtering
-- User profiles and dashboards
+- User profiles and dashboards with profile editing
 - Community interactions (likes, comments, favorites)
+- Optional PDX and Discord username display
+- **NEW**: Full image management system for city owners
 
 **Community Features:**
 - **Like System**: Users can like cities with heart icons and real-time counts
@@ -150,15 +168,26 @@ City (
 - **Favorites System**: Personal favorites collection with dedicated page
 - **Interactive UI**: Client-side components with proper authentication handling
 - **Social Navigation**: Easy access to community features throughout the app
+- **Profile Enhancement**: Users can optionally display their PDX and Discord usernames
+
+**Image Management Features:**
+- **Drag & Drop Reordering**: Intuitive drag-and-drop interface to reorder images
+- **Primary Image Selection**: Set any image as the main thumbnail for the city
+- **Image Deletion**: Remove unwanted images with safety checks
+- **Additional Uploads**: Add new images to existing cities anytime
+- **Owner-Only Access**: Image management only available to city owners
+- **Visual Feedback**: Clear indicators for drag states, hover effects, and confirmations
+- **Safety Features**: Prevents deletion of the only primary image, validates ownership
 
 **Technical Implementation:**
 - Comprehensive database schema with proper foreign keys and constraints
-- RESTful API endpoints for all community interactions
+- RESTful API endpoints for all community interactions and profile management
 - Client-side React components with loading states and error handling
-- Secure user authorization for all community actions
+- Secure user authorization for all community actions and profile updates
 - Real-time UI updates without page refreshes
+- Profile editing with form validation and success/error feedback
 
-**Next Priority:** The platform is now feature-complete with robust community features. Future enhancements could include:
+**Next Priority:** The platform is now feature-complete with robust community features and enhanced user profiles. Future enhancements could include:
 - Advanced community features (user following, notifications)
 - City comparison tools and analytics
 - Community challenges and contests

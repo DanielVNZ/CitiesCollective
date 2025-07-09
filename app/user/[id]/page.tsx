@@ -73,6 +73,25 @@ export default async function UserProfilePage({ params }: UserProfilePageProps) 
               <div className="ml-6">
                 <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{user.username || user.email || 'Unknown User'}</h1>
                 <p className="text-gray-600 dark:text-gray-400">Cities: Skylines 2 Builder</p>
+                {(user.pdxUsername || user.discordUsername) && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {user.pdxUsername && (
+                      <a
+                        href={`https://mods.paradoxplaza.com/authors/${user.pdxUsername}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors duration-200"
+                      >
+                        PDX: {user.pdxUsername}
+                      </a>
+                    )}
+                    {user.discordUsername && (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300">
+                        Discord: {user.discordUsername}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
             <div className="text-right">

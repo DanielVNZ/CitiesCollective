@@ -2,10 +2,15 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { getCityById, getUserById, getCityImages, getUser } from 'app/db';
 import { ImageGallery } from './ImageGallery';
+import { ImageManager } from 'app/components/ImageManager';
 import { LikeButton } from 'app/components/LikeButton';
 import { FavoriteButton } from 'app/components/FavoriteButton';
 import { Comments } from 'app/components/Comments';
 import { auth } from 'app/auth';
+import { ImageSection } from './ImageSection';
+
+// Force dynamic rendering to prevent caching
+export const dynamic = 'force-dynamic';
 
 interface CityDetailPageProps {
   params: {
@@ -55,7 +60,7 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
 
   const formatDate = (date: Date | null) => {
     if (!date) return 'Unknown';
-    return new Date(date).toLocaleDateString();
+    return new Date(date).toLocaleDateString('en-GB');
   };
 
   const simulationDate = city.simulationDate as any;
@@ -76,13 +81,8 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Image Gallery */}
-        {images.length > 0 && (
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-8">
-            <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-4">Screenshots</h2>
-            <ImageGallery images={images} />
-          </div>
-        )}
+        {/* Image Section - handles both gallery and management */}
+        <ImageSection cityId={cityId} initialImages={images} isOwner={isOwner} />
 
         {/* City Header */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-8 mb-8">

@@ -88,6 +88,7 @@ const cityImagesTable = pgTable('cityImages', {
   largePath: varchar('largePath', { length: 255 }),
   originalPath: varchar('originalPath', { length: 255 }),
   isPrimary: boolean('isPrimary').default(false),
+  sortOrder: integer('sortOrder').default(0),
   uploadedAt: timestamp('uploadedAt').defaultNow(),
 });
 
@@ -227,6 +228,8 @@ async function ensureTableExists() {
       email: varchar('email', { length: 64 }),
       password: varchar('password', { length: 64 }),
       username: varchar('username', { length: 32 }),
+      pdxUsername: varchar('pdxUsername', { length: 50 }),
+      discordUsername: varchar('discordUsername', { length: 50 }),
       isAdmin: boolean('isAdmin').default(false),
     });
   }
@@ -245,6 +248,8 @@ async function ensureTableExists() {
         email VARCHAR(64) UNIQUE,
         password VARCHAR(64),
         username VARCHAR(32) UNIQUE,
+        "pdxUsername" VARCHAR(50),
+        "discordUsername" VARCHAR(50),
         "isAdmin" BOOLEAN DEFAULT FALSE
       );`;
   } else {
@@ -303,6 +308,38 @@ async function ensureTableExists() {
         UPDATE "User" SET "isAdmin" = TRUE WHERE email = 'danielveerkamp@live.com';`;
       console.log('Set danielveerkamp@live.com as admin');
     }
+
+    // Check if pdxUsername column exists, if not add it
+    const pdxUsernameColumnExists = await client`
+      SELECT EXISTS (
+        SELECT FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = 'User'
+        AND column_name = 'pdxUsername'
+      );`;
+    
+    if (!pdxUsernameColumnExists[0].exists) {
+      console.log('Adding pdxUsername column to existing User table...');
+      await client`
+        ALTER TABLE "User" ADD COLUMN "pdxUsername" VARCHAR(50);`;
+      console.log('pdxUsername column added successfully');
+    }
+
+    // Check if discordUsername column exists, if not add it
+    const discordUsernameColumnExists = await client`
+      SELECT EXISTS (
+        SELECT FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = 'User'
+        AND column_name = 'discordUsername'
+      );`;
+    
+    if (!discordUsernameColumnExists[0].exists) {
+      console.log('Adding discordUsername column to existing User table...');
+      await client`
+        ALTER TABLE "User" ADD COLUMN "discordUsername" VARCHAR(50);`;
+      console.log('discordUsername column added successfully');
+    }
   }
 
   // Mark as initialized
@@ -313,6 +350,8 @@ async function ensureTableExists() {
     email: varchar('email', { length: 64 }),
     password: varchar('password', { length: 64 }),
     username: varchar('username', { length: 32 }),
+    pdxUsername: varchar('pdxUsername', { length: 50 }),
+    discordUsername: varchar('discordUsername', { length: 50 }),
     isAdmin: boolean('isAdmin').default(false),
   });
 
@@ -590,7 +629,14 @@ export async function getCityById(id: number) {
 
 export async function getUserById(id: number) {
   const users = await ensureTableExists();
-  const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
+  const result = await db.select({
+    id: users.id,
+    email: users.email,
+    username: users.username,
+    pdxUsername: users.pdxUsername,
+    discordUsername: users.discordUsername,
+    isAdmin: users.isAdmin,
+  }).from(users).where(eq(users.id, id)).limit(1);
   return result[0] || null;
 }
 
@@ -895,9 +941,26 @@ async function ensureCityImagesTableExists() {
         "largePath" VARCHAR(255),
         "originalPath" VARCHAR(255),
         "isPrimary" BOOLEAN DEFAULT FALSE,
+        "sortOrder" INTEGER DEFAULT 0,
         "uploadedAt" TIMESTAMP DEFAULT NOW()
       )
     `);
+    
+    // Check if sortOrder column exists, if not add it
+    const sortOrderColumnExists = await client`
+      SELECT EXISTS (
+        SELECT FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = 'cityImages'
+        AND column_name = 'sortOrder'
+      );`;
+    
+    if (!sortOrderColumnExists[0].exists) {
+      console.log('Adding sortOrder column to existing cityImages table...');
+      await client`
+        ALTER TABLE "cityImages" ADD COLUMN "sortOrder" INTEGER DEFAULT 0;`;
+      console.log('sortOrder column added successfully');
+    }
     
     // Mark as initialized
     tableInitCache.add(cacheKey);
@@ -924,6 +987,13 @@ export async function createCityImage(imageData: {
   
   const imageId = await generateUniqueId(cityImagesTable, cityImagesTable.id);
   
+  // Get the current max sortOrder for this city to set the new image at the end
+  const maxSortOrderResult = await db.select({ maxSortOrder: sql<number>`COALESCE(MAX("sortOrder"), -1)` })
+    .from(cityImagesTable)
+    .where(eq(cityImagesTable.cityId, imageData.cityId));
+  
+  const newSortOrder = (maxSortOrderResult[0]?.maxSortOrder || -1) + 1;
+  
   const result = await db.insert(cityImagesTable).values({
     id: imageId,
     cityId: imageData.cityId,
@@ -938,6 +1008,7 @@ export async function createCityImage(imageData: {
     largePath: imageData.largePath,
     originalPath: imageData.originalPath,
     isPrimary: imageData.isPrimary || false,
+    sortOrder: newSortOrder,
   }).returning();
   
   return result[0];
@@ -946,10 +1017,42 @@ export async function createCityImage(imageData: {
 export async function getCityImages(cityId: number) {
   await ensureCityImagesTableExists();
   
-  return await db.select()
+  // Initialize sortOrder for existing images if needed
+  await initializeSortOrderForCity(cityId);
+  
+  const images = await db.select()
     .from(cityImagesTable)
     .where(eq(cityImagesTable.cityId, cityId))
-    .orderBy(desc(cityImagesTable.isPrimary), desc(cityImagesTable.uploadedAt));
+    .orderBy(desc(cityImagesTable.isPrimary), asc(cityImagesTable.sortOrder));
+  
+
+  
+  return images;
+}
+
+async function initializeSortOrderForCity(cityId: number) {
+  // Check if any images don't have sortOrder set (only NULL values, 0 is valid)
+  const imagesWithoutSortOrder = await db.select()
+    .from(cityImagesTable)
+    .where(and(
+      eq(cityImagesTable.cityId, cityId),
+      sql`"sortOrder" IS NULL`
+    ));
+  
+  if (imagesWithoutSortOrder.length > 0) {
+    // Get all images for this city ordered by uploadedAt (newest first, then assign ascending sortOrder)
+    const allImages = await db.select()
+      .from(cityImagesTable)
+      .where(eq(cityImagesTable.cityId, cityId))
+      .orderBy(desc(cityImagesTable.isPrimary), desc(cityImagesTable.uploadedAt));
+    
+    // Update sortOrder for each image
+    for (let i = 0; i < allImages.length; i++) {
+      await db.update(cityImagesTable)
+        .set({ sortOrder: i })
+        .where(eq(cityImagesTable.id, allImages[i].id));
+    }
+  }
 }
 
 export async function deleteCityImage(imageId: number, userId: number) {

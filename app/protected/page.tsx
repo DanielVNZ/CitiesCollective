@@ -3,6 +3,7 @@ import { getUser, getCitiesByUser } from 'app/db';
 import Link from 'next/link';
 import { CityManagementCard } from './CityManagementCard';
 import { UserProfileSection } from 'app/components/UserProfileSection';
+import ProfileEditor from 'app/components/ProfileEditor';
 
 export default async function ProtectedPage() {
   const session = await auth();
@@ -53,6 +54,11 @@ export default async function ProtectedPage() {
           totalMoney={totalMoney}
           lastUpload={lastUpload}
         />
+
+        {/* Profile Settings */}
+        <div className="mb-8">
+          <ProfileEditor user={user} />
+        </div>
         {/* Cities Management */}
         <div className="mb-8">
           <div className="flex justify-between items-center mb-6">
