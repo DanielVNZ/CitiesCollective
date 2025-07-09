@@ -73,7 +73,7 @@ export default function CreateApiKeyForm({ userId }: CreateApiKeyFormProps) {
             </button>
           </div>
           <p className="text-sm text-green-700 dark:text-green-300 mb-2">
-            Copy this key now! It won't be shown again.
+            Copy this key now! It won&apos;t be shown again.
           </p>
           <div className="flex gap-2">
             <code className="flex-1 p-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm font-mono">
