@@ -86,6 +86,10 @@ export async function POST(
         // Extract filename from key for database storage
         const fileName = imageKeys.thumbnail.split('/').pop() || `${Date.now()}.webp`;
 
+        // Determine if this should be the primary image
+        // First image uploaded to a city with no existing images becomes primary
+        const shouldBePrimary = existingImageCount === 0 && uploadedImages.length === 0;
+
         // Save to database using existing function
         const imageData = {
           cityId,
@@ -99,7 +103,7 @@ export async function POST(
           mediumPath: mediumResult.url,
           largePath: largeResult.url,
           originalPath: originalResult.url,
-          isPrimary: false,
+          isPrimary: shouldBePrimary,
         };
 
         const savedImage = await createCityImage(imageData);
