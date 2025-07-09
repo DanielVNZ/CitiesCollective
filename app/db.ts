@@ -156,6 +156,83 @@ export async function createUser(email: string, password: string, username?: str
   return await db.insert(users).values({ id: userId, email, password: hash, username, isAdmin });
 }
 
+export async function createOAuthUser(email: string, name: string, avatar?: string, googleId?: string, githubId?: string) {
+  const users = await ensureTableExists();
+  
+  const userId = await generateUniqueId(users, users.id);
+  const isAdmin = email === 'danielveerkamp@live.com'; // Always admin
+  
+  // Generate username from email if not provided
+  const baseUsername = email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+  let username = baseUsername;
+  let counter = 1;
+  
+  // Ensure username is unique
+  while (true) {
+    const existingUsername = await db.select()
+      .from(users)
+      .where(eq(users.username, username))
+      .limit(1);
+    
+    if (existingUsername.length === 0) break;
+    username = `${baseUsername}${counter}`;
+    counter++;
+  }
+  
+  const result = await db.insert(users).values({ 
+    id: userId, 
+    email, 
+    name, 
+    avatar, 
+    googleId, 
+    githubId,
+    username, 
+    isAdmin 
+  }).returning();
+  
+  return result[0];
+}
+
+export async function getUserByGoogleId(googleId: string) {
+  const users = await ensureTableExists();
+  return await db.select().from(users).where(eq(users.googleId, googleId));
+}
+
+export async function getUserByGithubId(githubId: string) {
+  const users = await ensureTableExists();
+  return await db.select().from(users).where(eq(users.githubId, githubId));
+}
+
+export async function linkGoogleAccount(userId: number, googleId: string, name?: string, avatar?: string) {
+  const users = await ensureTableExists();
+  
+  const updateData: any = { googleId };
+  if (name) updateData.name = name;
+  if (avatar) updateData.avatar = avatar;
+  
+  const result = await db.update(users)
+    .set(updateData)
+    .where(eq(users.id, userId))
+    .returning();
+  
+  return result[0];
+}
+
+export async function linkGithubAccount(userId: number, githubId: string, name?: string, avatar?: string) {
+  const users = await ensureTableExists();
+  
+  const updateData: any = { githubId };
+  if (name) updateData.name = name;
+  if (avatar) updateData.avatar = avatar;
+  
+  const result = await db.update(users)
+    .set(updateData)
+    .where(eq(users.id, userId))
+    .returning();
+  
+  return result[0];
+}
+
 export async function updateUser(userId: number, data: { username?: string; isAdmin?: boolean }) {
   const users = await ensureTableExists();
   
@@ -235,6 +312,10 @@ async function ensureTableExists() {
       email: varchar('email', { length: 64 }),
       password: varchar('password', { length: 64 }),
       username: varchar('username', { length: 32 }),
+      name: varchar('name', { length: 100 }),
+      avatar: varchar('avatar', { length: 255 }),
+      googleId: varchar('googleId', { length: 100 }),
+      githubId: varchar('githubId', { length: 100 }),
       pdxUsername: varchar('pdxUsername', { length: 50 }),
       discordUsername: varchar('discordUsername', { length: 50 }),
       isAdmin: boolean('isAdmin').default(false),
@@ -255,6 +336,10 @@ async function ensureTableExists() {
         email VARCHAR(64) UNIQUE,
         password VARCHAR(64),
         username VARCHAR(32) UNIQUE,
+        name VARCHAR(100),
+        avatar VARCHAR(255),
+        "googleId" VARCHAR(100) UNIQUE,
+        "githubId" VARCHAR(100) UNIQUE,
         "pdxUsername" VARCHAR(50),
         "discordUsername" VARCHAR(50),
         "isAdmin" BOOLEAN DEFAULT FALSE
@@ -295,6 +380,70 @@ async function ensureTableExists() {
       }
     }
     
+    // Check if name column exists, if not add it
+    const nameColumnExists = await client`
+      SELECT EXISTS (
+        SELECT FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = 'User'
+        AND column_name = 'name'
+      );`;
+    
+    if (!nameColumnExists[0].exists) {
+      console.log('Adding name column to existing User table...');
+      await client`
+        ALTER TABLE "User" ADD COLUMN name VARCHAR(100);`;
+      console.log('Name column added successfully');
+    }
+
+    // Check if avatar column exists, if not add it
+    const avatarColumnExists = await client`
+      SELECT EXISTS (
+        SELECT FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = 'User'
+        AND column_name = 'avatar'
+      );`;
+    
+    if (!avatarColumnExists[0].exists) {
+      console.log('Adding avatar column to existing User table...');
+      await client`
+        ALTER TABLE "User" ADD COLUMN avatar VARCHAR(255);`;
+      console.log('Avatar column added successfully');
+    }
+
+    // Check if googleId column exists, if not add it
+    const googleIdColumnExists = await client`
+      SELECT EXISTS (
+        SELECT FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = 'User'
+        AND column_name = 'googleId'
+      );`;
+    
+    if (!googleIdColumnExists[0].exists) {
+      console.log('Adding googleId column to existing User table...');
+      await client`
+        ALTER TABLE "User" ADD COLUMN "googleId" VARCHAR(100) UNIQUE;`;
+      console.log('GoogleId column added successfully');
+    }
+
+    // Check if githubId column exists, if not add it
+    const githubIdColumnExists = await client`
+      SELECT EXISTS (
+        SELECT FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = 'User'
+        AND column_name = 'githubId'
+      );`;
+    
+    if (!githubIdColumnExists[0].exists) {
+      console.log('Adding githubId column to existing User table...');
+      await client`
+        ALTER TABLE "User" ADD COLUMN "githubId" VARCHAR(100) UNIQUE;`;
+      console.log('GithubId column added successfully');
+    }
+
     // Check if isAdmin column exists, if not add it
     const isAdminColumnExists = await client`
       SELECT EXISTS (
@@ -357,6 +506,10 @@ async function ensureTableExists() {
     email: varchar('email', { length: 64 }),
     password: varchar('password', { length: 64 }),
     username: varchar('username', { length: 32 }),
+    name: varchar('name', { length: 100 }),
+    avatar: varchar('avatar', { length: 255 }),
+    googleId: varchar('googleId', { length: 100 }),
+    githubId: varchar('githubId', { length: 100 }),
     pdxUsername: varchar('pdxUsername', { length: 50 }),
     discordUsername: varchar('discordUsername', { length: 50 }),
     isAdmin: boolean('isAdmin').default(false),
