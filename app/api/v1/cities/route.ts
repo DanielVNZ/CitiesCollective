@@ -43,9 +43,8 @@ export async function GET(request: NextRequest) {
         const commentCount = await getCityCommentCount(city.id);
 
         // Create download URL if downloadable
-        const baseUrl = new URL(request.url).origin;
         const downloadUrl = city.downloadable 
-          ? `${baseUrl}/api/cities/${city.id}/download`
+          ? `https://citiescollective.space/api/cities/${city.id}/download`
           : null;
 
         return {
