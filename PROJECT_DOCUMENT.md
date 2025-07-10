@@ -203,8 +203,47 @@ City (
 - [x] Error handling - Comprehensive error messages and validation
 - [x] City page integration - Description section prominently displayed on city detail pages
 
+### Phase 16: OSM Map System ✅ COMPLETED
+- [x] Database schema update - Add osmMapPath field to City table for storing OSM map file paths
+- [x] OSM map upload API endpoint - Secure POST endpoint for uploading OSM map files
+- [x] OSM map deletion API endpoint - Secure DELETE endpoint for removing OSM maps
+- [x] OSM map manager component - Interactive upload/delete interface with file validation
+- [x] OSM map viewer component - Interactive map display with Leaflet integration
+- [x] Interactive map rendering - Full Leaflet map with pan, zoom, and click interactions
+- [x] Road and path visualization - Colored polylines for different road types (motorways, primary, residential, etc.)
+- [x] Point of interest markers - Interactive markers for amenities, shops, leisure areas, and landmarks
+- [x] Map popups - Detailed information popups for roads and locations on click
+- [x] File storage system - OSM maps stored in `/public/uploads/cities/osm-maps/` directory
+- [x] File validation - Support for .osm files with 10MB size limit
+- [x] Owner-only management - Only city owners can upload/delete OSM maps, others can view
+- [x] City page integration - OSM map section displayed above city header on detail pages
+- [x] Map data parsing - XML parsing of OSM data with bounds, nodes, ways, and important locations
+- [x] Map statistics display - Show total points, important locations, roads, and zoom level
+- [x] Automatic map centering - Smart calculation of map center and zoom based on OSM bounds
+- [x] Performance optimization - Limited rendering of roads and markers to prevent performance issues
+- [x] Error handling - Comprehensive error messages and validation feedback
+
 ### Current Status
-✅ **CITY DESCRIPTION SYSTEM COMPLETE!** The Cities: Skylines 2 sharing platform now includes a comprehensive city description system with markdown support, allowing creators to share detailed information about their cities.
+✅ **INTERACTIVE OSM MAP SYSTEM COMPLETE!** The Cities: Skylines 2 sharing platform now includes a fully interactive OSM map system that renders maps directly on the website, allowing creators to upload and display city layout maps with full interactivity.
+
+**OSM Map Features:**
+- **Interactive Map Display**: Full Leaflet-powered maps rendered directly on the city page with pan, zoom, and click interactions
+- **Road Visualization**: Colored polylines showing different road types (motorways in red, primary roads in orange, residential in white, etc.)
+- **Point of Interest Markers**: Interactive markers for amenities, shops, leisure areas, tourism spots, and landmarks
+- **Information Popups**: Detailed popups showing road names/types and location information on click
+- **Map Upload System**: Secure file upload with validation for .osm files
+- **File Management**: Upload, replace, and delete OSM map files with intuitive interface
+- **Storage Integration**: OSM files stored in organized directory structure alongside city images
+- **Download Functionality**: Users can download OSM files for use in mapping applications
+- **Owner-Only Management**: Only city owners can upload/delete maps, while everyone can view them
+- **City Page Integration**: OSM map section prominently displayed above city header
+- **Smart Map Centering**: Automatic calculation of optimal map center and zoom level based on OSM bounds
+- **Performance Optimization**: Limited rendering of roads (50) and markers (20) to ensure smooth performance
+- **Map Statistics**: Display total points, important locations, roads count, and current zoom level
+- **Error Handling**: Comprehensive validation and user-friendly error messages
+- **Database Integration**: Secure API endpoints with proper authentication and authorization
+
+✅ **CITY DESCRIPTION SYSTEM COMPLETE!** The platform also includes a comprehensive city description system with markdown support, allowing creators to share detailed information about their cities.
 
 **City Description Features:**
 - **Markdown Support**: Full GitHub Flavored Markdown (GFM) support for rich text formatting

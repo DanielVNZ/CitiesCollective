@@ -71,6 +71,7 @@ export const cityTable = pgTable('City', {
   filePath: varchar('filePath', { length: 500 }),
   downloadable: boolean('downloadable').default(true),
   description: text('description'),
+  osmMapPath: varchar('osmMapPath', { length: 500 }),
   uploadedAt: timestamp('uploadedAt', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).defaultNow(),
 });
@@ -601,6 +602,7 @@ async function ensureCityTableExists() {
         "filePath" VARCHAR(500),
         "downloadable" BOOLEAN DEFAULT TRUE,
         description TEXT,
+        "osmMapPath" VARCHAR(500),
         "uploadedAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
         "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );`;
@@ -651,6 +653,22 @@ async function ensureCityTableExists() {
       await client`
         ALTER TABLE "City" ADD COLUMN description TEXT;`;
       console.log('description column added successfully');
+    }
+
+    // Check if osmMapPath column exists, if not add it
+    const osmMapPathColumnExists = await client`
+      SELECT EXISTS (
+        SELECT FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = 'City'
+        AND column_name = 'osmMapPath'
+      );`;
+    
+    if (!osmMapPathColumnExists[0].exists) {
+      console.log('Adding osmMapPath column to existing City table...');
+      await client`
+        ALTER TABLE "City" ADD COLUMN "osmMapPath" VARCHAR(500);`;
+      console.log('osmMapPath column added successfully');
     }
   }
 
@@ -893,6 +911,7 @@ export async function getCityById(id: number) {
     filePath: cityTable.filePath,
     downloadable: cityTable.downloadable,
     description: cityTable.description,
+    osmMapPath: cityTable.osmMapPath,
     uploadedAt: cityTable.uploadedAt,
     updatedAt: cityTable.updatedAt,
   }).from(cityTable).where(eq(cityTable.id, id)).limit(1);
@@ -947,6 +966,16 @@ export async function updateCityDescription(cityId: number, userId: number, desc
   // Only allow users to update their own cities
   const result = await db.update(cityTable)
     .set({ description, updatedAt: new Date() })
+    .where(and(eq(cityTable.id, cityId), eq(cityTable.userId, userId)))
+    .returning();
+  return result[0] || null;
+}
+
+export async function updateCityOsmMap(cityId: number, userId: number, osmMapPath: string) {
+  await ensureCityTableExists();
+  // Only allow users to update their own cities
+  const result = await db.update(cityTable)
+    .set({ osmMapPath, updatedAt: new Date() })
     .where(and(eq(cityTable.id, cityId), eq(cityTable.userId, userId)))
     .returning();
   return result[0] || null;

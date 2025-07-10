@@ -1,4 +1,5 @@
 import './globals.css';
+import 'leaflet/dist/leaflet.css';
 
 import { GeistSans } from 'geist/font/sans';
 import { ThemeProvider } from './components/ThemeProvider';

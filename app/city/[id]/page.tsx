@@ -7,6 +7,7 @@ import { LikeButton } from 'app/components/LikeButton';
 import { FavoriteButton } from 'app/components/FavoriteButton';
 import { Comments } from 'app/components/Comments';
 import { CityDescription } from 'app/components/CityDescription';
+import { OsmMapManager } from 'app/components/OsmMapManager';
 import { auth } from 'app/auth';
 import { ImageSection } from './ImageSection';
 
@@ -84,6 +85,13 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Image Section - handles both gallery and management */}
         <ImageSection cityId={cityId} initialImages={images} isOwner={isOwner} />
+
+        {/* OSM Map Section */}
+        <OsmMapManager 
+          cityId={cityId} 
+          initialOsmMapPath={city.osmMapPath} 
+          isOwner={isOwner} 
+        />
 
         {/* City Header */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-8 mb-8">
