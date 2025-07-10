@@ -42,7 +42,7 @@ export function UserProfileSection({ user, cities, totalPopulation, totalMoney, 
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-8 mb-8">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
         <div className="flex items-center">
           <div className="flex items-center justify-center w-16 h-16 bg-blue-500 text-white rounded-full text-2xl font-bold">
             {currentUsername.charAt(0).toUpperCase()}
@@ -57,7 +57,7 @@ export function UserProfileSection({ user, cities, totalPopulation, totalMoney, 
         </div>
         <Link
           href="/upload"
-          className="bg-blue-600 text-white px-6 py-3 rounded-md hover:bg-blue-700 transition-colors font-medium"
+          className="bg-blue-600 text-white px-6 py-3 rounded-md hover:bg-blue-700 transition-colors font-medium text-center md:text-left"
         >
           Upload New City
         </Link>

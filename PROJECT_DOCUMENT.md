@@ -179,8 +179,20 @@ City (
 - [x] Security features - API key validation, rate limiting considerations, and secure key generation
 - [x] Download link integration - Include download URLs for cities when downloadable is enabled
 
+### Phase 14: Follow System & Notifications ✅ COMPLETED
+- [x] Database schema for follows - Add follows table with follower/following relationships
+- [x] Database schema for notifications - Add notifications table with type, message, and related content
+- [x] Follow/unfollow API endpoints - Toggle follow status with proper authentication
+- [x] Notification system - Create notifications when followed users upload new cities
+- [x] Notifications API endpoints - Get, mark as read, and delete notifications
+- [x] Notifications menu component - Dropdown menu in header with unread count badge
+- [x] Follow button component - Interactive follow/unfollow button with real-time updates
+- [x] User profile enhancement - Display follower/following counts and follow button
+- [x] Upload notification trigger - Automatically notify followers when new cities are uploaded
+- [x] Real-time UI updates - Optimistic updates for follow actions and notification management
+
 ### Current Status
-✅ **EXTERNAL API SYSTEM COMPLETE!** The Cities: Skylines 2 sharing platform now includes a comprehensive external API system with secure API key authentication.
+✅ **FOLLOW SYSTEM & NOTIFICATIONS COMPLETE!** The Cities: Skylines 2 sharing platform now includes a comprehensive follow system and notification features for enhanced community engagement.
 
 **Core Features:**
 - Complete user authentication with username system
@@ -192,6 +204,16 @@ City (
 - Full image management system for city owners
 - Enhanced comment system with likes and sorting
 - **NEW**: Complete password reset system with email notifications
+
+**Follow System & Notification Features:**
+- **Follow System**: Users can follow/unfollow other users with real-time UI updates
+- **Notification System**: Automatic notifications when followed users upload new cities
+- **Notifications Menu**: Dropdown menu in header with unread count badge and notification management
+- **Follow Button Component**: Interactive follow/unfollow button with loading states and follower count
+- **User Profile Enhancement**: Display follower/following counts and follow functionality
+- **Real-time Updates**: Optimistic UI updates for immediate feedback on follow actions
+- **Notification Management**: Mark notifications as read, delete notifications, and mark all as read
+- **Upload Integration**: Automatic notification triggers when users upload new cities
 
 **External API Features:**
 - **Secure API Key System**: Cryptographically secure API keys with user association and last-used tracking

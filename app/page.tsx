@@ -3,6 +3,8 @@ import { getRecentCities, getTopCitiesByLikes, isUserAdmin } from 'app/db';
 import { CityCard } from 'app/components/CityCard';
 import { QuickSearch } from 'app/components/QuickSearch';
 import { ThemeToggle } from 'app/components/ThemeToggle';
+import { NotificationsMenu } from 'app/components/NotificationsMenu';
+import { ResponsiveNavigationWrapper } from 'app/components/ResponsiveNavigationWrapper';
 import { auth } from 'app/auth';
 
 export default async function Page() {
@@ -22,67 +24,7 @@ export default async function Page() {
                 Cities Collective
               </h1>
             </div>
-            <nav className="flex items-center space-x-4">
-              {session ? (
-                <>
-                  <Link
-                    href="/search"
-                    className="text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
-                  >
-                    Search
-                  </Link>
-                  <Link
-                    href="/favorites"
-                    className="text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
-                  >
-                    Favorites
-                  </Link>
-                  <Link
-                    href="/upload"
-                    className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
-                  >
-                    Upload City
-                  </Link>
-                  <Link
-                    href="/protected"
-                    className="text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
-                  >
-                    Dashboard
-                  </Link>
-                  {isAdmin && (
-                    <Link
-                      href="/admin"
-                      className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 font-medium"
-                    >
-                      Admin
-                    </Link>
-                  )}
-                  <ThemeToggle />
-                </>
-              ) : (
-                <>
-                  <Link
-                    href="/search"
-                    className="text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
-                  >
-                    Search
-                  </Link>
-                  <Link
-                    href="/login"
-                    className="text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
-                  >
-                    Login
-                  </Link>
-                  <Link
-                    href="/register"
-                    className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
-                  >
-                    Sign Up
-                  </Link>
-                  <ThemeToggle />
-                </>
-              )}
-            </nav>
+            <ResponsiveNavigationWrapper session={session} isAdmin={isAdmin} />
           </div>
         </div>
       </header>

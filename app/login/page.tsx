@@ -1,10 +1,29 @@
 import Link from 'next/link';
 import { signIn } from 'app/auth';
 import { SubmitButton } from 'app/submit-button';
+import { getRedirectUrl } from 'app/utils/redirect';
 
-export default function Login() {
+export default function Login({
+  searchParams,
+}: {
+  searchParams: { [key: string]: string | string[] | undefined };
+}) {
+  const redirectTo = getRedirectUrl(new URLSearchParams(searchParams as Record<string, string>));
   return (
     <div className="flex h-screen w-screen items-center justify-center bg-gray-50 dark:bg-gray-900">
+      {/* Return Home Button */}
+      <div className="absolute top-4 left-4">
+        <Link
+          href="/"
+          className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white transition-colors"
+        >
+          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
+          <span>Return Home</span>
+        </Link>
+      </div>
+      
       <div className="z-10 w-full max-w-md overflow-hidden rounded-2xl border border-gray-100 dark:border-gray-700 shadow-xl">
         <div className="flex flex-col items-center justify-center space-y-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-6 pt-8 text-center sm:px-16">
           <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Sign In</h3>
@@ -19,7 +38,7 @@ export default function Login() {
             <form
               action={async () => {
                 'use server';
-                await signIn('google', { redirectTo: '/protected' });
+                await signIn('google', { redirectTo });
               }}
             >
               <button
@@ -52,7 +71,7 @@ export default function Login() {
             <form
               action={async () => {
                 'use server';
-                await signIn('github', { redirectTo: '/protected' });
+                await signIn('github', { redirectTo });
               }}
             >
               <button
@@ -82,7 +101,7 @@ export default function Login() {
             action={async (formData: FormData) => {
               'use server';
               await signIn('credentials', {
-                redirectTo: '/protected',
+                redirectTo,
                 email: formData.get('email') as string,
                 password: formData.get('password') as string,
               });
@@ -136,7 +155,7 @@ export default function Login() {
             <SubmitButton>Sign in</SubmitButton>
             <p className="text-center text-sm text-gray-600 dark:text-gray-400">
               Don&apos;t have an account?{' '}
-              <Link href="/register" className="font-semibold text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400">
+              <Link href={`/register?redirect=${encodeURIComponent(redirectTo)}`} className="font-semibold text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400">
                 Sign up
               </Link>
               {' for free.'}

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import path from 'path';
 import AdmZip from 'adm-zip';
-import { cityTable, getUser, db, ensureCityTableExists, generateUniqueId, getCityCountByUser } from 'app/db';
+import { cityTable, getUser, db, ensureCityTableExists, generateUniqueId, getCityCountByUser, notifyFollowersOfNewCity } from 'app/db';
 import { auth } from 'app/auth';
 import { uploadToR2, generateFileKey } from 'app/utils/r2';
 
@@ -152,6 +152,14 @@ export async function POST(req: NextRequest) {
     console.log('Inserting city into database...');
     const inserted = await db.insert(cityTable).values(cityData).returning();
     console.log('City inserted successfully:', inserted[0].id);
+
+    // Notify followers of the new city upload
+    try {
+      await notifyFollowersOfNewCity(user.id, inserted[0].id, metadata.cityName);
+    } catch (notificationError) {
+      console.error('Failed to notify followers:', notificationError);
+      // Don't fail the upload if notification fails
+    }
 
     return NextResponse.json({ city: inserted[0] });
     

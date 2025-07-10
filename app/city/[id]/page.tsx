@@ -119,7 +119,7 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
                 </span>
               </div>
               {/* Download Button */}
-              {city.filePath && (city.downloadable || isOwner) && (
+              {city.filePath && (city.downloadable || isOwner) && session ? (
                 <div>
                   <a
                     href={`/api/cities/${city.id}/download`}
@@ -135,7 +135,19 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
                     )}
                   </a>
                 </div>
-              )}
+              ) : city.filePath && (city.downloadable || isOwner) && !session ? (
+                <div>
+                  <Link
+                    href={`/login?redirect=${encodeURIComponent(`/city/${city.id}`)}`}
+                    className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                    </svg>
+                    Login to Download
+                  </Link>
+                </div>
+              ) : null}
               {/* Show message when download is disabled */}
               {city.filePath && !city.downloadable && !isOwner && (
                 <div className="text-right">
@@ -212,7 +224,11 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
           )}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className={`grid gap-8 ${
+          city.contentPrerequisites && city.contentPrerequisites.length > 0 
+            ? 'grid-cols-1 lg:grid-cols-2' 
+            : 'grid-cols-1'
+        }`}>
           {/* Content Prerequisites */}
           {city.contentPrerequisites && city.contentPrerequisites.length > 0 && (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">

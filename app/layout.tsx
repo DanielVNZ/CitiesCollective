@@ -25,7 +25,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={GeistSans.variable}>
+      <body className={GeistSans.variable} suppressHydrationWarning>
         <ThemeProvider
           attribute="class"
           defaultTheme="light"

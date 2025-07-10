@@ -148,6 +148,28 @@ const apiKeysTable = pgTable('apiKeys', {
   createdAt: timestamp('createdAt').defaultNow(),
 });
 
+// Follows table for user following relationships
+const followsTable = pgTable('follows', {
+  id: serial('id').primaryKey(),
+  followerId: integer('followerId').notNull(),
+  followingId: integer('followingId').notNull(),
+  createdAt: timestamp('createdAt').defaultNow(),
+});
+
+// Notifications table for user notifications
+const notificationsTable = pgTable('notifications', {
+  id: serial('id').primaryKey(),
+  userId: integer('userId').notNull(),
+  type: varchar('type', { length: 50 }).notNull(), // 'new_city', 'like', 'comment', etc.
+  title: varchar('title', { length: 255 }).notNull(),
+  message: text('message').notNull(),
+  relatedUserId: integer('relatedUserId'), // User who triggered the notification
+  relatedCityId: integer('relatedCityId'), // City related to the notification
+  relatedCommentId: integer('relatedCommentId'), // Comment related to the notification
+  isRead: boolean('isRead').default(false),
+  createdAt: timestamp('createdAt').defaultNow(),
+});
+
 export async function getUser(email: string) {
   const users = await ensureTableExists();
   return await db.select().from(users).where(eq(users.email, email));
@@ -864,6 +886,8 @@ export async function getUserById(id: number) {
     id: users.id,
     email: users.email,
     username: users.username,
+    name: users.name,
+    avatar: users.avatar,
     pdxUsername: users.pdxUsername,
     discordUsername: users.discordUsername,
     isAdmin: users.isAdmin,
@@ -1184,16 +1208,20 @@ export async function getUniqueGameModes() {
 }
 
 async function ensureCityImagesTableExists() {
-  const cacheKey = 'cityImages';
-  
-  // Return if already initialized
-  if (tableInitCache.has(cacheKey)) {
-    return;
+  if (tableInitCache.has('cityImages')) {
+    return cityImagesTable;
   }
-  
-  try {
-    await db.execute(sql`
-      CREATE TABLE IF NOT EXISTS "cityImages" (
+
+  const result = await client`
+    SELECT EXISTS (
+      SELECT FROM information_schema.tables 
+      WHERE table_schema = 'public' 
+      AND table_name = 'cityImages'
+    );`;
+
+  if (!result[0].exists) {
+    await client`
+      CREATE TABLE "cityImages" (
         "id" SERIAL PRIMARY KEY,
         "cityId" INTEGER REFERENCES "City"("id") ON DELETE CASCADE,
         "fileName" VARCHAR(255),
@@ -1209,9 +1237,8 @@ async function ensureCityImagesTableExists() {
         "isPrimary" BOOLEAN DEFAULT FALSE,
         "sortOrder" INTEGER DEFAULT 0,
         "uploadedAt" TIMESTAMP DEFAULT NOW()
-      )
-    `);
-    
+      );`;
+  } else {
     // Check if sortOrder column exists, if not add it
     const sortOrderColumnExists = await client`
       SELECT EXISTS (
@@ -1222,17 +1249,13 @@ async function ensureCityImagesTableExists() {
       );`;
     
     if (!sortOrderColumnExists[0].exists) {
-      console.log('Adding sortOrder column to existing cityImages table...');
       await client`
         ALTER TABLE "cityImages" ADD COLUMN "sortOrder" INTEGER DEFAULT 0;`;
-      console.log('sortOrder column added successfully');
     }
-    
-    // Mark as initialized
-    tableInitCache.add(cacheKey);
-  } catch (error) {
-    console.error('Error creating city images table:', error);
   }
+
+  tableInitCache.add('cityImages');
+  return cityImagesTable;
 }
 
 export async function createCityImage(imageData: {
@@ -1392,11 +1415,8 @@ export { db };
 
 // Community features table creation functions
 async function ensureLikesTableExists() {
-  const cacheKey = 'likes';
-  
-  // Return if already initialized
-  if (tableInitCache.has(cacheKey)) {
-    return;
+  if (tableInitCache.has('likes')) {
+    return likesTable;
   }
   
   const result = await client`
@@ -1420,16 +1440,13 @@ async function ensureLikesTableExists() {
       CREATE UNIQUE INDEX likes_user_city_unique ON "likes"("userId", "cityId");`;
   }
   
-  // Mark as initialized
-  tableInitCache.add(cacheKey);
+  tableInitCache.add('likes');
+  return likesTable;
 }
 
 async function ensureCommentsTableExists() {
-  const cacheKey = 'comments';
-  
-  // Return if already initialized
-  if (tableInitCache.has(cacheKey)) {
-    return;
+  if (tableInitCache.has('comments')) {
+    return commentsTable;
   }
   
   const result = await client`
@@ -1451,16 +1468,13 @@ async function ensureCommentsTableExists() {
       );`;
   }
   
-  // Mark as initialized
-  tableInitCache.add(cacheKey);
+  tableInitCache.add('comments');
+  return commentsTable;
 }
 
 async function ensureFavoritesTableExists() {
-  const cacheKey = 'favorites';
-  
-  // Return if already initialized
-  if (tableInitCache.has(cacheKey)) {
-    return;
+  if (tableInitCache.has('favorites')) {
+    return favoritesTable;
   }
   
   const result = await client`
@@ -1484,16 +1498,13 @@ async function ensureFavoritesTableExists() {
       CREATE UNIQUE INDEX favorites_user_city_unique ON "favorites"("userId", "cityId");`;
   }
   
-  // Mark as initialized
-  tableInitCache.add(cacheKey);
+  tableInitCache.add('favorites');
+  return favoritesTable;
 }
 
 async function ensureCommentLikesTableExists() {
-  const cacheKey = 'commentLikes';
-  
-  // Return if already initialized
-  if (tableInitCache.has(cacheKey)) {
-    return;
+  if (tableInitCache.has('commentLikes')) {
+    return commentLikesTable;
   }
   
   const result = await client`
@@ -1517,8 +1528,8 @@ async function ensureCommentLikesTableExists() {
       CREATE UNIQUE INDEX commentLikes_user_comment_unique ON "commentLikes"("userId", "commentId");`;
   }
   
-  // Mark as initialized
-  tableInitCache.add(cacheKey);
+  tableInitCache.add('commentLikes');
+  return commentLikesTable;
 }
 
 // Community features functions
@@ -1731,11 +1742,8 @@ export async function getCityCommentCount(cityId: number) {
 
 // Moderation settings functions
 async function ensureModerationSettingsTableExists() {
-  const cacheKey = 'moderationSettings';
-  
-  // Return if already initialized
-  if (tableInitCache.has(cacheKey)) {
-    return;
+  if (tableInitCache.has('moderationSettings')) {
+    return moderationSettingsTable;
   }
   
   const result = await client`
@@ -1755,16 +1763,13 @@ async function ensureModerationSettingsTableExists() {
       );`;
   }
   
-  // Mark as initialized
-  tableInitCache.add(cacheKey);
+  tableInitCache.add('moderationSettings');
+  return moderationSettingsTable;
 }
 
 async function ensurePasswordResetTokensTableExists() {
-  const cacheKey = 'passwordResetTokens';
-  
-  // Return if already initialized
-  if (tableInitCache.has(cacheKey)) {
-    return;
+  if (tableInitCache.has('passwordResetTokens')) {
+    return passwordResetTokensTable;
   }
   
   const result = await client`
@@ -1785,8 +1790,8 @@ async function ensurePasswordResetTokensTableExists() {
       );`;
   }
   
-  // Mark as initialized
-  tableInitCache.add(cacheKey);
+  tableInitCache.add('passwordResetTokens');
+  return passwordResetTokensTable;
 }
 
 export async function getModerationSetting(key: string) {
@@ -1980,37 +1985,35 @@ export async function updateUserPassword(userId: number, newPassword: string) {
   return result[0];
 }
 
-// API Key Management Functions
-async function ensureApiKeysTableExists() {
-  if (tableInitCache.has('apiKeys')) {
+  // API Key Management Functions
+  async function ensureApiKeysTableExists() {
+    if (tableInitCache.has('apiKeys')) {
+      return apiKeysTable;
+    }
+
+    const result = await client`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'apiKeys'
+      );`;
+
+    if (!result[0].exists) {
+      await client`
+        CREATE TABLE "apiKeys" (
+          "id" serial PRIMARY KEY,
+          "userId" integer NOT NULL,
+          "name" varchar(255) NOT NULL,
+          "key" varchar(255) UNIQUE NOT NULL,
+          "isActive" boolean DEFAULT true,
+          "lastUsed" timestamp,
+          "createdAt" timestamp DEFAULT now()
+        );`;
+    }
+
+    tableInitCache.add('apiKeys');
     return apiKeysTable;
   }
-
-  const result = await client`
-    SELECT EXISTS (
-      SELECT FROM information_schema.tables 
-      WHERE table_schema = 'public' 
-      AND table_name = 'apiKeys'
-    );`;
-
-  if (!result[0].exists) {
-    await client`
-      CREATE TABLE "apiKeys" (
-        "id" serial PRIMARY KEY,
-        "userId" integer NOT NULL,
-        "name" varchar(255) NOT NULL,
-        "key" varchar(255) UNIQUE NOT NULL,
-        "isActive" boolean DEFAULT true,
-        "lastUsed" timestamp,
-        "createdAt" timestamp DEFAULT now()
-      );`;
-  }
-
-  // Mark as initialized
-  tableInitCache.add('apiKeys');
-
-  return apiKeysTable;
-}
 
 export async function createApiKey(userId: number, name: string) {
   const apiKeys = await ensureApiKeysTableExists();
@@ -2089,4 +2092,288 @@ export async function deleteApiKey(keyId: number, userId: number) {
   
   return await db.delete(apiKeys)
     .where(and(eq(apiKeys.id, keyId), eq(apiKeys.userId, userId)));
+}
+
+// Follow System Functions
+async function ensureFollowsTableExists() {
+  if (tableInitCache.has('follows')) {
+    return followsTable;
+  }
+
+  const result = await client`
+    SELECT EXISTS (
+      SELECT FROM information_schema.tables 
+      WHERE table_schema = 'public' 
+      AND table_name = 'follows'
+    );`;
+
+  if (!result[0].exists) {
+    await client`
+      CREATE TABLE "follows" (
+        "id" serial PRIMARY KEY,
+        "followerId" integer NOT NULL,
+        "followingId" integer NOT NULL,
+        "createdAt" timestamp DEFAULT now(),
+        UNIQUE("followerId", "followingId")
+      );`;
+  }
+
+  tableInitCache.add('follows');
+  return followsTable;
+}
+
+async function ensureNotificationsTableExists() {
+  if (tableInitCache.has('notifications')) {
+    return notificationsTable;
+  }
+
+  const result = await client`
+    SELECT EXISTS (
+      SELECT FROM information_schema.tables 
+      WHERE table_schema = 'public' 
+      AND table_name = 'notifications'
+    );`;
+
+  if (!result[0].exists) {
+    await client`
+      CREATE TABLE "notifications" (
+        "id" serial PRIMARY KEY,
+        "userId" integer NOT NULL,
+        "type" varchar(50) NOT NULL,
+        "title" varchar(255) NOT NULL,
+        "message" text NOT NULL,
+        "relatedUserId" integer,
+        "relatedCityId" integer,
+        "relatedCommentId" integer,
+        "isRead" boolean DEFAULT false,
+        "createdAt" timestamp DEFAULT now()
+      );`;
+  }
+
+  tableInitCache.add('notifications');
+  return notificationsTable;
+}
+
+export async function toggleFollow(followerId: number, followingId: number) {
+  const follows = await ensureFollowsTableExists();
+  
+  // Check if already following
+  const existingFollow = await db.select()
+    .from(follows)
+    .where(and(
+      eq(follows.followerId, followerId),
+      eq(follows.followingId, followingId)
+    ))
+    .limit(1);
+  
+  if (existingFollow.length > 0) {
+    // Unfollow
+    await db.delete(follows)
+      .where(and(
+        eq(follows.followerId, followerId),
+        eq(follows.followingId, followingId)
+      ));
+    return { isFollowing: false };
+  } else {
+    // Follow
+    await db.insert(follows).values({
+      followerId,
+      followingId
+    });
+    return { isFollowing: true };
+  }
+}
+
+export async function isFollowing(followerId: number, followingId: number) {
+  const follows = await ensureFollowsTableExists();
+  
+  const result = await db.select()
+    .from(follows)
+    .where(and(
+      eq(follows.followerId, followerId),
+      eq(follows.followingId, followingId)
+    ))
+    .limit(1);
+  
+  return result.length > 0;
+}
+
+export async function getFollowers(userId: number) {
+  const follows = await ensureFollowsTableExists();
+  const users = await ensureTableExists();
+  
+  return await db.select({
+    id: users.id,
+    username: users.username,
+    name: users.name,
+    avatar: users.avatar,
+    followedAt: follows.createdAt
+  })
+    .from(follows)
+    .innerJoin(users, eq(follows.followerId, users.id))
+    .where(eq(follows.followingId, userId))
+    .orderBy(desc(follows.createdAt));
+}
+
+export async function getFollowing(userId: number) {
+  const follows = await ensureFollowsTableExists();
+  const users = await ensureTableExists();
+  
+  return await db.select({
+    id: users.id,
+    username: users.username,
+    name: users.name,
+    avatar: users.avatar,
+    followedAt: follows.createdAt
+  })
+    .from(follows)
+    .innerJoin(users, eq(follows.followingId, users.id))
+    .where(eq(follows.followerId, userId))
+    .orderBy(desc(follows.createdAt));
+}
+
+export async function getFollowerCount(userId: number) {
+  const follows = await ensureFollowsTableExists();
+  
+  const result = await db.select({ count: sql<number>`COUNT(*)` })
+    .from(follows)
+    .where(eq(follows.followingId, userId));
+  
+  return result[0].count;
+}
+
+export async function getFollowingCount(userId: number) {
+  const follows = await ensureFollowsTableExists();
+  
+  const result = await db.select({ count: sql<number>`COUNT(*)` })
+    .from(follows)
+    .where(eq(follows.followerId, userId));
+  
+  return result[0].count;
+}
+
+// Notification System Functions
+export async function createNotification(data: {
+  userId: number;
+  type: string;
+  title: string;
+  message: string;
+  relatedUserId?: number;
+  relatedCityId?: number;
+  relatedCommentId?: number;
+}) {
+  const notifications = await ensureNotificationsTableExists();
+  
+  return await db.insert(notifications).values(data).returning();
+}
+
+export async function getUserNotifications(userId: number, limit: number = 20, offset: number = 0) {
+  const notifications = await ensureNotificationsTableExists();
+  const users = await ensureTableExists();
+  const cities = await ensureCityTableExists();
+  
+  return await db.select({
+    id: notifications.id,
+    type: notifications.type,
+    title: notifications.title,
+    message: notifications.message,
+    isRead: notifications.isRead,
+    createdAt: notifications.createdAt,
+    relatedUser: {
+      id: users.id,
+      username: users.username,
+      name: users.name,
+      avatar: users.avatar
+    },
+    relatedCity: {
+      id: cities.id,
+      cityName: cities.cityName,
+      mapName: cities.mapName
+    }
+  })
+    .from(notifications)
+    .leftJoin(users, eq(notifications.relatedUserId, users.id))
+    .leftJoin(cities, eq(notifications.relatedCityId, cities.id))
+    .where(eq(notifications.userId, userId))
+    .orderBy(desc(notifications.createdAt))
+    .limit(limit)
+    .offset(offset);
+}
+
+export async function getUnreadNotificationCount(userId: number) {
+  const notifications = await ensureNotificationsTableExists();
+  
+  const result = await db.select({ count: sql<number>`COUNT(*)` })
+    .from(notifications)
+    .where(and(
+      eq(notifications.userId, userId),
+      eq(notifications.isRead, false)
+    ));
+  
+  return result[0].count;
+}
+
+export async function markNotificationAsRead(notificationId: number, userId: number) {
+  const notifications = await ensureNotificationsTableExists();
+  
+  return await db.update(notifications)
+    .set({ isRead: true })
+    .where(and(
+      eq(notifications.id, notificationId),
+      eq(notifications.userId, userId)
+    ));
+}
+
+export async function markAllNotificationsAsRead(userId: number) {
+  const notifications = await ensureNotificationsTableExists();
+  
+  return await db.update(notifications)
+    .set({ isRead: true })
+    .where(eq(notifications.userId, userId));
+}
+
+export async function deleteNotification(notificationId: number, userId: number) {
+  const notifications = await ensureNotificationsTableExists();
+  
+  return await db.delete(notifications)
+    .where(and(
+      eq(notifications.id, notificationId),
+      eq(notifications.userId, userId)
+    ));
+}
+
+// Function to notify followers when a user uploads a new city
+export async function notifyFollowersOfNewCity(userId: number, cityId: number, cityName: string) {
+  const follows = await ensureFollowsTableExists();
+  const users = await ensureTableExists();
+  
+  // Get all followers of the user
+  const followers = await db.select({ followerId: follows.followerId })
+    .from(follows)
+    .where(eq(follows.followingId, userId));
+  
+  // Get user info for the notification
+  const userInfo = await db.select({ username: users.username, name: users.name })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  
+  if (userInfo.length === 0) return;
+  
+  const user = userInfo[0];
+  const displayName = user.username || user.name || 'Unknown User';
+  
+  // Create notifications for all followers
+  const notificationPromises = followers.map(follower => 
+    createNotification({
+      userId: follower.followerId,
+      type: 'new_city',
+      title: 'New City Uploaded',
+      message: `${displayName} uploaded a new city: ${cityName}`,
+      relatedUserId: userId,
+      relatedCityId: cityId
+    })
+  );
+  
+  await Promise.all(notificationPromises);
 }

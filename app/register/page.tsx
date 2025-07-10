@@ -3,8 +3,14 @@ import { redirect } from 'next/navigation';
 import { createUser, getUser, client } from 'app/db';
 import { signIn } from 'app/auth';
 import { SubmitButton } from 'app/submit-button';
+import { getRedirectUrl } from 'app/utils/redirect';
 
-export default function Register() {
+export default function Register({
+  searchParams,
+}: {
+  searchParams: { [key: string]: string | string[] | undefined };
+}) {
+  const redirectTo = getRedirectUrl(new URLSearchParams(searchParams as Record<string, string>));
   async function register(formData: FormData) {
     'use server';
     let email = formData.get('email') as string;
@@ -33,11 +39,24 @@ export default function Register() {
     }
 
     await createUser(email, password, username);
-    redirect('/login');
+    redirect(`/login?redirect=${encodeURIComponent(redirectTo)}`);
   }
 
   return (
     <div className="flex h-screen w-screen items-center justify-center bg-gray-50 dark:bg-gray-900">
+      {/* Return Home Button */}
+      <div className="absolute top-4 left-4">
+        <Link
+          href="/"
+          className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white transition-colors"
+        >
+          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
+          <span>Return Home</span>
+        </Link>
+      </div>
+      
       <div className="z-10 w-full max-w-md overflow-hidden rounded-2xl border border-gray-100 dark:border-gray-700 shadow-xl">
         <div className="flex flex-col items-center justify-center space-y-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-6 pt-8 text-center sm:px-16">
           <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Sign Up</h3>
@@ -52,7 +71,7 @@ export default function Register() {
             <form
               action={async () => {
                 'use server';
-                await signIn('google', { redirectTo: '/protected' });
+                await signIn('google', { redirectTo });
               }}
             >
               <button
@@ -85,7 +104,7 @@ export default function Register() {
             <form
               action={async () => {
                 'use server';
-                await signIn('github', { redirectTo: '/protected' });
+                await signIn('github', { redirectTo });
               }}
             >
               <button
@@ -198,7 +217,7 @@ export default function Register() {
             <SubmitButton>Sign Up</SubmitButton>
             <p className="text-center text-sm text-gray-600 dark:text-gray-400">
               {'Already have an account? '}
-              <Link href="/login" className="font-semibold text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400">
+              <Link href={`/login?redirect=${encodeURIComponent(redirectTo)}`} className="font-semibold text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400">
                 Sign in
               </Link>
               {' instead.'}

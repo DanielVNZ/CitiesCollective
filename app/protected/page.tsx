@@ -1,9 +1,10 @@
-import { auth, signOut } from 'app/auth';
+import { auth } from 'app/auth';
 import { getUser, getCitiesByUser } from 'app/db';
 import Link from 'next/link';
 import { CityManagementCard } from './CityManagementCard';
 import { UserProfileSection } from 'app/components/UserProfileSection';
 import ProfileEditor from 'app/components/ProfileEditor';
+import { SignOutButton } from 'app/components/SignOutButton';
 
 export default async function ProtectedPage() {
   const session = await auth();
@@ -96,23 +97,5 @@ export default async function ProtectedPage() {
         </div>
       </main>
     </div>
-  );
-}
-
-function SignOutButton() {
-  return (
-    <form
-      action={async () => {
-        'use server';
-        await signOut();
-      }}
-    >
-      <button 
-        type="submit"
-        className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200 px-3 py-2 rounded-md text-sm font-medium"
-      >
-        Sign Out
-      </button>
-    </form>
   );
 }

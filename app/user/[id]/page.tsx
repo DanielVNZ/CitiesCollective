@@ -1,7 +1,9 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { getCitiesByUser, getUserById } from 'app/db';
+import { getCitiesByUser, getUserById, getFollowerCount, getFollowingCount } from 'app/db';
 import { CityCard } from 'app/components/CityCard';
+import { FollowButton } from 'app/components/FollowButton';
+import { auth } from 'app/auth';
 
 interface UserProfilePageProps {
   params: {
@@ -15,13 +17,30 @@ export default async function UserProfilePage({ params }: UserProfilePageProps) 
     notFound();
   }
 
-  const [user, cities] = await Promise.all([
+  const session = await auth();
+  
+  const [user, cities, followerCount, followingCount] = await Promise.all([
     getUserById(userId),
-    getCitiesByUser(userId)
+    getCitiesByUser(userId),
+    getFollowerCount(userId),
+    getFollowingCount(userId)
   ]);
 
   if (!user) {
     notFound();
+  }
+
+  // Get current user info for follow button
+  let currentUser = null;
+  let isFollowing = false;
+  if (session?.user?.email) {
+    const { getUser, isFollowing: checkFollowing } = await import('app/db');
+    const currentUsers = await getUser(session.user.email);
+    currentUser = currentUsers[0];
+    
+    if (currentUser && currentUser.id !== userId) {
+      isFollowing = await checkFollowing(currentUser.id, userId);
+    }
   }
 
   const totalPopulation = cities.reduce((sum: number, city: any) => sum + (city.population || 0), 0);
@@ -65,28 +84,56 @@ export default async function UserProfilePage({ params }: UserProfilePageProps) 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* User Profile Header */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-8 mb-8">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center">
-              <div className="flex items-center justify-center w-16 h-16 bg-blue-500 text-white rounded-full text-2xl font-bold">
-                {(user.username || user.email || 'U').charAt(0).toUpperCase()}
+          <div className="flex items-start justify-between mb-8">
+            <div className="flex items-center flex-1">
+              <div className="flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-full text-2xl font-bold shadow-lg">
+                {(user.username || user.name || user.email || 'U').charAt(0).toUpperCase()}
               </div>
-              <div className="ml-6">
-                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{user.username || user.email || 'Unknown User'}</h1>
-                <p className="text-gray-600 dark:text-gray-400">Cities Collective Builder</p>
+              <div className="ml-6 flex-1">
+                <div className="flex items-center gap-4 mb-2">
+                  <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                    {user.username || user.name || user.email || 'Unknown User'}
+                  </h1>
+                </div>
+                <p className="text-gray-600 dark:text-gray-400 mb-3">Cities Collective Builder</p>
+                
+                {/* Social Stats Row */}
+                <div className="flex items-center gap-6 mb-3">
+                  <div className="flex items-center gap-1">
+                    <span className="font-semibold text-gray-900 dark:text-white">{cities.length}</span>
+                    <span className="text-sm text-gray-600 dark:text-gray-400">Cities</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="font-semibold text-gray-900 dark:text-white">{followerCount}</span>
+                    <span className="text-sm text-gray-600 dark:text-gray-400">Followers</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="font-semibold text-gray-900 dark:text-white">{followingCount}</span>
+                    <span className="text-sm text-gray-600 dark:text-gray-400">Following</span>
+                  </div>
+                </div>
+
+                {/* Platform Badges */}
                 {(user.pdxUsername || user.discordUsername) && (
-                  <div className="flex flex-wrap gap-2 mt-2">
+                  <div className="flex flex-wrap gap-2">
                     {user.pdxUsername && (
                       <a
                         href={`https://mods.paradoxplaza.com/authors/${user.pdxUsername}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors duration-200"
+                        className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors duration-200"
                       >
+                        <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M10 12L8 10l2-2 2 2-2 2z"/>
+                        </svg>
                         PDX: {user.pdxUsername}
                       </a>
                     )}
                     {user.discordUsername && (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300">
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300">
+                        <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M10 2L3 7v11l7-5 7 5V7l-7-5z"/>
+                        </svg>
                         Discord: {user.discordUsername}
                       </span>
                     )}
@@ -94,71 +141,91 @@ export default async function UserProfilePage({ params }: UserProfilePageProps) 
                 )}
               </div>
             </div>
-            <div className="text-right">
-              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{cities.length}</div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">Cities Shared</div>
-            </div>
+
+            {/* Follow Button - Right Side */}
+            {currentUser && currentUser.id !== userId && (
+              <div className="ml-6 flex-shrink-0">
+                <FollowButton
+                  targetUserId={userId}
+                  initialIsFollowing={isFollowing}
+                  initialFollowerCount={followerCount}
+                  className="min-w-[120px]"
+                />
+              </div>
+            )}
           </div>
 
-          {/* User Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-              <div className="text-2xl font-bold text-green-700 dark:text-green-400">
-                {formatNumber(totalPopulation)}
+          {/* City Statistics */}
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">City Statistics</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="text-center p-4 bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 rounded-xl border border-green-200 dark:border-green-800">
+                <div className="text-2xl font-bold text-green-700 dark:text-green-400 mb-1">
+                  {formatNumber(totalPopulation)}
+                </div>
+                <div className="text-sm font-medium text-green-600 dark:text-green-300">Total Population</div>
               </div>
-              <div className="text-sm text-green-600 dark:text-green-300">Total Population</div>
-            </div>
-            <div className="text-center p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
-              <div className="text-2xl font-bold text-yellow-700 dark:text-yellow-400">
-                ${formatNumber(totalMoney)}
+              <div className="text-center p-4 bg-gradient-to-br from-yellow-50 to-yellow-100 dark:from-yellow-900/20 dark:to-yellow-800/20 rounded-xl border border-yellow-200 dark:border-yellow-800">
+                <div className="text-2xl font-bold text-yellow-700 dark:text-yellow-400 mb-1">
+                  ${formatNumber(totalMoney)}
+                </div>
+                <div className="text-sm font-medium text-yellow-600 dark:text-yellow-300">Total Money</div>
               </div>
-              <div className="text-sm text-yellow-600 dark:text-yellow-300">Total Money</div>
-            </div>
-            <div className="text-center p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-              <div className="text-2xl font-bold text-purple-700 dark:text-purple-400">
-                {formatNumber(totalXP)}
+              <div className="text-center p-4 bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 rounded-xl border border-purple-200 dark:border-purple-800">
+                <div className="text-2xl font-bold text-purple-700 dark:text-purple-400 mb-1">
+                  {formatNumber(totalXP)}
+                </div>
+                <div className="text-sm font-medium text-purple-600 dark:text-purple-300">Total XP</div>
               </div>
-              <div className="text-sm text-purple-600 dark:text-purple-300">Total XP</div>
-            </div>
-            <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-              <div className="text-sm font-semibold text-blue-700 dark:text-blue-400">
-                {lastUpload ? formatDate(lastUpload) : 'Never'}
+              <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-xl border border-blue-200 dark:border-blue-800">
+                <div className="text-xl font-bold text-blue-700 dark:text-blue-400 mb-1">
+                  {lastUpload ? formatDate(lastUpload) : 'Never'}
+                </div>
+                <div className="text-sm font-medium text-blue-600 dark:text-blue-300">Last Upload</div>
               </div>
-              <div className="text-sm text-blue-600 dark:text-blue-300">Last Upload</div>
             </div>
           </div>
         </div>
 
         {/* Cities Section */}
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
-            Cities by {user.username || user.email || 'Unknown User'}
-          </h2>
-          <p className="text-gray-600 dark:text-gray-400">
-            {cities.length === 0 
-              ? 'This user hasn&apos;t shared any cities yet.' 
-              : `Explore ${cities.length} amazing ${cities.length === 1 ? 'city' : 'cities'} created by this builder.`
-            }
-          </p>
-        </div>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-8">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                Cities by {user.username || user.name || user.email || 'Unknown User'}
+              </h2>
+              <p className="text-gray-600 dark:text-gray-400 mt-1">
+                {cities.length === 0 
+                  ? 'This user hasn\'t shared any cities yet.' 
+                  : `Explore ${cities.length} amazing ${cities.length === 1 ? 'city' : 'cities'} created by this builder.`
+                }
+              </p>
+            </div>
+            {cities.length > 0 && (
+              <div className="text-sm text-gray-500 dark:text-gray-400">
+                {cities.length} {cities.length === 1 ? 'city' : 'cities'}
+              </div>
+            )}
+          </div>
 
-        {cities.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="text-gray-400 text-6xl mb-4">🏗️</div>
-            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-              No cities yet!
-            </h3>
-            <p className="text-gray-600 dark:text-gray-400">
-              This user hasn&apos;t shared any cities with the community yet.
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {cities.map((city: any) => (
-              <CityCard key={city.id} city={city} />
-            ))}
-          </div>
-        )}
+          {cities.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="text-gray-400 text-6xl mb-4">🏗️</div>
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                No cities yet!
+              </h3>
+              <p className="text-gray-600 dark:text-gray-400">
+                This user hasn&apos;t shared any cities with the community yet.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {cities.map((city: any) => (
+                <CityCard key={city.id} city={city} />
+              ))}
+            </div>
+          )}
+        </div>
       </main>
     </div>
   );

@@ -3,10 +3,13 @@ import Link from 'next/link';
 import { SearchBar } from 'app/components/SearchBar';
 import { CityCard } from 'app/components/CityCard';
 import { SearchResults } from './SearchResults';
+import { ResponsiveNavigationWrapper } from 'app/components/ResponsiveNavigationWrapper';
 import { auth } from 'app/auth';
+import { isUserAdmin } from 'app/db';
 
 export default async function SearchPage() {
   const session = await auth();
+  const isAdmin = session?.user?.email ? await isUserAdmin(session.user.email) : false;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -22,39 +25,7 @@ export default async function SearchPage() {
                 Search Cities
               </h1>
             </div>
-            <nav className="flex items-center space-x-4">
-              {session ? (
-                <>
-                  <Link
-                    href="/upload"
-                    className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
-                  >
-                    Upload City
-                  </Link>
-                  <Link
-                    href="/protected"
-                    className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
-                  >
-                    Dashboard
-                  </Link>
-                </>
-              ) : (
-                <>
-                  <Link
-                    href="/login"
-                    className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
-                  >
-                    Login
-                  </Link>
-                  <Link
-                    href="/register"
-                    className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
-                  >
-                    Sign Up
-                  </Link>
-                </>
-              )}
-            </nav>
+            <ResponsiveNavigationWrapper session={session} isAdmin={isAdmin} />
           </div>
         </div>
       </header>
