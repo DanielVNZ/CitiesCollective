@@ -220,7 +220,7 @@ export function OsmMapManager({ cityId, initialOsmMapPath, isOwner }: OsmMapMana
                 file:cursor-pointer"
             />
             <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              Supported format: .osm files. Max size: 10MB
+              Supported format: .osm files. Max size: 100MB
             </p>
           </div>
           

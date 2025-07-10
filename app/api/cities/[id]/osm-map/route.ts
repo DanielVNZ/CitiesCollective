@@ -53,11 +53,11 @@ export async function POST(
       }, { status: 400 });
     }
 
-    // Validate file size (max 10MB)
-    const maxSize = 10 * 1024 * 1024; // 10MB
+        // Validate file size (max 100MB)
+    const maxSize = 100 * 1024 * 1024; // 100MB
     if (file.size > maxSize) {
-      return NextResponse.json({ 
-        error: 'File too large. Please upload a file smaller than 10MB.' 
+      return NextResponse.json({
+        error: 'File too large. Please upload a file smaller than 100MB.'
       }, { status: 400 });
     }
 
