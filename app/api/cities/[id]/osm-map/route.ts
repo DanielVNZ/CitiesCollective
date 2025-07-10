@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from 'app/auth';
 import { getUser, updateCityOsmMap, getCityById } from 'app/db';
-import { writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
-import { v4 as uuidv4 } from 'uuid';
+import { uploadToR2, generateFileKey } from 'app/utils/r2';
 
 export async function POST(
   request: NextRequest,
@@ -63,21 +61,17 @@ export async function POST(
       }, { status: 400 });
     }
 
-    // Generate unique filename
-    const fileName = `${uuidv4()}-osm-map.${fileExtension || 'osm'}`;
+    // Generate unique filename and upload to R2
+    const fileName = `osm-map-${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExtension || 'osm'}`;
     
-    // Create directory path (same as city images)
-    const uploadDir = join(process.cwd(), 'public', 'uploads', 'cities', 'osm-maps');
-    await mkdir(uploadDir, { recursive: true });
-    
-    // Save file
-    const filePath = join(uploadDir, fileName);
+    // Upload to R2
+    const fileKey = generateFileKey('osm-maps', fileName, user.id);
     const bytes = await file.arrayBuffer();
-    await writeFile(filePath, new Uint8Array(bytes));
+    const buffer = Buffer.from(bytes);
+    const uploadResult = await uploadToR2(buffer, fileKey, file.type || 'application/xml');
 
-    // Update city with OSM map path
-    const relativePath = `/uploads/cities/osm-maps/${fileName}`;
-    const updatedCity = await updateCityOsmMap(cityId, user.id, relativePath);
+    // Update city with OSM map path (use R2 URL)
+    const updatedCity = await updateCityOsmMap(cityId, user.id, uploadResult.url);
     
     if (!updatedCity) {
       return NextResponse.json({ error: 'Failed to update city' }, { status: 500 });
@@ -85,7 +79,7 @@ export async function POST(
 
     return NextResponse.json({ 
       success: true,
-      osmMapPath: relativePath
+      osmMapPath: uploadResult.url
     });
 
   } catch (error) {
