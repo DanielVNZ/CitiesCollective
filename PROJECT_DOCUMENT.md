@@ -184,6 +184,7 @@ City (
 - [x] Database schema for notifications - Add notifications table with type, message, and related content
 - [x] Follow/unfollow API endpoints - Toggle follow status with proper authentication
 - [x] Notification system - Create notifications when followed users upload new cities
+- [x] New follower notifications - Notify users when someone starts following them
 - [x] Notifications API endpoints - Get, mark as read, and delete notifications
 - [x] Notifications menu component - Dropdown menu in header with unread count badge
 - [x] Follow button component - Interactive follow/unfollow button with real-time updates
@@ -214,7 +215,7 @@ City (
 - **City Page Integration**: Description section prominently displayed on city detail pages
 - **Database Integration**: Secure API endpoint with proper authentication and authorization
 
-✅ **FOLLOW SYSTEM & NOTIFICATIONS COMPLETE!** The platform also includes a comprehensive follow system and notification features for enhanced community engagement.
+✅ **FOLLOW SYSTEM & NOTIFICATIONS COMPLETE!** The platform also includes a comprehensive follow system and notification features for enhanced community engagement, including new follower notifications.
 
 **Core Features:**
 - Complete user authentication with username system
@@ -230,6 +231,7 @@ City (
 **Follow System & Notification Features:**
 - **Follow System**: Users can follow/unfollow other users with real-time UI updates
 - **Notification System**: Automatic notifications when followed users upload new cities
+- **New Follower Notifications**: Users are notified when someone starts following them
 - **Notifications Menu**: Dropdown menu in header with unread count badge and notification management
 - **Follow Button Component**: Interactive follow/unfollow button with loading states and follower count
 - **User Profile Enhancement**: Display follower/following counts and follow functionality

@@ -2209,6 +2209,10 @@ export async function toggleFollow(followerId: number, followingId: number) {
       followerId,
       followingId
     });
+    
+    // Notify the person being followed
+    await notifyNewFollower(followerId, followingId);
+    
     return { isFollowing: true };
   }
 }
@@ -2369,6 +2373,31 @@ export async function deleteNotification(notificationId: number, userId: number)
       eq(notifications.id, notificationId),
       eq(notifications.userId, userId)
     ));
+}
+
+// Function to notify when someone follows you
+export async function notifyNewFollower(followerId: number, followingId: number) {
+  const users = await ensureTableExists();
+  
+  // Get follower info for the notification
+  const followerInfo = await db.select({ username: users.username, name: users.name })
+    .from(users)
+    .where(eq(users.id, followerId))
+    .limit(1);
+  
+  if (followerInfo.length === 0) return;
+  
+  const follower = followerInfo[0];
+  const displayName = follower.username || follower.name || 'Unknown User';
+  
+  // Create notification for the person being followed
+  await createNotification({
+    userId: followingId,
+    type: 'new_follower',
+    title: 'New Follower',
+    message: `${displayName} started following you`,
+    relatedUserId: followerId
+  });
 }
 
 // Function to notify followers when a user uploads a new city
