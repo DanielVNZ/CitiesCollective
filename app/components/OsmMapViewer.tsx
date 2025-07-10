@@ -375,7 +375,7 @@ function CanvasOsmRenderer({
        };
        
        return processedWay;
-     }).filter(way => way !== null);
+     }).filter((way): way is NonNullable<typeof way> => way !== null);
     
     // Create custom high-performance canvas layer
     const CanvasLayer = L.Layer.extend({
