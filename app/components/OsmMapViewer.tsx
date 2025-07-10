@@ -285,7 +285,7 @@ export function OsmMapViewer({ osmMapPath, cityName, cityId }: OsmMapViewerProps
         tags.landuse === 'reservoir' || tags.landuse === 'basin' || 
         tags.place === 'sea' || tags.place === 'ocean' ||
         tags.natural === 'bay' || tags.natural === 'strait') {
-      return '#B5D0D0'; // Water blue
+      return '#2E86AB'; // Darker blue
     }
     
     // Forest and woods
@@ -351,6 +351,9 @@ export function OsmMapViewer({ osmMapPath, cityName, cityId }: OsmMapViewerProps
     // Glacier
     if (tags.natural === 'glacier') return '#DDECEC';
     
+    // Fell areas (high moorland/mountain terrain)
+    if (tags.natural === 'fell') return '#C5FF5B';
+    
     // Pedestrian areas
     if (tags.highway === 'pedestrian') return '#EDEDED';
     
@@ -390,8 +393,8 @@ export function OsmMapViewer({ osmMapPath, cityName, cityId }: OsmMapViewerProps
     if (tags.highway === 'primary' || tags.highway === 'primary_link') return '#ECA2A3';
     if (tags.highway === 'secondary' || tags.highway === 'secondary_link') return '#FDD6A4';
     if (tags.highway === 'tertiary' || tags.highway === 'tertiary_link') return '#FEFEB2';
-    if (tags.highway === 'residential' || tags.highway === 'unclassified') return '#FFFFFF';
-    if (tags.highway === 'service') return '#FFFFFF';
+    if (tags.highway === 'residential' || tags.highway === 'unclassified') return '#CCCCCC';
+    if (tags.highway === 'service') return '#CCCCCC';
     if (tags.highway === 'pedestrian') return '#EDEDED';
     if (tags.highway === 'footway') return '#F68474';
     if (tags.highway === 'cycleway') return '#0000FF';
@@ -1258,6 +1261,7 @@ function CanvasOsmRenderer({
          const visibleRoads: any[] = [];
          const visibleRailways: any[] = [];
          const visiblePower: any[] = [];
+         const visibleContours: any[] = [];
          
          // Categorize ways for comprehensive rendering
          for (let i = 0; i < allWaysToRender.length; i++) {
@@ -1266,6 +1270,14 @@ function CanvasOsmRenderer({
            
            // Skip multipolygons as they're handled separately
            if (way.isMultipolygon) continue;
+           
+           // Contour lines - check multiple tagging schemes
+           if ((tags.contour === 'elevation' && tags.ele) || 
+               (tags.natural === 'contour' && tags.ele) ||
+               tags.contour === 'contour' ||
+               tags['contour:type'] === 'elevation') {
+             visibleContours.push(way);
+           }
            
            // Water features - both areas and lines
            if (tags.natural === 'water' || tags.waterway === 'riverbank' || 
@@ -1302,8 +1314,8 @@ function CanvasOsmRenderer({
                tags.military === 'barracks' || tags.aeroway === 'apron' ||
                tags.aeroway === 'terminal' || tags.landuse === 'orchard' ||
                tags.landuse === 'quarry' || tags.landuse === 'landfill' ||
-               tags.natural === 'glacier' || tags.highway === 'pedestrian' ||
-               tags.power === 'substation') {
+               tags.natural === 'glacier' || tags.natural === 'fell' ||
+               tags.highway === 'pedestrian' || tags.power === 'substation') {
              visibleLandUse.push(way);
            }
            
@@ -1420,22 +1432,22 @@ function CanvasOsmRenderer({
              
              // Set color and width based on waterway type
              if (tags.waterway === 'river') {
-               ctx.strokeStyle = '#B5D0D0';
+               ctx.strokeStyle = '#2E86AB';
                ctx.lineWidth = 5;
              } else if (tags.waterway === 'stream') {
-               ctx.strokeStyle = '#B5D0D0';
+               ctx.strokeStyle = '#2E86AB';
                ctx.lineWidth = 2;
              } else if (tags.waterway === 'canal') {
-               ctx.strokeStyle = '#B5D0D0';
+               ctx.strokeStyle = '#2E86AB';
                ctx.lineWidth = 4;
              } else if (tags.waterway === 'drain') {
-               ctx.strokeStyle = '#B5D0D0';
+               ctx.strokeStyle = '#2E86AB';
                ctx.lineWidth = 1;
              } else if (tags.natural === 'coastline') {
-               ctx.strokeStyle = '#B5D0D0';
+               ctx.strokeStyle = '#2E86AB';
                ctx.lineWidth = 2;
              } else {
-               ctx.strokeStyle = '#B5D0D0';
+               ctx.strokeStyle = '#2E86AB';
                ctx.lineWidth = 2;
              }
              
@@ -1474,6 +1486,63 @@ function CanvasOsmRenderer({
            }
          };
          
+         // Render contour lines
+         const drawContours = (contours: any[]) => {
+           for (const way of contours) {
+             const tags = way.tags || {};
+             const elevation = parseInt(tags.ele || '0');
+             
+             // Check if this is a major contour (every 100m)
+             const isMajor = elevation % 100 === 0;
+             
+             // Convert to canvas coordinates
+             const canvasPoints = way.positions.map((pos: [number, number]) => {
+               const point = latLngToCanvasPoint(pos[0], pos[1]);
+               return { x: point.x, y: point.y };
+             });
+             
+             // Set contour line style
+             ctx.strokeStyle = '#7f3300';
+             ctx.globalAlpha = 0.35;
+             ctx.lineWidth = isMajor ? 2 : 1;
+             ctx.lineCap = 'round';
+             ctx.lineJoin = 'round';
+             
+             ctx.beginPath();
+             canvasPoints.forEach((point: {x: number, y: number}, index: number) => {
+               if (index === 0) {
+                 ctx.moveTo(point.x, point.y);
+               } else {
+                 ctx.lineTo(point.x, point.y);
+               }
+             });
+             ctx.stroke();
+             
+             // Reset alpha
+             ctx.globalAlpha = 1;
+             
+             // Store for click detection
+             const scaledPoints = canvasPoints.map((point: {x: number, y: number}) => ({
+               x: point.x * (window.devicePixelRatio || 1),
+               y: point.y * (window.devicePixelRatio || 1)
+             }));
+             
+             this._renderedElements.push({
+               type: 'contour',
+               points: scaledPoints,
+               width: ctx.lineWidth,
+               tags: way.tags || {},
+               way: way
+             });
+             
+             // Update progress
+             renderedFeatures++;
+             if (onRenderProgress && totalFeatures > 0) {
+               onRenderProgress({ current: renderedFeatures, total: totalFeatures });
+             }
+           }
+         };
+         
          // Render layers - comprehensive map rendering
          
          // Layer 1: Multipolygons with holes (render first for proper layering)
@@ -1488,18 +1557,26 @@ function CanvasOsmRenderer({
          
          // Layer 3: Water areas
          if (isLowDetail) {
-           drawBatchedPolygons(visibleWater, () => '#B5D0D0', undefined, 'water');
+           drawBatchedPolygons(visibleWater, () => '#2E86AB', undefined, 'water');
          }
          
          // Layer 4: Waterways (rivers, streams, etc.)
          drawWaterways(visibleWaterways);
          
-         // Layer 5: Buildings (render after land use for proper layering)
+         // Layer 5: Contour lines (render before buildings but after terrain)
+         if (isMediumDetail && visibleContours.length > 0) {
+           console.log(`Rendering ${visibleContours.length} contour lines`);
+           drawContours(visibleContours);
+         } else if (isMediumDetail) {
+           console.log('No contour lines found in OSM data - contour lines are not typically included in standard OSM exports');
+         }
+         
+         // Layer 6: Buildings (render after land use for proper layering)
          if (isMediumDetail) {
            drawBatchedPolygons(visibleBuildings, getBuildingColor, '#666', 'building');
          }
          
-         // Layer 6: Railways (render before roads)
+         // Layer 7: Railways (render before roads)
          if (isLowDetail) {
            for (const way of visibleRailways) {
              const tags = way.tags || {};
@@ -1552,14 +1629,14 @@ function CanvasOsmRenderer({
            }
          }
          
-         // Layer 7: Power lines
+         // Layer 8: Power lines
          if (isMediumDetail) {
            drawBatchedLines(visiblePower, () => '#5c5c5c', (tags) => {
              return tags.power === 'line' ? 2 : 1;
            }, 'power');
          }
          
-         // Layer 8: Roads (render last for visibility)
+         // Layer 9: Roads (render last for visibility)
          if (isLowDetail) {
            // Sort roads by importance
            const sortedRoads = [...visibleRoads];
@@ -1572,10 +1649,10 @@ function CanvasOsmRenderer({
            drawBatchedLines(sortedRoads, getRoadColor, getRoadWidth, 'road');
          }
          
-         // Layer 9: Points of Interest (render on top)
+         // Layer 10: Points of Interest (render on top)
          if (isMediumDetail) {
            const visibleNodes: any[] = [];
-           // Find POI nodes
+           // Find POI nodes including peaks
            for (let i = 0; i < osmData.nodes.length; i++) {
              const node = osmData.nodes[i];
              const tags = node.tags || {};
@@ -1583,7 +1660,8 @@ function CanvasOsmRenderer({
                  tags.historic || tags.natural || tags.place || tags.power || 
                  tags.highway === 'bus_stop' || tags.railway === 'station' ||
                  tags.railway === 'platform' || tags.public_transport === 'station' ||
-                 tags.public_transport === 'platform' || tags.aeroway === 'aerodrome') {
+                 tags.public_transport === 'platform' || tags.aeroway === 'aerodrome' ||
+                 tags.natural === 'peak') {
                visibleNodes.push(node);
              }
            }
@@ -1594,21 +1672,35 @@ function CanvasOsmRenderer({
              const node = visibleNodes[i];
              const tags = node.tags || {};
              let color = '#6B7280';
-             if (tags.amenity === 'hospital') color = '#EF4444';
-             else if (tags.amenity === 'school' || tags.amenity === 'university') color = '#059669';
-             else if (tags.amenity === 'restaurant' || tags.amenity === 'cafe') color = '#F59E0B';
-             else if (tags.shop) color = '#F59E0B';
-             else if (tags.tourism) color = '#10B981';
-             else if (tags.highway === 'bus_stop' || tags.railway === 'station') color = '#4F46E5';
+             let shape = 'circle';
              
-             if (!poiColorGroups.has(color)) {
-               poiColorGroups.set(color, []);
+             if (tags.natural === 'peak') {
+               color = '#D08F55';
+               shape = 'triangle';
+             } else if (tags.amenity === 'hospital') {
+               color = '#EF4444';
+             } else if (tags.amenity === 'school' || tags.amenity === 'university') {
+               color = '#059669';
+             } else if (tags.amenity === 'restaurant' || tags.amenity === 'cafe') {
+               color = '#F59E0B';
+             } else if (tags.shop) {
+               color = '#F59E0B';
+             } else if (tags.tourism) {
+               color = '#10B981';
+             } else if (tags.highway === 'bus_stop' || tags.railway === 'station') {
+               color = '#4F46E5';
              }
-             poiColorGroups.get(color)!.push(node);
+             
+             const groupKey = `${color}-${shape}`;
+             if (!poiColorGroups.has(groupKey)) {
+               poiColorGroups.set(groupKey, []);
+             }
+             poiColorGroups.get(groupKey)!.push(node);
            }
            
            // Render POI groups
-           poiColorGroups.forEach((nodes, color) => {
+           poiColorGroups.forEach((nodes, groupKey) => {
+             const [color, shape] = groupKey.split('-');
              ctx.fillStyle = color;
              ctx.strokeStyle = '#FFFFFF';
              ctx.lineWidth = 2;
@@ -1616,10 +1708,35 @@ function CanvasOsmRenderer({
              for (let i = 0; i < nodes.length; i++) {
                const node = nodes[i];
                const point = latLngToCanvasPoint(node.lat, node.lon);
+               
                ctx.beginPath();
-               ctx.arc(point.x, point.y, 6, 0, 2 * Math.PI);
+               if (shape === 'triangle') {
+                 // Draw triangle for peaks
+                 const size = 6;
+                 ctx.moveTo(point.x, point.y - size);
+                 ctx.lineTo(point.x - size, point.y + size);
+                 ctx.lineTo(point.x + size, point.y + size);
+                 ctx.closePath();
+               } else {
+                 // Draw circle for other POIs
+                 ctx.arc(point.x, point.y, 6, 0, 2 * Math.PI);
+               }
                ctx.fill();
                ctx.stroke();
+               
+               // Add elevation label for peaks
+               if (node.tags?.natural === 'peak' && (node.tags?.ele || node.tags?.name)) {
+                 ctx.fillStyle = '#ae4242';
+                 ctx.font = '10px Verdana';
+                 ctx.textAlign = 'center';
+                 ctx.textBaseline = 'top';
+                 
+                 const label = node.tags.name 
+                   ? (node.tags.ele ? `${node.tags.name}\n(${node.tags.ele}m)` : node.tags.name)
+                   : `${node.tags.ele}m`;
+                 
+                 ctx.fillText(label, point.x, point.y + 8);
+               }
                
                // Store for click detection
                this._renderedElements.push({

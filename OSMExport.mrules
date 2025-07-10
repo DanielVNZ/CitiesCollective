@@ -918,7 +918,7 @@ rules
 		elseif : *service
 			define
 				min-zoom : 13
-				line-color : white
+				line-color : #CCCCCC
 				line-width : 12:0.5;13:1;15:3;18:5
 				border-style : solid
 				border-color : #FEFEB2 black 20%
@@ -968,7 +968,7 @@ rules
 				min-zoom : 10
 				max-zoom : 13
 				border-style : none
-				line-color : white black 25%
+				line-color : #CCCCCC black 25%
 			draw : line
 			define
 				min-zoom : 15
