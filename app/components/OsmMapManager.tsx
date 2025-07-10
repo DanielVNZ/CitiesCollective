@@ -180,7 +180,7 @@ export function OsmMapManager({ cityId, initialOsmMapPath, isOwner }: OsmMapMana
                   rel="noopener noreferrer"
                   className="font-medium hover:underline"
                 >
-                  ferqusy
+                  ferqusq
                 </a>
                 {' '}for the OSM export functionality
               </p>

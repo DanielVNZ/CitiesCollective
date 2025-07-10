@@ -365,16 +365,20 @@ export function OsmMapViewer({ osmMapPath, cityName, cityId }: OsmMapViewerProps
   };
 
   const getBuildingColor = (tags: Record<string, string>) => {
-    // Special amenity buildings get their own colors
+    // Special amenity buildings get their own colors (following OSMExport.mrules style)
     if (tags.amenity === 'school' || tags.amenity === 'university' || tags.amenity === 'college') return '#F0F0D8';
-    if (tags.amenity === 'hospital') return '#FFE5E5';
-    if (tags.amenity === 'fire_station') return '#FF9999';
-    if (tags.amenity === 'police') return '#9999FF';
+    if (tags.amenity === 'hospital' || tags.amenity === 'pharmacy') return '#FF0000'; // Red for hospitals/medical centres/pharmacies
+    if (tags.amenity === 'fire_station') return '#FF6666'; // Lighter red for fire stations
+    if (tags.amenity === 'police') return '#000080'; // Dark blue for police stations
     if (tags.amenity === 'bank') return '#E0E7FF';
-    if (tags.amenity === 'restaurant' || tags.amenity === 'cafe' || tags.amenity === 'fast_food') return '#FEF3C7';
     
-    // Commercial buildings
-    if (tags.shop || tags.office || tags.building === 'commercial' || tags.building === 'retail') return '#DBEAFE';
+    // Transport stations get purple/blue color
+    if (tags.public_transport === 'station' || tags.railway === 'station' || tags.amenity === 'taxi') return '#8B5CF6';
+    
+    // All commercial buildings (shops, restaurants, cafes, pharmacies, etc.) get the same color for consistency
+    if (tags.shop || tags.office || tags.building === 'commercial' || tags.building === 'retail' || 
+        tags.amenity === 'restaurant' || tags.amenity === 'cafe' || tags.amenity === 'fast_food' || 
+        tags.amenity === 'pharmacy') return '#DBEAFE';
     
     // Industrial buildings
     if (tags.building === 'industrial' || tags.building === 'warehouse' || tags.building === 'factory') return '#FEF3C7';
@@ -722,6 +726,8 @@ function CanvasOsmRenderer({
         this._lastBounds = null;
         this._animationFrame = null;
         this._isDirty = true;
+        this._debounceTimeout = null;
+        this._renderQueue = [];
       },
       
              onAdd: function(map: any) {
@@ -773,6 +779,10 @@ function CanvasOsmRenderer({
              onRemove: function(map: any) {
          if (this._animationFrame) {
            cancelAnimationFrame(this._animationFrame);
+         }
+         
+         if (this._debounceTimeout) {
+           clearTimeout(this._debounceTimeout);
          }
          
          // Remove click listeners
@@ -1001,7 +1011,11 @@ function CanvasOsmRenderer({
       
       _onViewChange: function() {
         this._isDirty = true;
-        this._scheduleRender();
+        // Debounce render calls to avoid excessive re-rendering during pan/zoom
+        clearTimeout(this._debounceTimeout);
+        this._debounceTimeout = setTimeout(() => {
+          this._scheduleRender();
+        }, 50); // 50ms debounce
       },
       
       _onResize: function() {
@@ -1261,7 +1275,6 @@ function CanvasOsmRenderer({
          const visibleRoads: any[] = [];
          const visibleRailways: any[] = [];
          const visiblePower: any[] = [];
-         const visibleContours: any[] = [];
          
          // Categorize ways for comprehensive rendering
          for (let i = 0; i < allWaysToRender.length; i++) {
@@ -1270,14 +1283,6 @@ function CanvasOsmRenderer({
            
            // Skip multipolygons as they're handled separately
            if (way.isMultipolygon) continue;
-           
-           // Contour lines - check multiple tagging schemes
-           if ((tags.contour === 'elevation' && tags.ele) || 
-               (tags.natural === 'contour' && tags.ele) ||
-               tags.contour === 'contour' ||
-               tags['contour:type'] === 'elevation') {
-             visibleContours.push(way);
-           }
            
            // Water features - both areas and lines
            if (tags.natural === 'water' || tags.waterway === 'riverbank' || 
@@ -1319,8 +1324,12 @@ function CanvasOsmRenderer({
              visibleLandUse.push(way);
            }
            
-           // Buildings
-           if (tags.building) {
+           // Buildings (including amenity buildings that might not have building=* tag)
+           if (tags.building || tags.amenity === 'hospital' || tags.amenity === 'fire_station' || 
+               tags.amenity === 'police' || tags.amenity === 'school' || tags.amenity === 'university' || 
+               tags.amenity === 'college' || tags.amenity === 'bank' || tags.amenity === 'restaurant' || 
+               tags.amenity === 'cafe' || tags.amenity === 'fast_food' || tags.amenity === 'pharmacy' ||
+               tags.public_transport === 'station' || tags.railway === 'station' || tags.amenity === 'taxi') {
              visibleBuildings.push(way);
            }
            
@@ -1486,62 +1495,7 @@ function CanvasOsmRenderer({
            }
          };
          
-         // Render contour lines
-         const drawContours = (contours: any[]) => {
-           for (const way of contours) {
-             const tags = way.tags || {};
-             const elevation = parseInt(tags.ele || '0');
-             
-             // Check if this is a major contour (every 100m)
-             const isMajor = elevation % 100 === 0;
-             
-             // Convert to canvas coordinates
-             const canvasPoints = way.positions.map((pos: [number, number]) => {
-               const point = latLngToCanvasPoint(pos[0], pos[1]);
-               return { x: point.x, y: point.y };
-             });
-             
-             // Set contour line style
-             ctx.strokeStyle = '#7f3300';
-             ctx.globalAlpha = 0.35;
-             ctx.lineWidth = isMajor ? 2 : 1;
-             ctx.lineCap = 'round';
-             ctx.lineJoin = 'round';
-             
-             ctx.beginPath();
-             canvasPoints.forEach((point: {x: number, y: number}, index: number) => {
-               if (index === 0) {
-                 ctx.moveTo(point.x, point.y);
-               } else {
-                 ctx.lineTo(point.x, point.y);
-               }
-             });
-             ctx.stroke();
-             
-             // Reset alpha
-             ctx.globalAlpha = 1;
-             
-             // Store for click detection
-             const scaledPoints = canvasPoints.map((point: {x: number, y: number}) => ({
-               x: point.x * (window.devicePixelRatio || 1),
-               y: point.y * (window.devicePixelRatio || 1)
-             }));
-             
-             this._renderedElements.push({
-               type: 'contour',
-               points: scaledPoints,
-               width: ctx.lineWidth,
-               tags: way.tags || {},
-               way: way
-             });
-             
-             // Update progress
-             renderedFeatures++;
-             if (onRenderProgress && totalFeatures > 0) {
-               onRenderProgress({ current: renderedFeatures, total: totalFeatures });
-             }
-           }
-         };
+
          
          // Render layers - comprehensive map rendering
          
@@ -1563,27 +1517,25 @@ function CanvasOsmRenderer({
          // Layer 4: Waterways (rivers, streams, etc.)
          drawWaterways(visibleWaterways);
          
-         // Layer 5: Contour lines (render before buildings but after terrain)
-         if (isMediumDetail && visibleContours.length > 0) {
-           console.log(`Rendering ${visibleContours.length} contour lines`);
-           drawContours(visibleContours);
-         } else if (isMediumDetail) {
-           console.log('No contour lines found in OSM data - contour lines are not typically included in standard OSM exports');
-         }
-         
-         // Layer 6: Buildings (render after land use for proper layering)
+         // Layer 5: Buildings (render after land use for proper layering)
          if (isMediumDetail) {
            drawBatchedPolygons(visibleBuildings, getBuildingColor, '#666', 'building');
          }
          
-         // Layer 7: Railways (render before roads)
+         // Layer 6: Railways (render before roads)
          if (isLowDetail) {
            for (const way of visibleRailways) {
              const tags = way.tags || {};
-             const width = tags.railway === 'rail' ? 3 : 2;
+             let width = 2;
+             let color = '#666666';
              
              if (tags.railway === 'rail') {
+               width = 3;
                ctx.setLineDash([10, 5]);
+             } else if (tags.railway === 'tram') {
+               width = 2;
+               color = '#10B981'; // Green for tram lines
+               ctx.setLineDash([]);
              } else {
                ctx.setLineDash([]);
              }
@@ -1599,7 +1551,7 @@ function CanvasOsmRenderer({
                y: point.y * (window.devicePixelRatio || 1)
              }));
              
-             ctx.strokeStyle = '#666666';
+             ctx.strokeStyle = color;
              ctx.lineWidth = width;
              ctx.beginPath();
              canvasPoints.forEach((point: {x: number, y: number}, index: number) => {
@@ -1629,14 +1581,14 @@ function CanvasOsmRenderer({
            }
          }
          
-         // Layer 8: Power lines
+         // Layer 7: Power lines
          if (isMediumDetail) {
            drawBatchedLines(visiblePower, () => '#5c5c5c', (tags) => {
              return tags.power === 'line' ? 2 : 1;
            }, 'power');
          }
          
-         // Layer 9: Roads (render last for visibility)
+         // Layer 8: Roads (render last for visibility)
          if (isLowDetail) {
            // Sort roads by importance
            const sortedRoads = [...visibleRoads];
@@ -1649,7 +1601,7 @@ function CanvasOsmRenderer({
            drawBatchedLines(sortedRoads, getRoadColor, getRoadWidth, 'road');
          }
          
-         // Layer 10: Points of Interest (render on top)
+         // Layer 9: Points of Interest (render on top)
          if (isMediumDetail) {
            const visibleNodes: any[] = [];
            // Find POI nodes including peaks
@@ -1659,70 +1611,143 @@ function CanvasOsmRenderer({
              if (tags.amenity || tags.shop || tags.leisure || tags.tourism || 
                  tags.historic || tags.natural || tags.place || tags.power || 
                  tags.highway === 'bus_stop' || tags.railway === 'station' ||
-                 tags.railway === 'platform' || tags.public_transport === 'station' ||
-                 tags.public_transport === 'platform' || tags.aeroway === 'aerodrome' ||
-                 tags.natural === 'peak') {
+                 tags.railway === 'platform' || tags.railway === 'tram_stop' ||
+                 tags.public_transport === 'station' || tags.public_transport === 'platform' || 
+                 tags.aeroway === 'aerodrome' || tags.natural === 'peak') {
                visibleNodes.push(node);
              }
            }
            
-           // Batch POI rendering by color
-           const poiColorGroups = new Map<string, any[]>();
+           // Batch POI rendering by type with icons
+           const poiTypeGroups = new Map<string, any[]>();
            for (let i = 0; i < visibleNodes.length; i++) {
              const node = visibleNodes[i];
              const tags = node.tags || {};
-             let color = '#6B7280';
-             let shape = 'circle';
+             let poiType = 'default';
              
              if (tags.natural === 'peak') {
-               color = '#D08F55';
-               shape = 'triangle';
+               poiType = 'peak';
              } else if (tags.amenity === 'hospital') {
-               color = '#EF4444';
+               poiType = 'hospital';
              } else if (tags.amenity === 'school' || tags.amenity === 'university') {
-               color = '#059669';
+               poiType = 'school';
              } else if (tags.amenity === 'restaurant' || tags.amenity === 'cafe') {
-               color = '#F59E0B';
+               poiType = 'restaurant';
              } else if (tags.shop) {
-               color = '#F59E0B';
+               poiType = 'shop';
              } else if (tags.tourism) {
-               color = '#10B981';
-             } else if (tags.highway === 'bus_stop' || tags.railway === 'station') {
-               color = '#4F46E5';
+               poiType = 'tourism';
+             } else if (tags.amenity === 'taxi') {
+               poiType = 'taxi';
+             } else if (tags.highway === 'bus_stop') {
+               // Bus stops: must have highway=bus_stop
+               poiType = 'bus';
+             } else if (tags.railway === 'tram_stop' || (tags.public_transport === 'platform' && tags.tram === 'yes') || 
+                        (tags.name && (tags.name.toLowerCase().includes('tram') || tags.name.toLowerCase().includes('na tram') || tags.name.toLowerCase().includes('eu tram')))) {
+               // Tram stops: railway=tram_stop, platform with tram=yes, or name contains "tram"
+               poiType = 'tram';
+             } else if (tags.railway === 'station' || (tags.railway === 'platform' && tags.landuse === 'railway') || 
+                        (tags.name && tags.name.toLowerCase().includes('train station'))) {
+               // Train stations: railway=station, railway platform with railway landuse, or name contains "train station"
+               poiType = 'train';
+             } else if (tags.railway === 'platform') {
+               // Generic railway platforms (could be train or tram - default to train)
+               poiType = 'train';
+             } else if (tags.public_transport === 'station') {
+               // Pure subway stations: public_transport=station without railway/highway
+               poiType = 'subway';
+             } else if (tags.public_transport === 'platform') {
+               // Fallback for generic platforms
+               poiType = 'bus';
              }
              
-             const groupKey = `${color}-${shape}`;
-             if (!poiColorGroups.has(groupKey)) {
-               poiColorGroups.set(groupKey, []);
+             if (!poiTypeGroups.has(poiType)) {
+               poiTypeGroups.set(poiType, []);
              }
-             poiColorGroups.get(groupKey)!.push(node);
+             poiTypeGroups.get(poiType)!.push(node);
            }
            
-           // Render POI groups
-           poiColorGroups.forEach((nodes, groupKey) => {
-             const [color, shape] = groupKey.split('-');
+           // Helper function to draw transport icons (colored circles only)
+           const drawTransportIcon = (ctx: any, x: number, y: number, type: string) => {
+             // Color-coded circles for each transport type
+             let color = '#6B7280';
+             switch (type) {
+               case 'bus': color = '#4F46E5'; break;    // Blue
+               case 'taxi': color = '#F59E0B'; break;   // Orange
+               case 'train': color = '#DC2626'; break;  // Red
+               case 'subway': color = '#6B46C1'; break; // Purple
+               case 'tram': color = '#10B981'; break;   // Green
+             }
+             
              ctx.fillStyle = color;
              ctx.strokeStyle = '#FFFFFF';
              ctx.lineWidth = 2;
+             ctx.beginPath();
+             ctx.arc(x, y, 8, 0, 2 * Math.PI);
+             ctx.fill();
+             ctx.stroke();
              
+             // Add letter indicator
+             ctx.fillStyle = '#FFFFFF';
+             ctx.font = 'bold 10px Arial';
+             ctx.textAlign = 'center';
+             ctx.textBaseline = 'middle';
+             
+             // Use different letters for different transport types
+             let letter = type.charAt(0).toUpperCase();
+             if (type === 'tram') letter = 'M'; // Tram uses "M" to distinguish from Train "T"
+             
+             ctx.fillText(letter, x, y);
+           };
+           
+           // Render POI groups with icons (synchronous)
+           poiTypeGroups.forEach((nodes, poiType) => {
              for (let i = 0; i < nodes.length; i++) {
                const node = nodes[i];
                const point = latLngToCanvasPoint(node.lat, node.lon);
                
-               ctx.beginPath();
-               if (shape === 'triangle') {
-                 // Draw triangle for peaks
-                 const size = 6;
-                 ctx.moveTo(point.x, point.y - size);
-                 ctx.lineTo(point.x - size, point.y + size);
-                 ctx.lineTo(point.x + size, point.y + size);
-                 ctx.closePath();
+               // Draw transport icons (synchronous)
+               if (['bus', 'taxi', 'train', 'subway', 'tram'].includes(poiType)) {
+                 drawTransportIcon(ctx, point.x, point.y, poiType);
                } else {
-                 // Draw circle for other POIs
-                 ctx.arc(point.x, point.y, 6, 0, 2 * Math.PI);
+                 // Draw standard POI markers for non-transport
+                 let color = '#6B7280';
+                 let shape = 'circle';
+                 
+                 if (poiType === 'peak') {
+                   color = '#D08F55';
+                   shape = 'triangle';
+                 } else if (poiType === 'hospital') {
+                   color = '#EF4444';
+                 } else if (poiType === 'school') {
+                   color = '#059669';
+                 } else if (poiType === 'restaurant') {
+                   color = '#F59E0B';
+                 } else if (poiType === 'shop') {
+                   color = '#F59E0B';
+                 } else if (poiType === 'tourism') {
+                   color = '#10B981';
+                 }
+                 
+                 ctx.fillStyle = color;
+                 ctx.strokeStyle = '#FFFFFF';
+                 ctx.lineWidth = 2;
+                 
+                 ctx.beginPath();
+                 if (shape === 'triangle') {
+                   // Draw triangle for peaks
+                   const size = 6;
+                   ctx.moveTo(point.x, point.y - size);
+                   ctx.lineTo(point.x - size, point.y + size);
+                   ctx.lineTo(point.x + size, point.y + size);
+                   ctx.closePath();
+                 } else {
+                   // Draw circle for other POIs
+                   ctx.arc(point.x, point.y, 6, 0, 2 * Math.PI);
+                 }
+                 ctx.fill();
+                 ctx.stroke();
                }
-               ctx.fill();
-               ctx.stroke();
                
                // Add elevation label for peaks
                if (node.tags?.natural === 'peak' && (node.tags?.ele || node.tags?.name)) {
@@ -1738,12 +1763,13 @@ function CanvasOsmRenderer({
                  ctx.fillText(label, point.x, point.y + 8);
                }
                
-               // Store for click detection
+               // Store for click detection (adjust radius for transport icons)
+               const clickRadius = ['bus', 'taxi', 'train', 'subway', 'tram'].includes(poiType) ? 16 : 6;
                this._renderedElements.push({
                  type: 'poi',
                  x: point.x * (window.devicePixelRatio || 1),
                  y: point.y * (window.devicePixelRatio || 1),
-                 radius: 6 * (window.devicePixelRatio || 1),
+                 radius: clickRadius * (window.devicePixelRatio || 1),
                  tags: node.tags || {},
                  node: node
                });

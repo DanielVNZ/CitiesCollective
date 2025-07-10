@@ -8,6 +8,7 @@ import { FavoriteButton } from 'app/components/FavoriteButton';
 import { Comments } from 'app/components/Comments';
 import { CityDescription } from 'app/components/CityDescription';
 import { OsmMapManager } from 'app/components/OsmMapManager';
+import { MapLegend } from 'app/components/MapLegend';
 import { auth } from 'app/auth';
 import { ImageSection } from './ImageSection';
 
@@ -87,11 +88,18 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
         <ImageSection cityId={cityId} initialImages={images} isOwner={isOwner} />
 
         {/* OSM Map Section */}
-        <OsmMapManager 
-          cityId={cityId} 
-          initialOsmMapPath={city.osmMapPath} 
-          isOwner={isOwner} 
-        />
+        <div className="mb-8">
+          <OsmMapManager 
+            cityId={cityId} 
+            initialOsmMapPath={city.osmMapPath} 
+            isOwner={isOwner} 
+          />
+          
+          {/* Map Legend - Inline below map */}
+          <div className="mt-4 bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
+            <MapLegend />
+          </div>
+        </div>
 
         {/* City Header */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-8 mb-8">
