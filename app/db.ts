@@ -172,18 +172,7 @@ const notificationsTable = pgTable('notifications', {
   createdAt: timestamp('createdAt').defaultNow(),
 });
 
-// OSM Map Cache table for storing processed OSM data
-const osmMapCacheTable = pgTable('osmMapCache', {
-  id: serial('id').primaryKey(),
-  cityId: integer('cityId').references(() => cityTable.id, { onDelete: 'cascade' }),
-  osmMapPath: varchar('osmMapPath', { length: 500 }).notNull(),
-  processedData: json('processedData').notNull(), // Stores the processed OSM data
-  bounds: json('bounds'), // Map bounds
-  nodeCount: integer('nodeCount'),
-  wayCount: integer('wayCount'),
-  lastProcessed: timestamp('lastProcessed').defaultNow(),
-  createdAt: timestamp('createdAt').defaultNow(),
-});
+// OSM Map Cache table removed - now using client-side caching with IndexedDB
 
 export async function getUser(email: string) {
   const users = await ensureTableExists();
@@ -2225,36 +2214,7 @@ async function ensureNotificationsTableExists() {
   return notificationsTable;
 }
 
-async function ensureOsmMapCacheTableExists() {
-  if (tableInitCache.has('osmMapCache')) {
-    return osmMapCacheTable;
-  }
-
-  const result = await client`
-    SELECT EXISTS (
-      SELECT FROM information_schema.tables 
-      WHERE table_schema = 'public' 
-      AND table_name = 'osmMapCache'
-    );`;
-
-  if (!result[0].exists) {
-    await client`
-      CREATE TABLE "osmMapCache" (
-        "id" serial PRIMARY KEY,
-        "cityId" integer REFERENCES "City"("id") ON DELETE CASCADE,
-        "osmMapPath" varchar(500) NOT NULL,
-        "processedData" jsonb NOT NULL,
-        "bounds" jsonb,
-        "nodeCount" integer,
-        "wayCount" integer,
-        "lastProcessed" timestamp DEFAULT now(),
-        "createdAt" timestamp DEFAULT now()
-      );`;
-  }
-
-  tableInitCache.add('osmMapCache');
-  return osmMapCacheTable;
-}
+// OSM Map Cache Table functions removed - now using client-side caching with IndexedDB
 
 export async function toggleFollow(followerId: number, followingId: number) {
   const follows = await ensureFollowsTableExists();
@@ -2509,47 +2469,4 @@ export async function notifyFollowersOfNewCity(userId: number, cityId: number, c
   await Promise.all(notificationPromises);
 }
 
-// OSM Map Cache Functions
-export async function getOsmMapCache(cityId: number, osmMapPath: string) {
-  await ensureOsmMapCacheTableExists();
-  
-  const cache = await db.select()
-    .from(osmMapCacheTable)
-    .where(and(
-      eq(osmMapCacheTable.cityId, cityId),
-      eq(osmMapCacheTable.osmMapPath, osmMapPath)
-    ))
-    .limit(1);
-  
-  return cache[0] || null;
-}
-
-export async function saveOsmMapCache(cityId: number, osmMapPath: string, processedData: any, bounds?: any) {
-  await ensureOsmMapCacheTableExists();
-  
-  // Delete existing cache for this city/path combination
-  await db.delete(osmMapCacheTable)
-    .where(and(
-      eq(osmMapCacheTable.cityId, cityId),
-      eq(osmMapCacheTable.osmMapPath, osmMapPath)
-    ));
-  
-  // Insert new cache
-  const result = await db.insert(osmMapCacheTable).values({
-    cityId,
-    osmMapPath,
-    processedData,
-    bounds,
-    nodeCount: processedData.nodes?.length || 0,
-    wayCount: processedData.ways?.length || 0,
-  }).returning();
-  
-  return result[0];
-}
-
-export async function clearOsmMapCache(cityId: number) {
-  await ensureOsmMapCacheTableExists();
-  
-  await db.delete(osmMapCacheTable)
-    .where(eq(osmMapCacheTable.cityId, cityId));
-}
+// OSM Map Cache Functions removed - now using client-side caching with IndexedDB

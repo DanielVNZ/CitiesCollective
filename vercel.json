@@ -23,10 +23,6 @@
     "app/api/cities/[id]/osm-map/route.ts": {
       "maxDuration": 60,
       "memory": 1024
-    },
-    "app/api/cities/[id]/osm-data/route.ts": {
-      "maxDuration": 120,
-      "memory": 2048
     }
   },
   "regions": ["cle1"],

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useMap } from 'react-leaflet';
+import { ClientOsmProcessor, OsmCache, ProcessingProgress, OsmData, OsmNode, OsmWay, OsmRelation, OsmBounds } from '../utils/osmProcessor';
 
 // Dynamically import Leaflet components to avoid SSR issues
 const MapContainer = dynamic(
@@ -21,42 +22,7 @@ interface OsmMapViewerProps {
   cityId: number;
 }
 
-interface OsmBounds {
-  minLat: number;
-  maxLat: number;
-  minLng: number;
-  maxLng: number;
-}
-
-interface OsmNode {
-  id: string;
-  lat: number;
-  lon: number;
-  tags?: Record<string, string>;
-}
-
-interface OsmWay {
-  id: string;
-  nodes: string[];
-  tags?: Record<string, string>;
-}
-
-interface OsmRelation {
-  id: string;
-  members: Array<{
-    type: 'way' | 'node' | 'relation';
-    ref: string;
-    role: string;
-  }>;
-  tags?: Record<string, string>;
-}
-
-interface OsmData {
-  bounds?: OsmBounds;
-  nodes: OsmNode[];
-  ways: OsmWay[];
-  relations?: OsmRelation[];
-}
+// Types are now imported from osmProcessor utility
 
 export function OsmMapViewer({ osmMapPath, cityName, cityId }: OsmMapViewerProps) {
   const [osmData, setOsmData] = useState<OsmData | null>(null);
@@ -69,35 +35,68 @@ export function OsmMapViewer({ osmMapPath, cityName, cityId }: OsmMapViewerProps
   const [dataStats, setDataStats] = useState<{processed: number, total: number, type: string} | null>(null);
   const [renderProgress, setRenderProgress] = useState<{current: number, total: number} | null>(null);
   const [isRendering, setIsRendering] = useState(false);
+  const [processingProgress, setProcessingProgress] = useState<ProcessingProgress | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
     const loadOsmData = async () => {
+      if (!osmMapPath) return;
+      
       try {
         setIsLoading(true);
+        setIsProcessing(true);
         setError(null);
         setRenderProgress(null);
+        setProcessingProgress(null);
 
-        // Fetch processed OSM data from our caching API
-        const response = await fetch(`/api/cities/${cityId}/osm-data`);
-        if (!response.ok) {
-          throw new Error(`Failed to fetch OSM data: ${response.status}`);
+        // Initialize client-side cache
+        const cache = new OsmCache();
+        const cacheKey = `osm-${cityId}-${osmMapPath}`;
+        
+        // Check cache first
+        const cachedData = await cache.get(cacheKey);
+        if (cachedData) {
+          setOsmData(cachedData.data);
+          
+          // Show warning if data was limited
+          if (cachedData.stats.limited) {
+            console.warn(`OSM data was limited: ${cachedData.stats.processedNodes}/${cachedData.stats.totalNodesInFile} nodes, ${cachedData.stats.processedWays}/${cachedData.stats.totalWaysInFile} ways processed`);
+            setDataLimited(true);
+            setDataStats({
+              processed: cachedData.stats.processedNodes,
+              total: cachedData.stats.totalNodesInFile,
+              type: 'nodes'
+            });
+          } else {
+            setDataLimited(false);
+            setDataStats(null);
+          }
+          
+          // Process cached data
+          processCachedData(cachedData.data);
+          setIsProcessing(false);
+          return;
         }
+
+        // Process OSM data client-side
+        const processor = new ClientOsmProcessor();
         
-        const result = await response.json();
+        const result = await processor.processOsmFromUrl(osmMapPath, (progress) => {
+          setProcessingProgress(progress);
+        });
         
-        if (!result.success) {
-          throw new Error(result.error || 'Failed to load OSM data');
-        }
+        const { data, stats } = result;
         
-        const { data, bounds, cached, limited, totalNodesInFile, totalWaysInFile, processed } = result;
+        // Cache the processed data
+        await cache.set(cacheKey, data, stats);
         
         // Show warning if data was limited
-        if (limited) {
-          console.warn(`OSM data was limited: ${data.nodes.length}/${totalNodesInFile} nodes, ${data.ways.length}/${totalWaysInFile} ways processed`);
+        if (stats.limited) {
+          console.warn(`OSM data was limited: ${stats.processedNodes}/${stats.totalNodesInFile} nodes, ${stats.processedWays}/${stats.totalWaysInFile} ways processed`);
           setDataLimited(true);
           setDataStats({
-            processed: data.nodes.length,
-            total: totalNodesInFile,
+            processed: stats.processedNodes,
+            total: stats.totalNodesInFile,
             type: 'nodes'
           });
         } else {
@@ -105,101 +104,119 @@ export function OsmMapViewer({ osmMapPath, cityName, cityId }: OsmMapViewerProps
           setDataStats(null);
         }
         
-        // Create node map for quick lookup
-        const nodeMapData = new Map<string, OsmNode>();
-        
-        // Use iterative approach instead of forEach to prevent stack overflow
-        const maxNodesToMap = Math.min(data.nodes.length, 50000); // Limit to prevent stack overflow
-        for (let i = 0; i < maxNodesToMap; i++) {
-          const node = data.nodes[i];
-          nodeMapData.set(node.id, node);
-        }
-        setNodeMap(nodeMapData);
-
-        // Set bounds if available
-        if (bounds) {
-          data.bounds = bounds;
-        } else if (data.nodes.length > 0) {
-          // Calculate bounds from nodes if not provided (with limits)
-          const maxNodesForBounds = Math.min(data.nodes.length, 10000); // Limit for bounds calculation
-          const lats: number[] = [];
-          const lons: number[] = [];
-          
-          for (let i = 0; i < maxNodesForBounds; i++) {
-            const node = data.nodes[i];
-            lats.push(node.lat);
-            lons.push(node.lon);
-          }
-          
-          data.bounds = {
-            minLat: Math.min(...lats),
-            maxLat: Math.max(...lats),
-            minLng: Math.min(...lons),
-            maxLng: Math.max(...lons)
-          };
-        }
-
+        processCachedData(data);
         setOsmData(data);
-
-        // Calculate map center and zoom for custom map
-        if (data.bounds) {
-          const centerLat = (data.bounds.minLat + data.bounds.maxLat) / 2;
-          const centerLng = (data.bounds.minLng + data.bounds.maxLng) / 2;
-          
-          // Ensure we have valid coordinates
-          if (!isNaN(centerLat) && !isNaN(centerLng) && isFinite(centerLat) && isFinite(centerLng)) {
-            setMapCenter([centerLat, centerLng]);
-            
-            // For custom maps, use moderate zoom levels
-            const latDiff = Math.abs(data.bounds.maxLat - data.bounds.minLat);
-            const lngDiff = Math.abs(data.bounds.maxLng - data.bounds.minLng);
-            const maxDiff = Math.max(latDiff, lngDiff);
-            
-            let zoom = 13;
-            if (maxDiff > 1) zoom = 10;
-            else if (maxDiff > 0.1) zoom = 12;
-            else if (maxDiff > 0.01) zoom = 14;
-            else if (maxDiff > 0.001) zoom = 16;
-            else zoom = 18;
-            
-            setMapZoom(zoom);
-          } else {
-            // Fallback coordinates
-            setMapCenter([0, 0]);
-            setMapZoom(13);
-          }
-        } else if (data.nodes.length > 0) {
-          // Use first valid node as center if no bounds (iterative search)
-          let firstNode = null;
-          for (let i = 0; i < Math.min(data.nodes.length, 1000); i++) {
-            const node = data.nodes[i];
-            if (!isNaN(node.lat) && !isNaN(node.lon) && isFinite(node.lat) && isFinite(node.lon)) {
-              firstNode = node;
-              break;
-            }
-          }
-          if (firstNode) {
-            setMapCenter([firstNode.lat, firstNode.lon]);
-          } else {
-            setMapCenter([0, 0]);
-          }
-          setMapZoom(13);
-        } else {
-          // Ultimate fallback
-          setMapCenter([0, 0]);
-          setMapZoom(13);
-        }
+        
+        // Clean up
+        processor.destroy();
 
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load OSM data');
+        console.error('OSM data loading error:', err);
+        let errorMessage = 'Failed to load OSM data';
+        
+        if (err instanceof Error) {
+          errorMessage = err.message;
+          
+          // Provide more helpful error messages for common issues
+          if (err.message.includes('DOMParser')) {
+            errorMessage = 'Browser compatibility issue with XML parsing. Please try refreshing the page or using a different browser.';
+          } else if (err.message.includes('fetch')) {
+            errorMessage = 'Failed to download OSM file. Please check your internet connection.';
+          } else if (err.message.includes('too large')) {
+            errorMessage = err.message; // Keep the detailed size message
+          }
+        }
+        
+        setError(errorMessage);
       } finally {
         setIsLoading(false);
+        setIsProcessing(false);
+        setProcessingProgress(null);
       }
     };
 
-    if (osmMapPath) {
-      loadOsmData();
-    }
+    const processCachedData = (data: OsmData) => {
+      // Create node map for quick lookup
+      const nodeMapData = new Map<string, OsmNode>();
+      
+      // Use iterative approach instead of forEach to prevent stack overflow
+      const maxNodesToMap = Math.min(data.nodes.length, 50000); // Limit to prevent stack overflow
+      for (let i = 0; i < maxNodesToMap; i++) {
+        const node = data.nodes[i];
+        nodeMapData.set(node.id, node);
+      }
+      setNodeMap(nodeMapData);
+
+      // Set bounds if available
+      if (data.bounds) {
+        // Calculate map center and zoom for custom map
+        const centerLat = (data.bounds.minLat + data.bounds.maxLat) / 2;
+        const centerLng = (data.bounds.minLng + data.bounds.maxLng) / 2;
+        
+        // Ensure we have valid coordinates
+        if (!isNaN(centerLat) && !isNaN(centerLng) && isFinite(centerLat) && isFinite(centerLng)) {
+          setMapCenter([centerLat, centerLng]);
+          
+          // For custom maps, use moderate zoom levels
+          const latDiff = Math.abs(data.bounds.maxLat - data.bounds.minLat);
+          const lngDiff = Math.abs(data.bounds.maxLng - data.bounds.minLng);
+          const maxDiff = Math.max(latDiff, lngDiff);
+          
+          let zoom = 13;
+          if (maxDiff > 1) zoom = 10;
+          else if (maxDiff > 0.1) zoom = 12;
+          else if (maxDiff > 0.01) zoom = 14;
+          else if (maxDiff > 0.001) zoom = 16;
+          else zoom = 18;
+          
+          setMapZoom(zoom);
+        } else {
+          // Fallback coordinates
+          setMapCenter([0, 0]);
+          setMapZoom(13);
+        }
+      } else if (data.nodes.length > 0) {
+        // Calculate bounds from nodes if not provided (with limits)
+        const maxNodesForBounds = Math.min(data.nodes.length, 10000); // Limit for bounds calculation
+        const lats: number[] = [];
+        const lons: number[] = [];
+        
+        for (let i = 0; i < maxNodesForBounds; i++) {
+          const node = data.nodes[i];
+          lats.push(node.lat);
+          lons.push(node.lon);
+        }
+        
+        data.bounds = {
+          minLat: Math.min(...lats),
+          maxLat: Math.max(...lats),
+          minLng: Math.min(...lons),
+          maxLng: Math.max(...lons)
+        };
+        
+        // Use first valid node as center if no bounds (iterative search)
+        let firstNode = null;
+        for (let i = 0; i < Math.min(data.nodes.length, 1000); i++) {
+          const node = data.nodes[i];
+          if (!isNaN(node.lat) && !isNaN(node.lon) && isFinite(node.lat) && isFinite(node.lon)) {
+            firstNode = node;
+            break;
+          }
+        }
+        if (firstNode) {
+          setMapCenter([firstNode.lat, firstNode.lon]);
+        } else {
+          setMapCenter([0, 0]);
+        }
+        setMapZoom(13);
+      } else {
+        // Ultimate fallback
+        setMapCenter([0, 0]);
+        setMapZoom(13);
+      }
+    };
+
+    loadOsmData();
   }, [osmMapPath, cityId]);
 
 
@@ -213,7 +230,14 @@ export function OsmMapViewer({ osmMapPath, cityName, cityId }: OsmMapViewerProps
       <div className="w-full h-96 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-          <p className="text-gray-600 dark:text-gray-400">Loading map data...</p>
+          <p className="text-gray-600 dark:text-gray-400">
+            {isProcessing ? 'Processing map data...' : 'Loading map data...'}
+          </p>
+          {processingProgress && (
+            <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">
+              {processingProgress.message}
+            </p>
+          )}
         </div>
       </div>
     );
@@ -254,38 +278,35 @@ export function OsmMapViewer({ osmMapPath, cityName, cityId }: OsmMapViewerProps
  // Render all POIs for full quality
 
   const getLandUseColor = (tags: Record<string, string>) => {
-    // Following OSMExport.mrules area colors EXACTLY in the same order as the rules
+    // Comprehensive land use colors following OSM standards
     
-    // Buildings (handled separately)
-    if (tags.building) return '#BCA9A9';
+    // Water features
+    if (tags.natural === 'water' || tags.waterway === 'riverbank' || 
+        tags.landuse === 'reservoir' || tags.landuse === 'basin' || 
+        tags.place === 'sea' || tags.place === 'ocean' ||
+        tags.natural === 'bay' || tags.natural === 'strait') {
+      return '#B5D0D0'; // Water blue
+    }
     
     // Forest and woods
     if (tags.landuse === 'forest' || tags.natural === 'wood') return '#8DC56C';
     
-    // Beach
-    if (tags.natural === 'beach') return '#FEFEC0';
+    // Beach and sand
+    if (tags.natural === 'beach' || tags.natural === 'sand') return '#FEFEC0';
     
     // Farm areas
-    if (tags.landuse === 'farm') return '#E9D8BD';
+    if (tags.landuse === 'farm' || tags.landuse === 'farmland') return '#E9D8BD';
     if (tags.landuse === 'farmyard') return '#DCBE91';
-    
-    // Fell
-    if (tags.natural === 'fell') return '#C5FF5B';
     
     // Academic areas  
     if (tags.amenity === 'university' || tags.amenity === 'college' || tags.amenity === 'school') return '#F0F0D8';
     
-    // Residential
-    if (tags.landuse === 'residential') return '#90EE90'; // Light green
+    // Residential - medium green
+    if (tags.landuse === 'residential') return '#66BB6A';
     
-    // Grass
-    if (tags.landuse === 'grass') return '#CFECA8';
-    
-    // Allotments
-    if (tags.landuse === 'allotments') return '#C8B084';
-    
-    // Meadow
-    if (tags.natural === 'meadow' || tags.landuse === 'meadow') return '#CFECA8';
+    // Grass and parks
+    if (tags.landuse === 'grass' || tags.leisure === 'park' || 
+        tags.natural === 'meadow' || tags.landuse === 'meadow') return '#CFECA8';
     
     // Nature reserve
     if (tags.leisure === 'nature_reserve') return '#ABDE96';
@@ -294,11 +315,11 @@ export function OsmMapViewer({ osmMapPath, cityName, cityId }: OsmMapViewerProps
     if (tags.amenity === 'parking') return '#F6EEB7';
     
     // Parks and leisure
-    if (tags.leisure === 'park') return '#C0F6B0';
     if (tags.leisure === 'garden') return '#CFECA8';
     if (tags.leisure === 'pitch') return '#89D2AE';
     if (tags.leisure === 'stadium') return '#33CC99';
     if (tags.leisure === 'track') return '#74DCBA';
+    if (tags.leisure === 'playground') return '#CCFEF0';
     
     // Village green
     if (tags.landuse === 'village_green') return '#CFECA8';
@@ -306,7 +327,7 @@ export function OsmMapViewer({ osmMapPath, cityName, cityId }: OsmMapViewerProps
     // Commercial and retail
     if (tags.landuse === 'retail' || tags.shop === 'yes') return '#F0D9D9';
     if (tags.landuse === 'industrial') return '#FFFFE0'; // Light yellow
-    if (tags.office) return '#9932CC'; // Purple (Dark Orchid)
+    if (tags.office) return '#9932CC'; // Purple
     if (tags.landuse === 'commercial') return '#87CEEB'; // Sky Blue
     
     // Graveyard
@@ -318,15 +339,14 @@ export function OsmMapViewer({ osmMapPath, cityName, cityId }: OsmMapViewerProps
     // Aeroway
     if (tags.aeroway === 'apron' || tags.aeroway === 'terminal') return '#E9D1FE';
     
-    // Orchard and farmland
+    // Orchard
     if (tags.landuse === 'orchard') return '#9fd790';
-    if (tags.landuse === 'farmland') return '#e9d8be';
     
     // Quarry
     if (tags.landuse === 'quarry') return 'white';
     
     // Landfill
-    if (tags.landuse === 'landfill') return '#D3D3D3'; // Light grey
+    if (tags.landuse === 'landfill') return '#D3D3D3';
     
     // Glacier
     if (tags.natural === 'glacier') return '#DDECEC';
@@ -334,17 +354,11 @@ export function OsmMapViewer({ osmMapPath, cityName, cityId }: OsmMapViewerProps
     // Pedestrian areas
     if (tags.highway === 'pedestrian') return '#EDEDED';
     
-    // National parks
-    if (tags.boundary === 'national_park') return '#8DC56C';
-    
-    // Playground (special case)
-    if (tags.leisure === 'playground') return '#CCFEF0';
-    
-    // Power substation (from rules)
+    // Power substation
     if (tags.power === 'substation') return '#DFD1D6';
     
-    // Default - should not render (follows OSMExport.mrules "else stop" logic)
-    return 'transparent';
+    // Default land color
+    return '#F1EEE8';
   };
 
   const getBuildingColor = (tags: Record<string, string>) => {
@@ -356,25 +370,21 @@ export function OsmMapViewer({ osmMapPath, cityName, cityId }: OsmMapViewerProps
     if (tags.amenity === 'bank') return '#E0E7FF';
     if (tags.amenity === 'restaurant' || tags.amenity === 'cafe' || tags.amenity === 'fast_food') return '#FEF3C7';
     
-    // Commercial buildings (shops, offices, etc.)
-    if (tags.shop || tags.office || tags.building === 'commercial' || tags.building === 'retail') return '#DBEAFE'; // Light blue
+    // Commercial buildings
+    if (tags.shop || tags.office || tags.building === 'commercial' || tags.building === 'retail') return '#DBEAFE';
     
     // Industrial buildings
-    if (tags.building === 'industrial' || tags.building === 'warehouse' || tags.building === 'factory') return '#FEF3C7'; // Light yellow
+    if (tags.building === 'industrial' || tags.building === 'warehouse' || tags.building === 'factory') return '#FEF3C7';
     
-    // Residential buildings
-    if (tags.building === 'residential' || tags.building === 'house' || tags.building === 'apartments') return '#D1FAE5'; // Light green
+    // Residential buildings - medium green
+    if (tags.building === 'residential' || tags.building === 'house' || tags.building === 'apartments') return '#4CAF50';
     
-    // For buildings with just building=yes, we'll use a neutral color
-    // The actual color will be determined by the land use area they're in
-    if (tags.building === 'yes' || tags.building === 'true') return '#E5E7EB'; // Light gray
-    
-    // Default building color (for buildings without specific type tags)
+    // Default building color
     return '#BCA9A9';
   };
 
   const getRoadColor = (tags: Record<string, string>) => {
-    // Based on OSMExport.mrules highway colors
+    // Road colors based on hierarchy
     if (tags.highway === 'motorway' || tags.highway === 'motorway_link') return '#849BBD';
     if (tags.highway === 'trunk' || tags.highway === 'trunk_link') return '#96D296';
     if (tags.highway === 'primary' || tags.highway === 'primary_link') return '#ECA2A3';
@@ -418,6 +428,33 @@ export function OsmMapViewer({ osmMapPath, cityName, cityId }: OsmMapViewerProps
               <p className="text-sm text-yellow-800 dark:text-yellow-200">
                 <strong>Large map detected:</strong> This OSM file contains {dataStats.total.toLocaleString()} {dataStats.type}, but only {dataStats.processed.toLocaleString()} were processed to prevent performance issues.
               </p>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Client-side processing indicator */}
+      {isProcessing && processingProgress && (
+        <div className="bg-green-50 dark:bg-green-900/20 border-b border-green-200 dark:border-green-800 px-4 py-2">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600"></div>
+            </div>
+            <div className="ml-3 flex-1">
+              <div className="flex justify-between items-center">
+                <p className="text-sm text-green-800 dark:text-green-200">
+                  {processingProgress.message}
+                </p>
+                <span className="text-sm text-green-600 dark:text-green-300">
+                  {processingProgress.current} / {processingProgress.total}
+                </span>
+              </div>
+              <div className="w-full bg-green-200 dark:bg-green-800 rounded-full h-1.5 mt-1">
+                <div 
+                  className="bg-green-600 h-1.5 rounded-full transition-all duration-300"
+                  style={{ width: `${(processingProgress.current / processingProgress.total) * 100}%` }}
+                ></div>
+              </div>
             </div>
           </div>
         </div>
@@ -563,8 +600,8 @@ function CanvasOsmRenderer({
     }
     
     // Process multipolygon relations to create virtual ways for land/water areas
-    const processMultipolygonRelations = (relations: OsmRelation[], ways: any[], wayMap: Map<string, any>): any[] => {
-      const virtualWays: any[] = [];
+    const processMultipolygonRelations = (relations: OsmRelation[], ways: any[], wayMap: Map<string, any>) => {
+      const processedMultipolygons: any[] = [];
       
       for (const relation of relations) {
         if (relation.tags?.type === 'multipolygon' && relation.tags) {
@@ -575,7 +612,7 @@ function CanvasOsmRenderer({
           for (const member of relation.members) {
             if (member.type === 'way') {
               const way = wayMap.get(member.ref);
-              if (way) {
+              if (way && way.positions && way.positions.length > 2) {
                 if (member.role === 'outer') {
                   outerWays.push(way);
                 } else if (member.role === 'inner') {
@@ -585,23 +622,94 @@ function CanvasOsmRenderer({
             }
           }
           
-          // Create virtual ways for outer rings (these represent the main area)
-          for (const outerWay of outerWays) {
-            const virtualWay = {
-              id: `relation_${relation.id}_outer_${outerWay.id}`,
-              positions: outerWay.positions,
-              tags: { ...relation.tags }, // Use relation tags for land use classification
-              isFromRelation: true,
-              relationId: relation.id
-            };
-            virtualWays.push(virtualWay);
+          // Create multipolygon objects with outer and inner rings
+          if (outerWays.length > 0) {
+            // Try to merge outer ways into continuous rings
+            const outerRings = mergeWaysIntoRings(outerWays);
+            const innerRings = mergeWaysIntoRings(innerWays);
+            
+            for (const outerRing of outerRings) {
+              const multipolygon = {
+                id: `multipolygon_${relation.id}_${outerRing.id}`,
+                positions: outerRing.positions,
+                holes: innerRings.map(ring => ring.positions),
+                tags: { ...relation.tags }, // Use relation tags
+                isMultipolygon: true,
+                relationId: relation.id
+              };
+              processedMultipolygons.push(multipolygon);
+            }
           }
         }
       }
       
-      return virtualWays;
+      return processedMultipolygons;
     };
     
+    // Helper function to merge ways into continuous rings
+    const mergeWaysIntoRings = (ways: any[]): any[] => {
+      if (ways.length === 0) return [];
+      
+      const rings: any[] = [];
+      const unprocessedWays = [...ways];
+      
+      while (unprocessedWays.length > 0) {
+        const ring = unprocessedWays.shift()!;
+        let ringPositions = [...ring.positions];
+        
+        // Try to connect other ways to form a closed ring
+        let foundConnection = true;
+        while (foundConnection && unprocessedWays.length > 0) {
+          foundConnection = false;
+          
+          for (let i = 0; i < unprocessedWays.length; i++) {
+            const way = unprocessedWays[i];
+            const wayPositions = way.positions;
+            
+            // Check if way connects to end of ring
+            if (isPointsEqual(ringPositions[ringPositions.length - 1], wayPositions[0])) {
+              // Connect to end
+              ringPositions = [...ringPositions, ...wayPositions.slice(1)];
+              unprocessedWays.splice(i, 1);
+              foundConnection = true;
+              break;
+            } else if (isPointsEqual(ringPositions[ringPositions.length - 1], wayPositions[wayPositions.length - 1])) {
+              // Connect to end (reversed)
+              ringPositions = [...ringPositions, ...wayPositions.slice(0, -1).reverse()];
+              unprocessedWays.splice(i, 1);
+              foundConnection = true;
+              break;
+            } else if (isPointsEqual(ringPositions[0], wayPositions[wayPositions.length - 1])) {
+              // Connect to start
+              ringPositions = [...wayPositions, ...ringPositions.slice(1)];
+              unprocessedWays.splice(i, 1);
+              foundConnection = true;
+              break;
+            } else if (isPointsEqual(ringPositions[0], wayPositions[0])) {
+              // Connect to start (reversed)
+              ringPositions = [...wayPositions.reverse(), ...ringPositions.slice(1)];
+              unprocessedWays.splice(i, 1);
+              foundConnection = true;
+              break;
+            }
+          }
+        }
+        
+        rings.push({
+          id: ring.id,
+          positions: ringPositions
+        });
+      }
+      
+      return rings;
+    };
+    
+    // Helper function to check if two points are equal (with tolerance)
+    const isPointsEqual = (p1: [number, number], p2: [number, number]): boolean => {
+      const tolerance = 0.000001;
+      return Math.abs(p1[0] - p2[0]) < tolerance && Math.abs(p1[1] - p2[1]) < tolerance;
+    };
+
     // Create custom high-performance canvas layer
     const CanvasLayer = L.Layer.extend({
       initialize: function() {
@@ -933,8 +1041,8 @@ function CanvasOsmRenderer({
          // Clear canvas
          ctx.clearRect(0, 0, this._canvas.width, this._canvas.height);
          
-         // Add sea background color (following OSMExport.mrules map-sea-color)
-         ctx.fillStyle = '#afb3b0'; // Light grey background for sea/ocean areas
+         // Add sea background color (following OSMExport.mrules map-sea-color exactly)
+         ctx.fillStyle = '#F1EEE8'; // Light beige background for sea/ocean areas (from OSMExport.mrules)
          ctx.fillRect(0, 0, this._canvas.width, this._canvas.height);
          
          // Clear rendered elements for click detection
@@ -950,13 +1058,13 @@ function CanvasOsmRenderer({
          }
          
          // Process multipolygon relations if available
-         let virtualWays: any[] = [];
+         let multipolygons: any[] = [];
          if (osmData.relations && osmData.relations.length > 0) {
-           virtualWays = processMultipolygonRelations(osmData.relations, waysToRender, wayMap);
+           multipolygons = processMultipolygonRelations(osmData.relations, waysToRender, wayMap);
          }
          
-         // Combine regular ways with virtual ways from relations
-         const allWaysToRender = [...waysToRender, ...virtualWays];
+         // Combine regular ways with multipolygons
+         const allWaysToRender = [...waysToRender, ...multipolygons];
          
          // Level of detail optimizations based on number of features
          const totalFeatures = allWaysToRender.length + osmData.nodes.length;
@@ -1142,75 +1250,60 @@ function CanvasOsmRenderer({
            });
          };
         
-                 // Filter visible ways by type for efficient rendering (iterative to prevent stack overflow)
+                 // Filter visible ways by type for efficient rendering
          const visibleLandUse: any[] = [];
          const visibleBuildings: any[] = [];
          const visibleWater: any[] = [];
+         const visibleWaterways: any[] = [];
          const visibleRoads: any[] = [];
          const visibleRailways: any[] = [];
          const visiblePower: any[] = [];
          
-         // Iteratively categorize ways to prevent stack overflow (following OSMExport.mrules exactly)
+         // Categorize ways for comprehensive rendering
          for (let i = 0; i < allWaysToRender.length; i++) {
            const way = allWaysToRender[i];
            const tags = way.tags || {};
            
-           // Water features - both areas and lines (from OSMExport.mrules) - handle first to avoid double categorization
+           // Skip multipolygons as they're handled separately
+           if (way.isMultipolygon) continue;
+           
+           // Water features - both areas and lines
            if (tags.natural === 'water' || tags.waterway === 'riverbank' || 
                tags.landuse === 'reservoir' || tags.landuse === 'basin' || 
-               tags.waterway === 'dock' || tags.waterway === 'river' || 
-               tags.waterway === 'stream' || tags.waterway === 'canal' || 
-               tags.waterway === 'drain' || tags.natural === 'coastline' ||
-               tags.place === 'sea' || tags.place === 'ocean' ||
-               tags.man_made === 'pier' || tags['seamark:type'] === 'ferry_route' ||
-               tags.natural === 'bay' || tags.natural === 'strait' || 
-               tags.leisure === 'marina') {
+               tags.waterway === 'dock' || tags.place === 'sea' || 
+               tags.place === 'ocean' || tags.natural === 'bay' ||
+               tags.natural === 'strait' || tags.leisure === 'marina') {
              visibleWater.push(way);
            }
-           // Land use and terrain features - following OSMExport.mrules areas section EXACTLY
-           else if (
-             // Natural areas
-             tags.natural === 'beach' || tags.natural === 'wood' || tags.natural === 'fell' || 
-             tags.natural === 'glacier' || tags.natural === 'meadow' || tags.natural === 'grass' ||
-             
-             // Land use areas  
-             tags.landuse === 'village_green' || tags.landuse === 'forest' || tags.landuse === 'farm' ||
-             tags.landuse === 'farmyard' || tags.landuse === 'grass' || tags.landuse === 'allotments' ||
-             tags.landuse === 'meadow' || tags.landuse === 'retail' || tags.landuse === 'industrial' ||
-             tags.landuse === 'commercial' || tags.landuse === 'residential' || tags.landuse === 'orchard' ||
-             tags.landuse === 'farmland' || tags.landuse === 'quarry' || tags.landuse === 'landfill' ||
-             tags.landuse === 'cemetery' || tags.landuse === 'military' ||
-             
-             // Leisure areas
-             tags.leisure === 'nature_reserve' || tags.leisure === 'playground' || tags.leisure === 'track' ||
-             tags.leisure === 'park' || tags.leisure === 'garden' || tags.leisure === 'pitch' ||
-             tags.leisure === 'stadium' ||
-             
-             // Amenity areas
-             tags.amenity === 'parking' || tags.amenity === 'grave_yard' || 
-             tags.amenity === 'university' || tags.amenity === 'college' || tags.amenity === 'school' ||
-             
-             // Boundaries
-             tags.boundary === 'national_park' ||
-             
-             // Highway areas
-             tags.highway === 'pedestrian' ||
-             
-             // Aeroway areas
-             tags.aeroway === 'apron' || tags.aeroway === 'terminal' ||
-             
-             // Military
-             tags.military === 'barracks' ||
-             
-             // Office
-             tags.office ||
-             
-             // Power
-             tags.power === 'substation' ||
-             
-             // Shop areas
-             tags.shop === 'yes'
-           ) {
+           
+           // Waterways (rivers, streams, etc.)
+           if (tags.waterway === 'river' || tags.waterway === 'stream' || 
+               tags.waterway === 'canal' || tags.waterway === 'drain' || 
+               tags.natural === 'coastline') {
+             visibleWaterways.push(way);
+           }
+           
+           // Land use features
+           if (tags.landuse === 'forest' || tags.natural === 'wood' ||
+               tags.natural === 'beach' || tags.natural === 'sand' ||
+               tags.landuse === 'grass' || tags.leisure === 'park' ||
+               tags.natural === 'meadow' || tags.landuse === 'meadow' ||
+               tags.landuse === 'residential' || tags.landuse === 'commercial' ||
+               tags.landuse === 'industrial' || tags.landuse === 'farm' ||
+               tags.landuse === 'farmland' || tags.landuse === 'farmyard' ||
+               tags.amenity === 'university' || tags.amenity === 'college' ||
+               tags.amenity === 'school' || tags.leisure === 'nature_reserve' ||
+               tags.amenity === 'parking' || tags.leisure === 'garden' ||
+               tags.leisure === 'pitch' || tags.leisure === 'stadium' ||
+               tags.leisure === 'track' || tags.leisure === 'playground' ||
+               tags.landuse === 'village_green' || tags.landuse === 'retail' ||
+               tags.shop === 'yes' || tags.office || tags.amenity === 'grave_yard' ||
+               tags.landuse === 'cemetery' || tags.landuse === 'military' ||
+               tags.military === 'barracks' || tags.aeroway === 'apron' ||
+               tags.aeroway === 'terminal' || tags.landuse === 'orchard' ||
+               tags.landuse === 'quarry' || tags.landuse === 'landfill' ||
+               tags.natural === 'glacier' || tags.highway === 'pedestrian' ||
+               tags.power === 'substation') {
              visibleLandUse.push(way);
            }
            
@@ -1234,126 +1327,181 @@ function CanvasOsmRenderer({
              visiblePower.push(way);
            }
          }
+
+         // New function to draw multipolygons with holes using canvas clipping
+         const drawMultipolygonsWithHoles = (multipolygons: any[], getColor: (tags: any) => string) => {
+           for (const multipolygon of multipolygons) {
+             const color = getColor(multipolygon.tags || {});
+             if (color === 'transparent') continue;
+             
+             // Convert outer ring to canvas coordinates
+             const outerCanvasPoints = multipolygon.positions.map((pos: [number, number]) => {
+               const point = latLngToCanvasPoint(pos[0], pos[1]);
+               return { x: point.x, y: point.y };
+             });
+             
+             // Convert holes to canvas coordinates
+             const holeCanvasPoints = multipolygon.holes.map((hole: [number, number][]) => {
+               return hole.map((pos: [number, number]) => {
+                 const point = latLngToCanvasPoint(pos[0], pos[1]);
+                 return { x: point.x, y: point.y };
+               });
+             });
+             
+             // Use canvas clipping to create holes
+             ctx.save();
+             
+             // Create clipping path for outer ring
+             ctx.beginPath();
+             outerCanvasPoints.forEach((point: {x: number, y: number}, index: number) => {
+               if (index === 0) {
+                 ctx.moveTo(point.x, point.y);
+               } else {
+                 ctx.lineTo(point.x, point.y);
+               }
+             });
+             ctx.closePath();
+             
+             // Add holes as counter-clockwise paths to subtract from outer ring
+             for (const hole of holeCanvasPoints) {
+               if (hole.length < 3) continue;
+               
+               // Add hole path (counter-clockwise to create hole)
+               ctx.moveTo(hole[0].x, hole[0].y);
+               for (let i = hole.length - 1; i > 0; i--) {
+                 ctx.lineTo(hole[i].x, hole[i].y);
+               }
+               ctx.closePath();
+             }
+             
+             // Set fill rule to handle holes properly
+             ctx.fillStyle = color;
+             ctx.fill('evenodd'); // Use even-odd fill rule to handle holes
+             
+             ctx.restore();
+             
+             // Store for click detection
+             const scaledOuterPoints = outerCanvasPoints.map((point: {x: number, y: number}) => ({
+               x: point.x * (window.devicePixelRatio || 1),
+               y: point.y * (window.devicePixelRatio || 1)
+             }));
+             
+             this._renderedElements.push({
+               type: 'multipolygon',
+               points: scaledOuterPoints,
+               holes: holeCanvasPoints.map((hole: {x: number, y: number}[]) => 
+                 hole.map((point: {x: number, y: number}) => ({
+                   x: point.x * (window.devicePixelRatio || 1),
+                   y: point.y * (window.devicePixelRatio || 1)
+                 }))
+               ),
+               tags: multipolygon.tags || {},
+               way: multipolygon
+             });
+             
+             // Update progress
+             renderedFeatures++;
+             if (onRenderProgress && totalFeatures > 0) {
+               onRenderProgress({ current: renderedFeatures, total: totalFeatures });
+             }
+           }
+         };
          
-         // Render layers with LOD optimizations (always show core features)
+         // Simplified waterway rendering
+         const drawWaterways = (waterways: any[]) => {
+           for (const way of waterways) {
+             const tags = way.tags || {};
+             
+             // Convert to canvas coordinates
+             const canvasPoints = way.positions.map((pos: [number, number]) => {
+               const point = latLngToCanvasPoint(pos[0], pos[1]);
+               return { x: point.x, y: point.y };
+             });
+             
+             // Set color and width based on waterway type
+             if (tags.waterway === 'river') {
+               ctx.strokeStyle = '#B5D0D0';
+               ctx.lineWidth = 5;
+             } else if (tags.waterway === 'stream') {
+               ctx.strokeStyle = '#B5D0D0';
+               ctx.lineWidth = 2;
+             } else if (tags.waterway === 'canal') {
+               ctx.strokeStyle = '#B5D0D0';
+               ctx.lineWidth = 4;
+             } else if (tags.waterway === 'drain') {
+               ctx.strokeStyle = '#B5D0D0';
+               ctx.lineWidth = 1;
+             } else if (tags.natural === 'coastline') {
+               ctx.strokeStyle = '#B5D0D0';
+               ctx.lineWidth = 2;
+             } else {
+               ctx.strokeStyle = '#B5D0D0';
+               ctx.lineWidth = 2;
+             }
+             
+             ctx.lineCap = 'round';
+             ctx.lineJoin = 'round';
+             
+             ctx.beginPath();
+             canvasPoints.forEach((point: {x: number, y: number}, index: number) => {
+               if (index === 0) {
+                 ctx.moveTo(point.x, point.y);
+               } else {
+                 ctx.lineTo(point.x, point.y);
+               }
+             });
+             ctx.stroke();
+             
+             // Store for click detection
+             const scaledPoints = canvasPoints.map((point: {x: number, y: number}) => ({
+               x: point.x * (window.devicePixelRatio || 1),
+               y: point.y * (window.devicePixelRatio || 1)
+             }));
+             
+             this._renderedElements.push({
+               type: 'waterway',
+               points: scaledPoints,
+               width: ctx.lineWidth,
+               tags: way.tags || {},
+               way: way
+             });
+             
+             // Update progress
+             renderedFeatures++;
+             if (onRenderProgress && totalFeatures > 0) {
+               onRenderProgress({ current: renderedFeatures, total: totalFeatures });
+             }
+           }
+         };
          
-         // Layer 1: Land Use Areas (always render for context)
+         // Render layers - comprehensive map rendering
+         
+         // Layer 1: Multipolygons with holes (render first for proper layering)
+         if (multipolygons.length > 0) {
+           drawMultipolygonsWithHoles(multipolygons, getLandUseColor);
+         }
+         
+         // Layer 2: Land use areas (render before buildings for proper layering)
          if (isLowDetail) {
            drawBatchedPolygons(visibleLandUse, getLandUseColor, undefined, 'landuse');
          }
          
-         // Layer 2: Water Features (render at all zoom levels like OSMExport.mrules)
+         // Layer 3: Water areas
          if (isLowDetail) {
-           
-           let renderedWaterAreas = 0;
-           let renderedWaterLines = 0;
-           
-           // Render water features (areas and waterways)
-           for (let i = 0; i < visibleWater.length; i++) {
-             const way = visibleWater[i];
-             const tags = way.tags || {};
-             
-             if (way.positions && way.positions.length > 0) {
-               // Convert positions to canvas points
-               const canvasPoints: {x: number, y: number}[] = [];
-               for (let j = 0; j < way.positions.length; j++) {
-                 const pos = way.positions[j];
-                 const point = latLngToCanvasPoint(pos[0], pos[1]);
-                 canvasPoints.push({ x: point.x, y: point.y });
-               }
-               
-               // Water areas (following OSMExport.mrules)
-               if (tags.natural === 'water' || tags.waterway === 'riverbank' || 
-                   tags.landuse === 'reservoir' || tags.landuse === 'basin' || 
-                   tags.waterway === 'dock' || tags.place === 'sea' || 
-                   tags.place === 'ocean' || tags.natural === 'bay' ||
-                   tags.natural === 'strait' || tags.leisure === 'marina') {
-                 
-                 // Use a more visible blue color for water
-                 ctx.fillStyle = '#2E86AB'; // Darker blue for water areas (lakes, rivers)
-                 ctx.beginPath();
-                 ctx.moveTo(canvasPoints[0].x, canvasPoints[0].y);
-                 for (let j = 1; j < canvasPoints.length; j++) {
-                   ctx.lineTo(canvasPoints[j].x, canvasPoints[j].y);
-                 }
-                 ctx.closePath();
-                 ctx.fill();
-                 
-                 // Debug: Also add a blue stroke to make it more visible
-                 ctx.strokeStyle = '#0066CC';
-                 ctx.lineWidth = 2;
-                 ctx.stroke();
-                 
-                 // Store for click detection with scaled coordinates
-                 const scaledPoints = canvasPoints.map((point: {x: number, y: number}) => ({
-                   x: point.x * (window.devicePixelRatio || 1),
-                   y: point.y * (window.devicePixelRatio || 1)
-                 }));
-                 
-                 this._renderedElements.push({
-                   type: 'water',
-                   points: scaledPoints,
-                   tags: way.tags || {},
-                   way: way
-                 });
-                 
-                 renderedWaterAreas++;
-               }
-               
-               // Water lines (following OSMExport.mrules) - separate check, not else if
-               if (tags.waterway === 'river' || tags.waterway === 'stream' || 
-                   tags.waterway === 'canal' || tags.waterway === 'drain' || 
-                   tags.natural === 'coastline' || tags.man_made === 'pier' ||
-                   tags['seamark:type'] === 'ferry_route') {
-                 
-                 // Set width based on waterway type (from OSMExport.mrules)
-                 if (tags.waterway === 'river') {
-                   ctx.lineWidth = 5; // rivers: line-width : 7:1;12:2;14:5
-                 } else if (tags.waterway === 'stream') {
-                   ctx.lineWidth = 2; // streams: line-width : 13:1;15:2
-                 } else if (tags.waterway === 'canal') {
-                   ctx.lineWidth = 4; // canals: line-width : 12:1;17:8
-                 } else if (tags.waterway === 'drain') {
-                   ctx.lineWidth = 1; // drains: line-width : 1
-                 } else if (tags.natural === 'coastline') {
-                   ctx.lineWidth = 2; // coastlines: line-width : 2
-                 } else if (tags.man_made === 'pier') {
-                   ctx.lineWidth = 3; // piers: line-width : 1:1;20:8 (simplified)
-                   ctx.strokeStyle = '#F1EEE8'; // pier color from OSMExport.mrules
-                 } else if (tags['seamark:type'] === 'ferry_route') {
-                   ctx.lineWidth = 1; // ferry routes: line-width : 1
-                   ctx.strokeStyle = '#6666FF'; // ferry color from OSMExport.mrules
-                   ctx.setLineDash([10, 5]); // dashlong style
-                 } else {
-                   ctx.lineWidth = 2; // default for other waterways
-                 }
-                 
-                 ctx.beginPath();
-                 ctx.moveTo(canvasPoints[0].x, canvasPoints[0].y);
-                 for (let j = 1; j < canvasPoints.length; j++) {
-                   ctx.lineTo(canvasPoints[j].x, canvasPoints[j].y);
-                 }
-                 ctx.stroke();
-                 
-                 // Reset dash pattern for next feature
-                 ctx.setLineDash([]);
-                 
-                 renderedWaterLines++;
-               }
-             }
-           }
-           
+           drawBatchedPolygons(visibleWater, () => '#B5D0D0', undefined, 'water');
          }
          
-         // Layer 3: Buildings (full detail at all zoom levels)
+         // Layer 4: Waterways (rivers, streams, etc.)
+         drawWaterways(visibleWaterways);
+         
+         // Layer 5: Buildings (render after land use for proper layering)
          if (isMediumDetail) {
-           // Always render ALL buildings for full detail
            drawBatchedPolygons(visibleBuildings, getBuildingColor, '#666', 'building');
          }
          
-         // Layer 4: Railways (always render at low+ detail)
+         // Layer 6: Railways (render before roads)
          if (isLowDetail) {
-           visibleRailways.forEach(way => {
+           for (const way of visibleRailways) {
              const tags = way.tags || {};
              const width = tags.railway === 'rail' ? 3 : 2;
              
@@ -1387,7 +1535,7 @@ function CanvasOsmRenderer({
              ctx.stroke();
              ctx.setLineDash([]);
              
-             // Store for click detection with scaled coordinates
+             // Store for click detection
              this._renderedElements.push({
                type: 'railway',
                points: scaledPoints,
@@ -1395,19 +1543,25 @@ function CanvasOsmRenderer({
                tags: way.tags || {},
                way: way
              });
-           });
+             
+             // Update progress
+             renderedFeatures++;
+             if (onRenderProgress && totalFeatures > 0) {
+               onRenderProgress({ current: renderedFeatures, total: totalFeatures });
+             }
+           }
          }
          
-         // Layer 5: Power Lines (medium+ detail)
+         // Layer 7: Power lines
          if (isMediumDetail) {
            drawBatchedLines(visiblePower, () => '#5c5c5c', (tags) => {
              return tags.power === 'line' ? 2 : 1;
            }, 'power');
          }
          
-         // Layer 6: Roads (always render ALL roads for full detail)
+         // Layer 8: Roads (render last for visibility)
          if (isLowDetail) {
-           // Sort roads by importance (using simple sort to avoid potential stack issues)
+           // Sort roads by importance
            const sortedRoads = [...visibleRoads];
            sortedRoads.sort((a, b) => {
              const aImportance = getRoadImportance(a.tags || {});
@@ -1415,14 +1569,13 @@ function CanvasOsmRenderer({
              return bImportance - aImportance; // Render important roads first
            });
            
-           // Render ALL roads for full detail
            drawBatchedLines(sortedRoads, getRoadColor, getRoadWidth, 'road');
          }
-        
-                          // Layer 7: Points of Interest (show at medium+ detail)
+         
+         // Layer 9: Points of Interest (render on top)
          if (isMediumDetail) {
            const visibleNodes: any[] = [];
-           // Find POI nodes iteratively
+           // Find POI nodes
            for (let i = 0; i < osmData.nodes.length; i++) {
              const node = osmData.nodes[i];
              const tags = node.tags || {};
@@ -1430,33 +1583,31 @@ function CanvasOsmRenderer({
                  tags.historic || tags.natural || tags.place || tags.power || 
                  tags.highway === 'bus_stop' || tags.railway === 'station' ||
                  tags.railway === 'platform' || tags.public_transport === 'station' ||
-                 tags.public_transport === 'platform' || tags.aeroway === 'aerodrome' ||
-                 tags.place === 'sea' || tags.place === 'ocean') {
+                 tags.public_transport === 'platform' || tags.aeroway === 'aerodrome') {
                visibleNodes.push(node);
              }
            }
-          
-          // Batch POI rendering by color (iterative)
-          const poiColorGroups = new Map<string, any[]>();
-          for (let i = 0; i < visibleNodes.length; i++) {
-            const node = visibleNodes[i];
-            const tags = node.tags || {};
-            let color = '#6B7280';
-            if (tags.amenity === 'hospital') color = '#EF4444';
-            else if (tags.amenity === 'school' || tags.amenity === 'university') color = '#059669';
-            else if (tags.amenity === 'restaurant' || tags.amenity === 'cafe') color = '#F59E0B';
-            else if (tags.shop) color = '#F59E0B';
-            else if (tags.tourism) color = '#10B981';
-            else if (tags.highway === 'bus_stop' || tags.railway === 'station') color = '#4F46E5';
-            else if (tags.place === 'sea' || tags.place === 'ocean') color = '#4A90E2'; // Water blue for large water bodies
-            
-            if (!poiColorGroups.has(color)) {
-              poiColorGroups.set(color, []);
-            }
-            poiColorGroups.get(color)!.push(node);
-          }
-          
-                     // Render POI groups iteratively
+           
+           // Batch POI rendering by color
+           const poiColorGroups = new Map<string, any[]>();
+           for (let i = 0; i < visibleNodes.length; i++) {
+             const node = visibleNodes[i];
+             const tags = node.tags || {};
+             let color = '#6B7280';
+             if (tags.amenity === 'hospital') color = '#EF4444';
+             else if (tags.amenity === 'school' || tags.amenity === 'university') color = '#059669';
+             else if (tags.amenity === 'restaurant' || tags.amenity === 'cafe') color = '#F59E0B';
+             else if (tags.shop) color = '#F59E0B';
+             else if (tags.tourism) color = '#10B981';
+             else if (tags.highway === 'bus_stop' || tags.railway === 'station') color = '#4F46E5';
+             
+             if (!poiColorGroups.has(color)) {
+               poiColorGroups.set(color, []);
+             }
+             poiColorGroups.get(color)!.push(node);
+           }
+           
+           // Render POI groups
            poiColorGroups.forEach((nodes, color) => {
              ctx.fillStyle = color;
              ctx.strokeStyle = '#FFFFFF';
@@ -1470,7 +1621,7 @@ function CanvasOsmRenderer({
                ctx.fill();
                ctx.stroke();
                
-               // Store for click detection with scaled coordinates
+               // Store for click detection
                this._renderedElements.push({
                  type: 'poi',
                  x: point.x * (window.devicePixelRatio || 1),
@@ -1480,19 +1631,19 @@ function CanvasOsmRenderer({
                  node: node
                });
                
-                                // Update progress
-                 renderedFeatures++;
-                 if (onRenderProgress && totalFeatures > 0) {
-                   onRenderProgress({ current: renderedFeatures, total: totalFeatures });
-                 }
+               // Update progress
+               renderedFeatures++;
+               if (onRenderProgress && totalFeatures > 0) {
+                 onRenderProgress({ current: renderedFeatures, total: totalFeatures });
                }
-             });
-          }
-        
-        // Complete progressive rendering
-        if (onRenderComplete) onRenderComplete();
-      }
-    });
+             }
+           });
+         }
+
+         // Complete progressive rendering
+         if (onRenderComplete) onRenderComplete();
+       }
+     });
     
     // Helper function for road importance (for rendering priority)
     function getRoadImportance(tags: Record<string, string>): number {
