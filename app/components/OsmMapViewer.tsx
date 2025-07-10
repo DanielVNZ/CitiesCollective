@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
+import { useMap } from 'react-leaflet';
 
 // Dynamically import Leaflet components to avoid SSR issues
 const MapContainer = dynamic(
@@ -14,29 +15,10 @@ const TileLayer = dynamic(
   { ssr: false }
 );
 
-const Marker = dynamic(
-  () => import('react-leaflet').then((mod) => mod.Marker),
-  { ssr: false }
-);
-
-const Popup = dynamic(
-  () => import('react-leaflet').then((mod) => mod.Popup),
-  { ssr: false }
-);
-
-const Polyline = dynamic(
-  () => import('react-leaflet').then((mod) => mod.Polyline),
-  { ssr: false }
-);
-
-const Polygon = dynamic(
-  () => import('react-leaflet').then((mod) => mod.Polygon),
-  { ssr: false }
-);
-
 interface OsmMapViewerProps {
   osmMapPath: string;
   cityName?: string;
+  cityId: number;
 }
 
 interface OsmBounds {
@@ -65,7 +47,7 @@ interface OsmData {
   ways: OsmWay[];
 }
 
-export function OsmMapViewer({ osmMapPath, cityName }: OsmMapViewerProps) {
+export function OsmMapViewer({ osmMapPath, cityName, cityId }: OsmMapViewerProps) {
   const [osmData, setOsmData] = useState<OsmData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -79,58 +61,46 @@ export function OsmMapViewer({ osmMapPath, cityName }: OsmMapViewerProps) {
         setIsLoading(true);
         setError(null);
 
-        // Fetch the OSM file
-        const response = await fetch(osmMapPath);
+        // Extract city ID from the osmMapPath
+        // const pathParts = osmMapPath.split('/');
+        // const cityId = pathParts[pathParts.length - 2]; // Assuming path is /api/cities/{id}/osm-data
+        
+        // if (!cityId || isNaN(parseInt(cityId))) {
+        //   throw new Error('Invalid city ID in OSM map path');
+        // }
+        
+        // Fetch processed OSM data from our caching API
+        const response = await fetch(`/api/cities/${cityId}/osm-data`);
         if (!response.ok) {
-          throw new Error('Failed to load OSM data');
+          throw new Error(`Failed to fetch OSM data: ${response.status}`);
         }
-
-        const xmlText = await response.text();
-        const parser = new DOMParser();
-        const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
-
-        // Parse OSM data
-        const bounds = xmlDoc.querySelector('bounds');
-        const nodes = Array.from(xmlDoc.querySelectorAll('node')).map(node => ({
-          id: node.getAttribute('id') || '',
-          lat: parseFloat(node.getAttribute('lat') || '0'),
-          lon: parseFloat(node.getAttribute('lon') || '0'),
-          tags: parseTags(node)
-        }));
-
-        const ways = Array.from(xmlDoc.querySelectorAll('way')).map(way => ({
-          id: way.getAttribute('id') || '',
-          nodes: Array.from(way.querySelectorAll('nd')).map(nd => nd.getAttribute('ref') || ''),
-          tags: parseTags(way)
-        }));
-
-        const data: OsmData = { nodes, ways };
-
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to load OSM data');
+        }
+        
+        const { data, bounds, cached } = result;
+        
         // Create node map for quick lookup
         const nodeMapData = new Map<string, OsmNode>();
-        nodes.forEach(node => nodeMapData.set(node.id, node));
+        data.nodes.forEach((node: OsmNode) => nodeMapData.set(node.id, node));
         setNodeMap(nodeMapData);
 
         // Set bounds if available
         if (bounds) {
-          data.bounds = {
-            minLat: parseFloat(bounds.getAttribute('minlat') || '0'),
-            maxLat: parseFloat(bounds.getAttribute('maxlat') || '0'),
-            minLng: parseFloat(bounds.getAttribute('minlon') || '0'),
-            maxLng: parseFloat(bounds.getAttribute('maxlon') || '0')
-          };
-        } else {
+          data.bounds = bounds;
+        } else if (data.nodes.length > 0) {
           // Calculate bounds from nodes if not provided
-          if (nodes.length > 0) {
-            const lats = nodes.map(n => n.lat);
-            const lons = nodes.map(n => n.lon);
-            data.bounds = {
-              minLat: Math.min(...lats),
-              maxLat: Math.max(...lats),
-              minLng: Math.min(...lons),
-              maxLng: Math.max(...lons)
-            };
-          }
+          const lats = data.nodes.map((n: OsmNode) => n.lat);
+          const lons = data.nodes.map((n: OsmNode) => n.lon);
+          data.bounds = {
+            minLat: Math.min(...lats),
+            maxLat: Math.max(...lats),
+            minLng: Math.min(...lons),
+            maxLng: Math.max(...lons)
+          };
         }
 
         setOsmData(data);
@@ -162,9 +132,9 @@ export function OsmMapViewer({ osmMapPath, cityName }: OsmMapViewerProps) {
             setMapCenter([0, 0]);
             setMapZoom(13);
           }
-        } else if (nodes.length > 0) {
+        } else if (data.nodes.length > 0) {
           // Use first valid node as center if no bounds
-          const firstNode = nodes.find(n => !isNaN(n.lat) && !isNaN(n.lon) && isFinite(n.lat) && isFinite(n.lon));
+          const firstNode = data.nodes.find((n: OsmNode) => !isNaN(n.lat) && !isNaN(n.lon) && isFinite(n.lat) && isFinite(n.lon));
           if (firstNode) {
             setMapCenter([firstNode.lat, firstNode.lon]);
           } else {
@@ -177,6 +147,12 @@ export function OsmMapViewer({ osmMapPath, cityName }: OsmMapViewerProps) {
           setMapZoom(13);
         }
 
+        console.log(`OSM data loaded${cached ? ' from cache' : ' and cached'}:`, {
+          nodes: data.nodes.length,
+          ways: data.ways.length,
+          cached
+        });
+
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load OSM data');
       } finally {
@@ -187,150 +163,13 @@ export function OsmMapViewer({ osmMapPath, cityName }: OsmMapViewerProps) {
     if (osmMapPath) {
       loadOsmData();
     }
-  }, [osmMapPath]);
+  }, [osmMapPath, cityId]);
 
-  const parseTags = (element: Element): Record<string, string> => {
-    const tags: Record<string, string> = {};
-    element.querySelectorAll('tag').forEach(tag => {
-      const key = tag.getAttribute('k');
-      const value = tag.getAttribute('v');
-      if (key && value) {
-        tags[key] = value;
-      }
-    });
-    return tags;
-  };
 
-  const createPolygonFromWay = (way: OsmWay): [number, number][] | null => {
-    const wayNodes = way.nodes
-      .map(nodeId => nodeMap.get(nodeId))
-      .filter(node => node !== undefined);
-    
-    if (wayNodes.length < 3) return null; // Need at least 3 points for a polygon
-    
-    return wayNodes.map(node => [node!.lat, node!.lon] as [number, number]);
-  };
 
-  const createLineFromWay = (way: OsmWay): [number, number][] | null => {
-    const wayNodes = way.nodes
-      .map(nodeId => nodeMap.get(nodeId))
-      .filter(node => node !== undefined);
-    
-    if (wayNodes.length < 2) return null; // Need at least 2 points for a line
-    
-    return wayNodes.map(node => [node!.lat, node!.lon] as [number, number]);
-  };
 
-  // Create custom icon based on POI type
-  const createCustomIcon = (tags: Record<string, string>) => {
-    // We'll use a dynamic import to avoid SSR issues
-    if (typeof window === 'undefined') return undefined;
-    
-    const L = require('leaflet');
-    
-    const iconSize = 20;
-    let iconSvg = '';
-    let bgColor = '#6B7280';
-    
-    // Transport icons
-    if (tags.highway === 'bus_stop' || tags.public_transport === 'platform' || 
-        tags.railway === 'station' || tags.public_transport === 'station' ||
-        tags.railway === 'platform' || tags.aeroway === 'aerodrome' ||
-        tags.amenity === 'bus_station' || tags.amenity === 'taxi') {
-      bgColor = '#4F46E5';
-      iconSvg = `<svg width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24">
-        <circle cx="12" cy="12" r="10" fill="currentColor"/>
-        <text x="12" y="16" text-anchor="middle" fill="white" font-size="12" font-weight="bold">🚌</text>
-      </svg>`;
-    } else if (tags.amenity === 'hospital') {
-      bgColor = '#EF4444';
-      iconSvg = `<svg width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24">
-        <circle cx="12" cy="12" r="10" fill="currentColor"/>
-        <text x="12" y="16" text-anchor="middle" fill="white" font-size="12" font-weight="bold">🏥</text>
-      </svg>`;
-    } else if (tags.amenity === 'school' || tags.amenity === 'university' || tags.amenity === 'college') {
-      bgColor = '#059669';
-      iconSvg = `<svg width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24">
-        <circle cx="12" cy="12" r="10" fill="currentColor"/>
-        <text x="12" y="16" text-anchor="middle" fill="white" font-size="12" font-weight="bold">🎓</text>
-      </svg>`;
-    } else if (tags.amenity === 'police') {
-      bgColor = '#1E40AF';
-      iconSvg = `<svg width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24">
-        <circle cx="12" cy="12" r="10" fill="currentColor"/>
-        <text x="12" y="16" text-anchor="middle" fill="white" font-size="12" font-weight="bold">👮</text>
-      </svg>`;
-    } else if (tags.amenity === 'fire_station') {
-      bgColor = '#DC2626';
-      iconSvg = `<svg width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24">
-        <circle cx="12" cy="12" r="10" fill="currentColor"/>
-        <text x="12" y="16" text-anchor="middle" fill="white" font-size="12" font-weight="bold">🚒</text>
-      </svg>`;
-    } else if (tags.amenity === 'parking') {
-      bgColor = '#3B82F6';
-      iconSvg = `<svg width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24">
-        <circle cx="12" cy="12" r="10" fill="currentColor"/>
-        <text x="12" y="16" text-anchor="middle" fill="white" font-size="12" font-weight="bold">🅿️</text>
-      </svg>`;
-    } else if (tags.amenity === 'bank') {
-      bgColor = '#6366F1';
-      iconSvg = `<svg width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24">
-        <circle cx="12" cy="12" r="10" fill="currentColor"/>
-        <text x="12" y="16" text-anchor="middle" fill="white" font-size="12" font-weight="bold">🏦</text>
-      </svg>`;
 
-    } else if (tags.amenity === 'restaurant' || tags.amenity === 'cafe' || tags.amenity === 'fast_food') {
-      bgColor = '#F59E0B';
-      iconSvg = `<svg width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24">
-        <circle cx="12" cy="12" r="10" fill="currentColor"/>
-        <text x="12" y="16" text-anchor="middle" fill="white" font-size="12" font-weight="bold">🍽️</text>
-      </svg>`;
-    } else if (tags.shop) {
-      bgColor = '#F59E0B';
-      iconSvg = `<svg width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24">
-        <circle cx="12" cy="12" r="10" fill="currentColor"/>
-        <text x="12" y="16" text-anchor="middle" fill="white" font-size="12" font-weight="bold">🛒</text>
-      </svg>`;
-    } else if (tags.tourism) {
-      bgColor = '#10B981';
-      iconSvg = `<svg width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24">
-        <circle cx="12" cy="12" r="10" fill="currentColor"/>
-        <text x="12" y="16" text-anchor="middle" fill="white" font-size="12" font-weight="bold">🏛️</text>
-      </svg>`;
-    } else {
-      // Default icon
-      bgColor = '#6B7280';
-      iconSvg = `<svg width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24">
-        <circle cx="12" cy="12" r="8" fill="currentColor"/>
-        <circle cx="12" cy="12" r="3" fill="white"/>
-      </svg>`;
-    }
-    
-    const iconHtml = `
-      <div style="
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 32px;
-        height: 32px;
-        background: white;
-        border-radius: 50%;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-        border: 2px solid white;
-        color: ${bgColor};
-      ">
-        ${iconSvg}
-      </div>
-    `;
-    
-    return L.divIcon({
-      html: iconHtml,
-      className: 'custom-poi-icon',
-      iconSize: [32, 32],
-      iconAnchor: [16, 16],
-      popupAnchor: [0, -16]
-    });
-  };
+
 
   if (isLoading) {
     return (
@@ -369,113 +208,13 @@ export function OsmMapViewer({ osmMapPath, cityName }: OsmMapViewerProps) {
     );
   }
 
-  // Categorize ways based on OSMExport.mrules
-  const landUseWays = osmData.ways.filter(way => {
-    const tags = way.tags || {};
-    return tags.landuse || tags.leisure || tags.natural || tags.amenity === 'parking';
-  });
 
-  const buildingWays = osmData.ways.filter(way => {
-    const tags = way.tags || {};
-    return tags.building;
-  });
 
-  // Create a function to determine building color based on context
-  const getBuildingColorWithContext = (buildingTags: Record<string, string>, buildingPositions: [number, number][]) => {
-    // First check for specific building types
-    if (buildingTags.amenity === 'school' || buildingTags.amenity === 'university' || buildingTags.amenity === 'college') return '#F0F0D8';
-    if (buildingTags.amenity === 'hospital') return '#FFE5E5';
-    if (buildingTags.amenity === 'fire_station') return '#FF9999';
-    if (buildingTags.amenity === 'police') return '#9999FF';
-    if (buildingTags.amenity === 'bank') return '#E0E7FF';
-    if (buildingTags.amenity === 'restaurant' || buildingTags.amenity === 'cafe' || buildingTags.amenity === 'fast_food') return '#FEF3C7';
-    
-    // Zoning-based building colors (Cities: Skylines 2 style)
-    if (buildingTags.building === 'commercial') return '#FF9999'; // Light blue for commercial zoning
-    if (buildingTags.building === 'residential') return '#FF9999'; // Light green for residential zoning
-    if (buildingTags.building === 'industrial') return '#FF9999'; // Light yellow for industrial zoning
-    
-    // Other commercial buildings (shops, offices, etc.)
-    if (buildingTags.shop || buildingTags.office || buildingTags.building === 'retail') return '#DBEAFE'; // Light blue
-    
-    // Other industrial buildings
-    if (buildingTags.building === 'warehouse' || buildingTags.building === 'factory') return '#FEF3C7'; // Light yellow
-    
-    // Other residential buildings
-    if (buildingTags.building === 'house' || buildingTags.building === 'apartments') return '#D1FAE5'; // Light green
-    
-    // For buildings with just building=yes, try to determine context from surrounding land use
-    if (buildingTags.building === 'yes' || buildingTags.building === 'true' || !buildingTags.building) {
-      // Calculate building center
-      const centerLat = buildingPositions.reduce((sum, pos) => sum + pos[0], 0) / buildingPositions.length;
-      const centerLng = buildingPositions.reduce((sum, pos) => sum + pos[1], 0) / buildingPositions.length;
-      
-      // Check if building is inside any land use area
-      for (const landUseWay of landUseWays) {
-        const landUsePositions = createPolygonFromWay(landUseWay);
-        if (landUsePositions) {
-          const landUseTags = landUseWay.tags || {};
-          if (landUseTags.landuse === 'residential' && isPointInPolygon([centerLat, centerLng], landUsePositions)) {
-            return '#D1FAE5'; // Light green for residential
-          } else if ((landUseTags.landuse === 'commercial' || landUseTags.landuse === 'retail') && isPointInPolygon([centerLat, centerLng], landUsePositions)) {
-            return '#DBEAFE'; // Light blue for commercial
-          } else if (landUseTags.landuse === 'industrial' && isPointInPolygon([centerLat, centerLng], landUsePositions)) {
-            return '#FEF3C7'; // Light yellow for industrial
-          }
-        }
-      }
-    }
-    
-    // Default building color
-    return '#BCA9A9';
-  };
 
-  // Helper function to check if a point is inside a polygon
-  const isPointInPolygon = (point: [number, number], polygon: [number, number][]) => {
-    const [lat, lng] = point;
-    let inside = false;
-    
-    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-      const [xi, yi] = polygon[i];
-      const [xj, yj] = polygon[j];
-      
-      if (((yi > lat) !== (yj > lat)) && (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi)) {
-        inside = !inside;
-      }
-    }
-    
-    return inside;
-  };
 
-  const waterWays = osmData.ways.filter(way => {
-    const tags = way.tags || {};
-    return tags.waterway || tags.natural === 'water';
-  });
 
-  const roadWays = osmData.ways.filter(way => {
-    const tags = way.tags || {};
-    return tags.highway;
-  });
 
-  const railwayWays = osmData.ways.filter(way => {
-    const tags = way.tags || {};
-    return tags.railway;
-  });
-
-  const powerWays = osmData.ways.filter(way => {
-    const tags = way.tags || {};
-    return tags.power === 'line' || tags.power === 'minor_line';
-  });
-
-  // Categorize points based on OSMExport.mrules
-  const importantNodes = osmData.nodes.filter(node => {
-    const tags = node.tags || {};
-    return tags.amenity || tags.shop || tags.leisure || tags.tourism || 
-           tags.historic || tags.natural || tags.place || tags.power || 
-           tags.highway === 'bus_stop' || tags.railway === 'station' ||
-           tags.railway === 'platform' || tags.public_transport === 'station' ||
-           tags.public_transport === 'platform' || tags.aeroway === 'aerodrome';
-  });
+ // Render all POIs for full quality
 
   const getLandUseColor = (tags: Record<string, string>) => {
     // Based on OSMExport.mrules colors, updated for better building visibility
@@ -558,14 +297,16 @@ export function OsmMapViewer({ osmMapPath, cityName }: OsmMapViewerProps) {
 
   return (
     <div className="w-full bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-      {/* Enhanced Cities: Skylines 2 Map */}
+      {/* Enhanced Cities: Skylines 2 Map - Canvas Rendered */}
       <div className="w-full h-96 bg-white dark:bg-gray-800 rounded-t-lg overflow-hidden">
         <MapContainer
           {...{
             center: mapCenter,
             zoom: mapZoom,
             style: { height: '100%', width: '100%' },
-            scrollWheelZoom: true
+            scrollWheelZoom: true,
+            preferCanvas: true, // Enable canvas rendering
+            renderer: typeof window !== 'undefined' ? require('leaflet').canvas() : undefined
           } as any}
         >
           {/* Base tile layer for coordinate system */}
@@ -576,260 +317,740 @@ export function OsmMapViewer({ osmMapPath, cityName }: OsmMapViewerProps) {
             } as any}
           />
           
-          {/* Layer 1: Land Use Areas (background) */}
-          {landUseWays.map(way => {
-            const positions = createPolygonFromWay(way);
-            if (!positions) return null;
-            
-            const tags = way.tags || {};
-            const landUseColor = getLandUseColor(tags);
-            
-            return (
-              <Polygon
-                key={way.id}
-                {...{
-                  positions: positions,
-                  pathOptions: {
-                    fillColor: landUseColor,
-                    fillOpacity: 0.7,
-                    color: landUseColor,
-                    weight: 1,
-                    opacity: 0.8
-                  }
-                } as any}
-              >
-                <Popup>
-                  <div className="text-sm">
-                    <div className="font-semibold">
-                      {tags.name || tags.landuse || tags.leisure || tags.natural || 'Land Use'}
-                    </div>
-                    <div className="text-gray-600">
-                      Type: {tags.landuse || tags.leisure || tags.natural || 'Area'}
-                    </div>
-                    <div className="text-gray-500 text-xs mt-1">
-                      Color: {landUseColor}
-                    </div>
-                  </div>
-                </Popup>
-              </Polygon>
-            );
-          })}
-          
-          {/* Layer 2: Water Features */}
-          {waterWays.map(way => {
-            const positions = createLineFromWay(way);
-            if (!positions) return null;
-            
-            const tags = way.tags || {};
-            
-            return (
-              <Polyline
-                key={way.id}
-                {...{
-                  positions: positions,
-                  pathOptions: {
-                    color: '#B5D0D0',
-                    weight: tags.waterway === 'river' ? 4 : tags.waterway === 'stream' ? 2 : 6,
-                    opacity: 0.8
-                  }
-                } as any}
-              >
-                <Popup>
-                  <div className="text-sm">
-                    <div className="font-semibold">
-                      {tags.name || 'Water Feature'}
-                    </div>
-                    <div className="text-gray-600">Type: {tags.waterway || tags.natural || 'Water'}</div>
-                  </div>
-                </Popup>
-              </Polyline>
-            );
-          })}
-
-          {/* Layer 3: Buildings */}
-          {buildingWays.map(way => {
-            const positions = createPolygonFromWay(way);
-            if (!positions) return null;
-            
-            const tags = way.tags || {};
-            const buildingColor = getBuildingColorWithContext(tags, positions);
-            
-            return (
-              <Polygon
-                key={way.id}
-                {...{
-                  positions: positions,
-                  pathOptions: {
-                    fillColor: buildingColor,
-                    fillOpacity: 0.8,
-                    color: '#666',
-                    weight: 1,
-                    opacity: 1
-                  }
-                } as any}
-              >
-                <Popup>
-                  <div className="text-sm">
-                    <div className="font-semibold">
-                      {tags.name || tags.amenity || 'Building'}
-                    </div>
-                    <div className="text-gray-600">
-                      Type: {tags.building || tags.amenity || 'Building'}
-                    </div>
-                    {tags.shop && (
-                      <div className="text-gray-600">Shop: {tags.shop}</div>
-                    )}
-                    {tags.office && (
-                      <div className="text-gray-600">Office: {tags.office}</div>
-                    )}
-                    <div className="text-gray-500 text-xs mt-1">
-                      Color: {buildingColor}
-                    </div>
-                  </div>
-                </Popup>
-              </Polygon>
-            );
-          })}
-
-          {/* Layer 4: Railways */}
-          {railwayWays.map(way => {
-            const positions = createLineFromWay(way);
-            if (!positions) return null;
-            
-            const tags = way.tags || {};
-            
-            return (
-              <Polyline
-                key={way.id}
-                {...{
-                  positions: positions,
-                  pathOptions: {
-                    color: '#666666',
-                    weight: tags.railway === 'rail' ? 3 : 2,
-                    opacity: 0.9,
-                    dashArray: tags.railway === 'rail' ? '10, 5' : undefined
-                  }
-                } as any}
-              >
-                <Popup>
-                  <div className="text-sm">
-                    <div className="font-semibold">
-                      {tags.name || 'Railway'}
-                    </div>
-                    <div className="text-gray-600">Type: {tags.railway}</div>
-                  </div>
-                </Popup>
-              </Polyline>
-            );
-          })}
-
-          {/* Layer 5: Power Lines */}
-          {powerWays.map(way => {
-            const positions = createLineFromWay(way);
-            if (!positions) return null;
-            
-            const tags = way.tags || {};
-            
-            return (
-              <Polyline
-                key={way.id}
-                {...{
-                  positions: positions,
-                  pathOptions: {
-                    color: '#5c5c5c',
-                    weight: tags.power === 'line' ? 2 : 1,
-                    opacity: 0.7
-                  }
-                } as any}
-              >
-                <Popup>
-                  <div className="text-sm">
-                    <div className="font-semibold">Power Line</div>
-                    <div className="text-gray-600">Type: {tags.power}</div>
-                  </div>
-                </Popup>
-              </Polyline>
-            );
-          })}
-          
-          {/* Layer 6: Roads (top layer) */}
-          {roadWays.map(way => {
-            const positions = createLineFromWay(way);
-            if (!positions) return null;
-            
-            const tags = way.tags || {};
-            
-            return (
-              <Polyline
-                key={way.id}
-                {...{
-                  positions: positions,
-                  pathOptions: {
-                    color: getRoadColor(tags),
-                    weight: getRoadWidth(tags),
-                    opacity: 0.9
-                  }
-                } as any}
-              >
-                <Popup>
-                  <div className="text-sm">
-                    <div className="font-semibold">
-                      {tags.name || tags.highway || 'Road'}
-                    </div>
-                    <div className="text-gray-600">Type: {tags.highway}</div>
-                  </div>
-                </Popup>
-              </Polyline>
-            );
-          })}
-          
-          {/* Layer 7: Points of Interest with Custom Icons */}
-          {importantNodes.slice(0, 100).map(node => {
-            const customIcon = createCustomIcon(node.tags || {});
-            
-            return (
-              <Marker 
-                key={node.id} 
-                {...{ 
-                  position: [node.lat, node.lon],
-                  icon: customIcon
-                } as any}
-              >
-                <Popup>
-                  <div className="text-sm">
-                    <div className="font-semibold">
-                      {node.tags?.name || node.tags?.amenity || node.tags?.shop || node.tags?.tourism || 'Location'}
-                    </div>
-                    {node.tags?.amenity && (
-                      <div className="text-gray-600">Amenity: {node.tags.amenity}</div>
-                    )}
-                    {node.tags?.shop && (
-                      <div className="text-gray-600">Shop: {node.tags.shop}</div>
-                    )}
-                    {node.tags?.tourism && (
-                      <div className="text-gray-600">Tourism: {node.tags.tourism}</div>
-                    )}
-                    {node.tags?.leisure && (
-                      <div className="text-gray-600">Leisure: {node.tags.leisure}</div>
-                    )}
-                    {node.tags?.highway === 'bus_stop' && (
-                      <div className="text-gray-600">Transport: Bus Stop</div>
-                    )}
-                    {(node.tags?.railway === 'station' || node.tags?.public_transport === 'station') && (
-                      <div className="text-gray-600">Transport: Railway Station</div>
-                    )}
-                    {node.tags?.aeroway && (
-                      <div className="text-gray-600">Aeroway: {node.tags.aeroway}</div>
-                    )}
-                  </div>
-                </Popup>
-              </Marker>
-            );
-          })}
+          {/* Canvas-based OSM Renderer */}
+          <CanvasOsmRenderer 
+            osmData={osmData}
+            getLandUseColor={getLandUseColor}
+            getBuildingColor={getBuildingColor}
+            getRoadColor={getRoadColor}
+            getRoadWidth={getRoadWidth}
+          />
         </MapContainer>
       </div>
-
-
     </div>
   );
+}
+
+// Canvas-based OSM renderer component with advanced performance optimizations
+function CanvasOsmRenderer({ 
+  osmData, 
+  getLandUseColor, 
+  getBuildingColor, 
+  getRoadColor, 
+  getRoadWidth
+}: {
+  osmData: OsmData;
+  getLandUseColor: (tags: Record<string, string>) => string;
+  getBuildingColor: (tags: Record<string, string>) => string;
+  getRoadColor: (tags: Record<string, string>) => string;
+  getRoadWidth: (tags: Record<string, string>) => number;
+}) {
+  const map = useMap();
+  
+  useEffect(() => {
+    if (!osmData || typeof window === 'undefined') return;
+    
+    const L = require('leaflet');
+    
+    // Create optimized data structures  
+    const nodeMap = new Map<string, OsmNode>();
+    
+    // Build node map for O(1) lookups
+    osmData.nodes.forEach(node => {
+      nodeMap.set(node.id, node);
+    });
+    
+         // Pre-process ways with positions for efficient rendering
+     const processedWays = osmData.ways.map(way => {
+       const wayNodes = way.nodes
+         .map(nodeId => nodeMap.get(nodeId))
+         .filter(node => node !== undefined) as OsmNode[];
+       
+       if (wayNodes.length === 0) return null;
+       
+       const processedWay = {
+         ...way,
+         nodes: wayNodes,
+         positions: wayNodes.map(node => [node.lat, node.lon] as [number, number])
+       };
+       
+       return processedWay;
+     }).filter(way => way !== null);
+    
+    // Create custom high-performance canvas layer
+    const CanvasLayer = L.Layer.extend({
+      initialize: function() {
+        this._canvas = null;
+        this._ctx = null;
+        this._lastZoom = null;
+        this._lastBounds = null;
+        this._animationFrame = null;
+        this._isDirty = true;
+      },
+      
+             onAdd: function(map: any) {
+         this._map = map;
+         this._canvas = L.DomUtil.create('canvas', 'leaflet-canvas-layer');
+         this._ctx = this._canvas.getContext('2d');
+         
+         // Enable hardware acceleration
+         this._ctx.imageSmoothingEnabled = true;
+         this._ctx.imageSmoothingQuality = 'high';
+         
+         // Set canvas size
+         const size = map.getSize();
+         this._canvas.width = size.x * (window.devicePixelRatio || 1);
+         this._canvas.height = size.y * (window.devicePixelRatio || 1);
+         this._canvas.style.width = size.x + 'px';
+         this._canvas.style.height = size.y + 'px';
+         this._ctx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
+         
+         // Position canvas
+         L.DomUtil.setPosition(this._canvas, L.point(0, 0));
+         
+         // Add to map pane
+         map.getPanes().overlayPane.appendChild(this._canvas);
+         
+         // Store rendered elements for click detection
+         this._renderedElements = [];
+         
+         // Add click interactivity
+         this._canvas.style.cursor = 'pointer';
+         this._canvas.style.pointerEvents = 'auto';
+         this._canvas.style.position = 'absolute';
+         this._canvas.style.zIndex = '100';
+         this._canvas.addEventListener('click', this._onCanvasClick.bind(this));
+         this._canvas.addEventListener('mousemove', this._onCanvasMouseMove.bind(this));
+         
+         // Bind events for smooth interaction
+         map.on('viewreset', this._onViewChange, this);
+         map.on('zoom', this._onViewChange, this);
+         map.on('move', this._onViewChange, this);
+         map.on('zoomend', this._onViewChange, this);
+         map.on('moveend', this._onViewChange, this);
+         map.on('resize', this._onResize, this);
+         
+         // Initial render
+         this._scheduleRender();
+       },
+      
+             onRemove: function(map: any) {
+         if (this._animationFrame) {
+           cancelAnimationFrame(this._animationFrame);
+         }
+         
+         // Remove click listeners
+         this._canvas.removeEventListener('click', this._onCanvasClick);
+         this._canvas.removeEventListener('mousemove', this._onCanvasMouseMove);
+         
+         L.DomUtil.remove(this._canvas);
+         map.off('viewreset', this._onViewChange, this);
+         map.off('zoom', this._onViewChange, this);
+         map.off('move', this._onViewChange, this);
+         map.off('zoomend', this._onViewChange, this);
+         map.off('moveend', this._onViewChange, this);
+         map.off('resize', this._onResize, this);
+       },
+       
+       _onCanvasClick: function(e: MouseEvent) {
+         // Account for canvas position and device pixel ratio
+         const rect = this._canvas.getBoundingClientRect();
+         const x = (e.clientX - rect.left) * (window.devicePixelRatio || 1);
+         const y = (e.clientY - rect.top) * (window.devicePixelRatio || 1);
+         
+         // Find clicked element
+         const clickedElement = this._getElementAtPoint(x, y);
+         
+         if (clickedElement) {
+           // Prevent event from bubbling to document
+           e.stopPropagation();
+           e.preventDefault();
+           this._showPopup(clickedElement, e);
+         }
+       },
+       
+       _onCanvasMouseMove: function(e: MouseEvent) {
+         const rect = this._canvas.getBoundingClientRect();
+         const x = (e.clientX - rect.left) * (window.devicePixelRatio || 1);
+         const y = (e.clientY - rect.top) * (window.devicePixelRatio || 1);
+         
+         // Check if hovering over an interactive element
+         const hoveredElement = this._getElementAtPoint(x, y);
+         this._canvas.style.cursor = hoveredElement ? 'pointer' : 'grab';
+       },
+       
+       _getElementAtPoint: function(x: number, y: number) {
+         // Check rendered elements for hit detection
+         for (let i = this._renderedElements.length - 1; i >= 0; i--) {
+           const element = this._renderedElements[i];
+           
+           if (element.type === 'poi') {
+             // Check if click is within POI circle
+             const distance = Math.sqrt(
+               Math.pow(x - element.x, 2) + Math.pow(y - element.y, 2)
+             );
+             if (distance <= element.radius + 5) { // 5px tolerance
+               return element;
+             }
+           } else if (element.type === 'building' || element.type === 'landuse') {
+             // Check if point is inside polygon
+             if (this._pointInPolygon(x, y, element.points)) {
+               return element;
+             }
+           } else if (element.type === 'road' || element.type === 'railway' || element.type === 'water') {
+             // Check if click is near line
+             if (this._pointNearLine(x, y, element.points, element.width + 5)) {
+               return element;
+             }
+           }
+         }
+         return null;
+       },
+       
+       _pointInPolygon: function(x: number, y: number, polygon: Array<{x: number, y: number}>) {
+         let inside = false;
+         for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+           if (((polygon[i].y > y) !== (polygon[j].y > y)) &&
+               (x < (polygon[j].x - polygon[i].x) * (y - polygon[i].y) / (polygon[j].y - polygon[i].y) + polygon[i].x)) {
+             inside = !inside;
+           }
+         }
+         return inside;
+       },
+       
+       _pointNearLine: function(x: number, y: number, line: Array<{x: number, y: number}>, tolerance: number) {
+         for (let i = 0; i < line.length - 1; i++) {
+           const distance = this._distanceToLineSegment(x, y, line[i], line[i + 1]);
+           if (distance <= tolerance) {
+             return true;
+           }
+         }
+         return false;
+       },
+       
+       _distanceToLineSegment: function(px: number, py: number, p1: {x: number, y: number}, p2: {x: number, y: number}) {
+         const A = px - p1.x;
+         const B = py - p1.y;
+         const C = p2.x - p1.x;
+         const D = p2.y - p1.y;
+         
+         const dot = A * C + B * D;
+         const lenSq = C * C + D * D;
+         let param = -1;
+         if (lenSq !== 0) {
+           param = dot / lenSq;
+         }
+         
+         let xx, yy;
+         if (param < 0) {
+           xx = p1.x;
+           yy = p1.y;
+         } else if (param > 1) {
+           xx = p2.x;
+           yy = p2.y;
+         } else {
+           xx = p1.x + param * C;
+           yy = p1.y + param * D;
+         }
+         
+         const dx = px - xx;
+         const dy = py - yy;
+         return Math.sqrt(dx * dx + dy * dy);
+       },
+       
+       _showPopup: function(element: any, e: MouseEvent) {
+         // Remove existing popup
+         const existingPopup = document.getElementById('canvas-osm-popup');
+         if (existingPopup) {
+           existingPopup.remove();
+         }
+         
+         // Create popup element
+         const popup = document.createElement('div');
+         popup.id = 'canvas-osm-popup';
+         popup.style.cssText = `
+           position: fixed;
+           left: ${e.clientX + 10}px;
+           top: ${e.clientY - 10}px;
+           background: white;
+           border: 1px solid #ccc;
+           border-radius: 4px;
+           padding: 8px;
+           box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+           z-index: 10000;
+           font-size: 12px;
+           max-width: 200px;
+           pointer-events: auto;
+           color: black;
+         `;
+         
+         // Generate popup content
+         let content = '';
+         const tags = element.tags || {};
+         
+         if (element.type === 'poi') {
+           content = `
+             <div style="font-weight: bold;">${tags.name || tags.amenity || tags.shop || tags.tourism || 'Location'}</div>
+             ${tags.amenity ? `<div>Amenity: ${tags.amenity}</div>` : ''}
+             ${tags.shop ? `<div>Shop: ${tags.shop}</div>` : ''}
+             ${tags.tourism ? `<div>Tourism: ${tags.tourism}</div>` : ''}
+           `;
+         } else if (element.type === 'building') {
+           content = `
+             <div style="font-weight: bold;">${tags.name || tags.amenity || 'Building'}</div>
+             <div>Type: ${tags.building || tags.amenity || 'Building'}</div>
+             ${tags.shop ? `<div>Shop: ${tags.shop}</div>` : ''}
+           `;
+         } else if (element.type === 'road') {
+           content = `
+             <div style="font-weight: bold;">${tags.name || tags.highway || 'Road'}</div>
+             <div>Type: ${tags.highway}</div>
+             ${tags.maxspeed ? `<div>Speed limit: ${tags.maxspeed}</div>` : ''}
+             ${tags.lanes ? `<div>Lanes: ${tags.lanes}</div>` : ''}
+           `;
+         } else if (element.type === 'railway') {
+           content = `
+             <div style="font-weight: bold;">${tags.name || tags.railway || 'Railway'}</div>
+             <div>Type: ${tags.railway}</div>
+           `;
+         } else if (element.type === 'landuse') {
+           content = `
+             <div style="font-weight: bold;">${tags.name || tags.landuse || tags.leisure || tags.natural || 'Land Use'}</div>
+             <div>Type: ${tags.landuse || tags.leisure || tags.natural || 'Area'}</div>
+           `;
+         } else if (element.type === 'water') {
+           content = `
+             <div style="font-weight: bold;">${tags.name || tags.waterway || tags.natural || 'Water'}</div>
+             <div>Type: ${tags.waterway || tags.natural || 'Water feature'}</div>
+           `;
+         } else if (element.type === 'power') {
+           content = `
+             <div style="font-weight: bold;">${tags.name || 'Power line'}</div>
+             <div>Type: ${tags.power}</div>
+           `;
+         } else {
+           content = `
+             <div style="font-weight: bold;">${tags.name || element.type}</div>
+             <div>Type: ${element.type}</div>
+           `;
+         }
+         
+         popup.innerHTML = content;
+         
+         // Prevent popup clicks from bubbling up and removing the popup
+         popup.addEventListener('click', function(e) {
+           e.stopPropagation();
+         });
+         
+         document.body.appendChild(popup);
+         
+         // Auto-remove popup after 5 seconds or on next click
+         setTimeout(() => {
+           if (popup.parentNode) {
+             popup.remove();
+           }
+         }, 5000);
+         
+         // Add click listener after a short delay to prevent immediate removal
+         setTimeout(() => {
+           function removePopup(event: Event) {
+             if (popup.parentNode) {
+               popup.remove();
+               document.removeEventListener('click', removePopup);
+             }
+           }
+           document.addEventListener('click', removePopup);
+         }, 100);
+       },
+      
+      _onViewChange: function() {
+        this._isDirty = true;
+        this._scheduleRender();
+      },
+      
+      _onResize: function() {
+        const size = this._map.getSize();
+        this._canvas.width = size.x * (window.devicePixelRatio || 1);
+        this._canvas.height = size.y * (window.devicePixelRatio || 1);
+        this._canvas.style.width = size.x + 'px';
+        this._canvas.style.height = size.y + 'px';
+        this._ctx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
+        this._isDirty = true;
+        this._scheduleRender();
+      },
+      
+             _scheduleRender: function() {
+         if (this._animationFrame) return;
+         
+         // Use requestAnimationFrame for smooth 60fps rendering
+         this._animationFrame = requestAnimationFrame(() => {
+           this._animationFrame = null;
+           if (this._isDirty) {
+             this._render();
+             this._isDirty = false;
+           }
+         });
+       },
+      
+             _render: function() {
+         if (!this._ctx || !osmData) return;
+         
+         const ctx = this._ctx;
+         const map = this._map;
+         const zoom = map.getZoom();
+         const bounds = map.getBounds();
+         const size = map.getSize();
+         
+         // Position canvas correctly relative to map
+         const topLeft = map.latLngToLayerPoint(bounds.getNorthWest());
+         L.DomUtil.setPosition(this._canvas, topLeft);
+         
+         // Clear canvas
+         ctx.clearRect(0, 0, this._canvas.width, this._canvas.height);
+         
+         // Clear rendered elements for click detection
+         this._renderedElements = [];
+         
+         // Use all processed ways (no viewport culling)
+         const waysToRender = processedWays;
+         
+         // Level of Detail (LOD): adjust rendering based on zoom (more permissive)
+         const isHighDetail = zoom >= 13;
+         const isMediumDetail = zoom >= 10;
+         const isLowDetail = zoom >= 6;
+         
+         // Helper function to convert lat/lng to canvas coordinates
+         const latLngToCanvasPoint = (lat: number, lng: number) => {
+           const layerPoint = map.latLngToLayerPoint([lat, lng]);
+           const canvasPoint = {
+             x: layerPoint.x - topLeft.x,
+             y: layerPoint.y - topLeft.y
+           };
+           return canvasPoint;
+         };
+        
+                 // Optimized drawing functions with batching
+         const drawBatchedPolygons = (ways: any[], getColor: (tags: any) => string, strokeColor?: string, elementType: string = 'polygon') => {
+           const colorGroups = new Map<string, any[]>();
+           
+           // Group by color for batching
+           ways.forEach(way => {
+             const color = getColor(way.tags || {});
+             if (!colorGroups.has(color)) {
+               colorGroups.set(color, []);
+             }
+             colorGroups.get(color)!.push(way);
+           });
+           
+           // Render each color group in batch
+           colorGroups.forEach((group, color) => {
+             ctx.fillStyle = color;
+             if (strokeColor) {
+               ctx.strokeStyle = strokeColor;
+               ctx.lineWidth = 1;
+             }
+             
+             group.forEach(way => {
+               if (way.positions.length < 3) return;
+               
+               const canvasPoints = way.positions.map((pos: [number, number]) => {
+                 const point = latLngToCanvasPoint(pos[0], pos[1]);
+                 return { x: point.x, y: point.y };
+               });
+               
+               // Scale for click detection
+               const scaledPoints = canvasPoints.map((point: {x: number, y: number}) => ({
+                 x: point.x * (window.devicePixelRatio || 1),
+                 y: point.y * (window.devicePixelRatio || 1)
+               }));
+               
+               ctx.beginPath();
+               canvasPoints.forEach((point: {x: number, y: number}, index: number) => {
+                 if (index === 0) {
+                   ctx.moveTo(point.x, point.y);
+                 } else {
+                   ctx.lineTo(point.x, point.y);
+                 }
+               });
+               ctx.closePath();
+               ctx.fill();
+               if (strokeColor) ctx.stroke();
+               
+               // Store for click detection with scaled coordinates
+               this._renderedElements.push({
+                 type: elementType,
+                 points: scaledPoints,
+                 tags: way.tags || {},
+                 way: way
+               });
+             });
+           });
+         };
+        
+                 const drawBatchedLines = (ways: any[], getColor: (tags: any) => string, getWidth: (tags: any) => number, elementType: string = 'line') => {
+           const styleGroups = new Map<string, any[]>();
+           
+           // Group by style for batching
+           ways.forEach(way => {
+             const color = getColor(way.tags || {});
+             const width = getWidth(way.tags || {});
+             const styleKey = `${color}-${width}`;
+             if (!styleGroups.has(styleKey)) {
+               styleGroups.set(styleKey, []);
+             }
+             styleGroups.get(styleKey)!.push(way);
+           });
+           
+           // Render each style group in batch
+           styleGroups.forEach((group, styleKey) => {
+             const [color, width] = styleKey.split('-');
+             ctx.strokeStyle = color;
+             ctx.lineWidth = parseInt(width);
+             ctx.lineCap = 'round';
+             ctx.lineJoin = 'round';
+             
+             group.forEach(way => {
+               if (way.positions.length < 2) return;
+               
+               const canvasPoints = way.positions.map((pos: [number, number]) => {
+                 const point = latLngToCanvasPoint(pos[0], pos[1]);
+                 return { x: point.x, y: point.y };
+               });
+               
+               // Scale for click detection
+               const scaledPoints = canvasPoints.map((point: {x: number, y: number}) => ({
+                 x: point.x * (window.devicePixelRatio || 1),
+                 y: point.y * (window.devicePixelRatio || 1)
+               }));
+               
+               ctx.beginPath();
+               canvasPoints.forEach((point: {x: number, y: number}, index: number) => {
+                 if (index === 0) {
+                   ctx.moveTo(point.x, point.y);
+                 } else {
+                   ctx.lineTo(point.x, point.y);
+                 }
+               });
+               ctx.stroke();
+               
+               // Store for click detection with scaled coordinates
+               this._renderedElements.push({
+                 type: elementType,
+                 points: scaledPoints,
+                 width: parseInt(width),
+                 tags: way.tags || {},
+                 way: way
+               });
+             });
+           });
+         };
+        
+                 // Filter visible ways by type for efficient rendering
+         const visibleLandUse = waysToRender.filter(way => {
+           const tags = way.tags || {};
+           return tags.landuse || tags.leisure || tags.natural || tags.amenity === 'parking';
+         });
+         
+         const visibleBuildings = waysToRender.filter(way => {
+           const tags = way.tags || {};
+           return tags.building;
+         });
+         
+         const visibleWater = waysToRender.filter(way => {
+           const tags = way.tags || {};
+           return tags.waterway || tags.natural === 'water';
+         });
+         
+         const visibleRoads = waysToRender.filter(way => {
+           const tags = way.tags || {};
+           return tags.highway;
+         });
+         
+         const visibleRailways = waysToRender.filter(way => {
+           const tags = way.tags || {};
+           return tags.railway;
+         });
+         
+         const visiblePower = waysToRender.filter(way => {
+           const tags = way.tags || {};
+           return tags.power === 'line' || tags.power === 'minor_line';
+         });
+        
+                 // Render layers with LOD optimizations (always show core features)
+         
+         // Layer 1: Land Use Areas (always render for context)
+         if (isLowDetail) {
+           drawBatchedPolygons(visibleLandUse, getLandUseColor, undefined, 'landuse');
+         }
+         
+         // Layer 2: Water Features (always render at medium+ detail)
+         if (isMediumDetail) {
+           drawBatchedLines(visibleWater, () => '#B5D0D0', (tags) => {
+             return tags.waterway === 'river' ? 4 : tags.waterway === 'stream' ? 2 : 6;
+           }, 'water');
+         }
+         
+         // Layer 3: Buildings (scale complexity with zoom)
+         if (isMediumDetail) {
+           if (isHighDetail) {
+             // Full building detail
+             drawBatchedPolygons(visibleBuildings, getBuildingColor, '#666', 'building');
+           } else {
+             // Simplified buildings at medium zoom (more generous limit)
+             drawBatchedPolygons(visibleBuildings.slice(0, 500), getBuildingColor, undefined, 'building');
+           }
+         }
+         
+         // Layer 4: Railways (always render at low+ detail)
+         if (isLowDetail) {
+           visibleRailways.forEach(way => {
+             const tags = way.tags || {};
+             const width = tags.railway === 'rail' ? 3 : 2;
+             
+             if (tags.railway === 'rail') {
+               ctx.setLineDash([10, 5]);
+             } else {
+               ctx.setLineDash([]);
+             }
+             
+             const canvasPoints = way.positions.map((pos: [number, number]) => {
+               const point = latLngToCanvasPoint(pos[0], pos[1]);
+               return { x: point.x, y: point.y };
+             });
+             
+             // Scale for click detection
+             const scaledPoints = canvasPoints.map((point: {x: number, y: number}) => ({
+               x: point.x * (window.devicePixelRatio || 1),
+               y: point.y * (window.devicePixelRatio || 1)
+             }));
+             
+             ctx.strokeStyle = '#666666';
+             ctx.lineWidth = width;
+             ctx.beginPath();
+             canvasPoints.forEach((point: {x: number, y: number}, index: number) => {
+               if (index === 0) {
+                 ctx.moveTo(point.x, point.y);
+               } else {
+                 ctx.lineTo(point.x, point.y);
+               }
+             });
+             ctx.stroke();
+             ctx.setLineDash([]);
+             
+             // Store for click detection with scaled coordinates
+             this._renderedElements.push({
+               type: 'railway',
+               points: scaledPoints,
+               width: width,
+               tags: way.tags || {},
+               way: way
+             });
+           });
+         }
+         
+         // Layer 5: Power Lines (medium+ detail)
+         if (isMediumDetail) {
+           drawBatchedLines(visiblePower, () => '#5c5c5c', (tags) => {
+             return tags.power === 'line' ? 2 : 1;
+           }, 'power');
+         }
+         
+         // Layer 6: Roads (always render - most important layer)
+         if (isLowDetail) {
+           const sortedRoads = visibleRoads.sort((a, b) => {
+             const aImportance = getRoadImportance(a.tags || {});
+             const bImportance = getRoadImportance(b.tags || {});
+             return bImportance - aImportance; // Render important roads first
+           });
+           
+           // Limit roads at lower zoom levels but always show major ones
+           const roadLimit = isHighDetail ? sortedRoads.length : isMediumDetail ? 1000 : 500;
+           const roadsToRender = sortedRoads.slice(0, roadLimit);
+           
+           drawBatchedLines(roadsToRender, getRoadColor, getRoadWidth, 'road');
+         }
+        
+                          // Layer 7: Points of Interest (show at medium+ detail)
+         if (isMediumDetail) {
+           const visibleNodes = osmData.nodes.filter(node => {
+             const tags = node.tags || {};
+             return tags.amenity || tags.shop || tags.leisure || tags.tourism || 
+                    tags.historic || tags.natural || tags.place || tags.power || 
+                    tags.highway === 'bus_stop' || tags.railway === 'station' ||
+                    tags.railway === 'platform' || tags.public_transport === 'station' ||
+                    tags.public_transport === 'platform' || tags.aeroway === 'aerodrome';
+           });
+          
+          // Batch POI rendering by color
+          const poiColorGroups = new Map<string, any[]>();
+          visibleNodes.forEach(node => {
+            const tags = node.tags || {};
+            let color = '#6B7280';
+            if (tags.amenity === 'hospital') color = '#EF4444';
+            else if (tags.amenity === 'school' || tags.amenity === 'university') color = '#059669';
+            else if (tags.amenity === 'restaurant' || tags.amenity === 'cafe') color = '#F59E0B';
+            else if (tags.shop) color = '#F59E0B';
+            else if (tags.tourism) color = '#10B981';
+            else if (tags.highway === 'bus_stop' || tags.railway === 'station') color = '#4F46E5';
+            
+            if (!poiColorGroups.has(color)) {
+              poiColorGroups.set(color, []);
+            }
+            poiColorGroups.get(color)!.push(node);
+          });
+          
+                     poiColorGroups.forEach((nodes, color) => {
+             ctx.fillStyle = color;
+             ctx.strokeStyle = '#FFFFFF';
+             ctx.lineWidth = 2;
+             
+             nodes.forEach(node => {
+               const point = latLngToCanvasPoint(node.lat, node.lon);
+               ctx.beginPath();
+               ctx.arc(point.x, point.y, 6, 0, 2 * Math.PI);
+               ctx.fill();
+               ctx.stroke();
+               
+               // Store for click detection with scaled coordinates
+               this._renderedElements.push({
+                 type: 'poi',
+                 x: point.x * (window.devicePixelRatio || 1),
+                 y: point.y * (window.devicePixelRatio || 1),
+                 radius: 6 * (window.devicePixelRatio || 1),
+                 tags: node.tags || {},
+                 node: node
+               });
+             });
+           });
+        }
+      }
+    });
+    
+    // Helper function for road importance (for rendering priority)
+    function getRoadImportance(tags: Record<string, string>): number {
+      if (tags.highway === 'motorway' || tags.highway === 'motorway_link') return 10;
+      if (tags.highway === 'trunk' || tags.highway === 'trunk_link') return 9;
+      if (tags.highway === 'primary' || tags.highway === 'primary_link') return 8;
+      if (tags.highway === 'secondary' || tags.highway === 'secondary_link') return 7;
+      if (tags.highway === 'tertiary' || tags.highway === 'tertiary_link') return 6;
+      if (tags.highway === 'residential' || tags.highway === 'unclassified') return 5;
+      if (tags.highway === 'service') return 4;
+      if (tags.highway === 'footway' || tags.highway === 'cycleway' || tags.highway === 'path') return 3;
+      if (tags.highway === 'track') return 2;
+      return 1;
+    }
+    
+    // Add canvas layer to map
+    const canvasLayer = new CanvasLayer();
+    canvasLayer.addTo(map);
+    
+    // Cleanup function
+    return () => {
+      if (map.hasLayer(canvasLayer)) {
+        map.removeLayer(canvasLayer);
+      }
+    };
+  }, [osmData, map, getLandUseColor, getBuildingColor, getRoadColor, getRoadWidth]);
+  
+  return null; // This component doesn't render anything directly
 } 

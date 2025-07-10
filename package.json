@@ -14,6 +14,7 @@
     "@types/react": "^18.2.45",
     "@types/react-dom": "^18.2.18",
     "@types/uuid": "^10.0.0",
+    "@xmldom/xmldom": "^0.9.8",
     "adm-zip": "^0.5.16",
     "bcrypt-ts": "^5.0.0",
     "crypto": "^1.0.1",
