@@ -70,6 +70,7 @@ export const cityTable = pgTable('City', {
   fileName: varchar('fileName', { length: 255 }),
   filePath: varchar('filePath', { length: 500 }),
   downloadable: boolean('downloadable').default(true),
+  description: text('description'),
   uploadedAt: timestamp('uploadedAt', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).defaultNow(),
 });
@@ -599,6 +600,7 @@ async function ensureCityTableExists() {
         "fileName" VARCHAR(255),
         "filePath" VARCHAR(500),
         "downloadable" BOOLEAN DEFAULT TRUE,
+        description TEXT,
         "uploadedAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
         "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
       );`;
@@ -633,6 +635,22 @@ async function ensureCityTableExists() {
       await client`
         ALTER TABLE "City" ADD COLUMN "downloadable" BOOLEAN DEFAULT TRUE;`;
       console.log('downloadable column added successfully');
+    }
+
+    // Check if description column exists, if not add it
+    const descriptionColumnExists = await client`
+      SELECT EXISTS (
+        SELECT FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = 'City'
+        AND column_name = 'description'
+      );`;
+    
+    if (!descriptionColumnExists[0].exists) {
+      console.log('Adding description column to existing City table...');
+      await client`
+        ALTER TABLE "City" ADD COLUMN description TEXT;`;
+      console.log('description column added successfully');
     }
   }
 
@@ -874,6 +892,7 @@ export async function getCityById(id: number) {
     fileName: cityTable.fileName,
     filePath: cityTable.filePath,
     downloadable: cityTable.downloadable,
+    description: cityTable.description,
     uploadedAt: cityTable.uploadedAt,
     updatedAt: cityTable.updatedAt,
   }).from(cityTable).where(eq(cityTable.id, id)).limit(1);
@@ -918,6 +937,16 @@ export async function updateCityDownloadable(cityId: number, userId: number, dow
   // Only allow users to update their own cities
   const result = await db.update(cityTable)
     .set({ downloadable, updatedAt: new Date() })
+    .where(and(eq(cityTable.id, cityId), eq(cityTable.userId, userId)))
+    .returning();
+  return result[0] || null;
+}
+
+export async function updateCityDescription(cityId: number, userId: number, description: string) {
+  await ensureCityTableExists();
+  // Only allow users to update their own cities
+  const result = await db.update(cityTable)
+    .set({ description, updatedAt: new Date() })
     .where(and(eq(cityTable.id, cityId), eq(cityTable.userId, userId)))
     .returning();
   return result[0] || null;

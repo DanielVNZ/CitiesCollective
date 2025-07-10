@@ -191,8 +191,30 @@ City (
 - [x] Upload notification trigger - Automatically notify followers when new cities are uploaded
 - [x] Real-time UI updates - Optimistic updates for follow actions and notification management
 
+### Phase 15: City Description System ✅ COMPLETED
+- [x] Database schema update - Add description field to City table with TEXT type for markdown support
+- [x] Description update API endpoint - Secure PUT endpoint for updating city descriptions
+- [x] City description component - Interactive editor with markdown support and preview
+- [x] Markdown rendering - React-markdown with GitHub Flavored Markdown (GFM) support
+- [x] Owner-only editing - Only city owners can edit descriptions, others can view
+- [x] Typography styling - Tailwind CSS typography plugin for beautiful markdown rendering
+- [x] Real-time editing - Inline editing with save/cancel functionality
+- [x] Error handling - Comprehensive error messages and validation
+- [x] City page integration - Description section prominently displayed on city detail pages
+
 ### Current Status
-✅ **FOLLOW SYSTEM & NOTIFICATIONS COMPLETE!** The Cities: Skylines 2 sharing platform now includes a comprehensive follow system and notification features for enhanced community engagement.
+✅ **CITY DESCRIPTION SYSTEM COMPLETE!** The Cities: Skylines 2 sharing platform now includes a comprehensive city description system with markdown support, allowing creators to share detailed information about their cities.
+
+**City Description Features:**
+- **Markdown Support**: Full GitHub Flavored Markdown (GFM) support for rich text formatting
+- **Interactive Editor**: Inline editing with real-time preview and save/cancel functionality
+- **Owner-Only Editing**: Only city owners can edit descriptions, while everyone can view them
+- **Beautiful Typography**: Tailwind CSS typography plugin for professional markdown rendering
+- **Error Handling**: Comprehensive validation and user-friendly error messages
+- **City Page Integration**: Description section prominently displayed on city detail pages
+- **Database Integration**: Secure API endpoint with proper authentication and authorization
+
+✅ **FOLLOW SYSTEM & NOTIFICATIONS COMPLETE!** The platform also includes a comprehensive follow system and notification features for enhanced community engagement.
 
 **Core Features:**
 - Complete user authentication with username system

@@ -6,6 +6,7 @@ import { ImageManager } from 'app/components/ImageManager';
 import { LikeButton } from 'app/components/LikeButton';
 import { FavoriteButton } from 'app/components/FavoriteButton';
 import { Comments } from 'app/components/Comments';
+import { CityDescription } from 'app/components/CityDescription';
 import { auth } from 'app/auth';
 import { ImageSection } from './ImageSection';
 
@@ -223,6 +224,13 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
             </div>
           )}
         </div>
+
+        {/* City Description */}
+        <CityDescription 
+          cityId={cityId} 
+          initialDescription={city.description} 
+          isOwner={isOwner} 
+        />
 
         <div className={`grid gap-8 ${
           city.contentPrerequisites && city.contentPrerequisites.length > 0 
