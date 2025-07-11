@@ -40,26 +40,12 @@ export default async function ApiKeyManagement() {
       <div className="max-w-6xl mx-auto">
         <h1 className="text-3xl font-bold mb-8">API Key Management</h1>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* User Selection */}
-          <div className="lg:col-span-1">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-              <h2 className="text-xl font-semibold mb-4">Select User</h2>
-              <div className="space-y-2 max-h-96 overflow-y-auto">
-                {users.map((user) => (
-                  <UserApiKeySection key={user.id} user={user} />
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* API Keys Management */}
-          <div className="lg:col-span-2">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-              <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-                Select a user to manage their API keys
-              </div>
-            </div>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 w-full">
+          <h2 className="text-xl font-semibold mb-4">Select User</h2>
+          <div className="space-y-2">
+            {users.map((user) => (
+              <UserApiKeySection key={user.id} user={user} />
+            ))}
           </div>
         </div>
       </div>
