@@ -4,6 +4,7 @@ import { createUser, getUser, client } from 'app/db';
 import { signIn } from 'app/auth';
 import { SubmitButton } from 'app/submit-button';
 import { getRedirectUrl } from 'app/utils/redirect';
+import TurnstileWidget from 'app/components/TurnstileWidget';
 
 export default function Register({
   searchParams,
@@ -215,16 +216,11 @@ export default function Register({
               </label>
             </div>
             
-            {/* Cloudflare Turnstile - disabled on localhost */}
-            {typeof window !== 'undefined' && window.location.hostname !== 'localhost' && (
-              <div className="flex justify-center">
-                <div 
-                  className="cf-turnstile" 
-                  data-sitekey={process.env.NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY}
-                  data-theme="light"
-                ></div>
-              </div>
-            )}
+            {/* Cloudflare Turnstile */}
+            <TurnstileWidget 
+              siteKey={process.env.NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY || 'test-key'}
+              theme="light"
+            />
             
             <SubmitButton>Sign Up</SubmitButton>
             <p className="text-center text-sm text-gray-600 dark:text-gray-400">

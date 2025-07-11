@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { SubmitButton } from 'app/submit-button';
+import TurnstileWidget from 'app/components/TurnstileWidget';
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
@@ -80,16 +81,11 @@ export default function ForgotPassword() {
               />
             </div>
             
-            {/* Cloudflare Turnstile - disabled on localhost */}
-            {typeof window !== 'undefined' && window.location.hostname !== 'localhost' && (
-              <div className="flex justify-center">
-                <div 
-                  className="cf-turnstile" 
-                  data-sitekey={process.env.NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY}
-                  data-theme="light"
-                ></div>
-              </div>
-            )}
+            {/* Cloudflare Turnstile */}
+            <TurnstileWidget 
+              siteKey={process.env.NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY || 'test-key'}
+              theme="light"
+            />
             
             <button
               type="submit"

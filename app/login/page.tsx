@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { signIn } from 'app/auth';
-import { SubmitButton } from 'app/submit-button';
 import { getRedirectUrl } from 'app/utils/redirect';
+import TurnstileWidget from 'app/components/TurnstileWidget';
 
 export default function Login({
   searchParams,
@@ -143,6 +143,7 @@ export default function Login({
               />
             </div>
             
+            {/* Temporarily show Turnstile everywhere for testing */}
             <div className="flex items-center justify-between">
               <div></div>
               <Link
@@ -153,18 +154,18 @@ export default function Login({
               </Link>
             </div>
             
-            {/* Cloudflare Turnstile - disabled on localhost */}
-            {typeof window !== 'undefined' && window.location.hostname !== 'localhost' && (
-              <div className="flex justify-center">
-                <div 
-                  className="cf-turnstile" 
-                  data-sitekey={process.env.NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY}
-                  data-theme="light"
-                ></div>
-              </div>
-            )}
+            {/* Cloudflare Turnstile - temporarily showing everywhere for testing */}
+            <TurnstileWidget 
+              siteKey={process.env.NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY || 'test-key'}
+              theme="light"
+            />
             
-            <SubmitButton>Sign in</SubmitButton>
+            <button
+              type="submit"
+              className="flex h-10 w-full items-center justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+            >
+              Sign in
+            </button>
             <p className="text-center text-sm text-gray-600 dark:text-gray-400">
               Don&apos;t have an account?{' '}
               <Link href={`/register?redirect=${encodeURIComponent(redirectTo)}`} className="font-semibold text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400">
