@@ -10,6 +10,7 @@ interface UploadedCity {
   population: number;
   money: number;
   xp: number;
+  unlimitedMoney?: boolean;
 }
 
 export function UploadForm() {
@@ -418,7 +419,7 @@ export function UploadForm() {
                 <div className="text-sm text-gray-600 dark:text-gray-400">Population</div>
               </div>
               <div className="text-center">
-                <div className="text-lg font-semibold text-gray-900 dark:text-white">${metadata.money?.toLocaleString()}</div>
+                <div className="text-lg font-semibold text-gray-900 dark:text-white">{metadata.unlimitedMoney ? '∞' : `$${metadata.money?.toLocaleString()}`}</div>
                 <div className="text-sm text-gray-600 dark:text-gray-400">Money</div>
               </div>
               <div className="text-center">

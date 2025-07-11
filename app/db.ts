@@ -723,6 +723,7 @@ export async function getRecentCities(limit: number = 12) {
       population: cityTable.population,
       money: cityTable.money,
       xp: cityTable.xp,
+      unlimitedMoney: cityTable.unlimitedMoney,
       uploadedAt: cityTable.uploadedAt,
       user: {
         id: users.id,
@@ -794,6 +795,7 @@ export async function getTopCitiesByLikes(limit: number = 3) {
       population: cityTable.population,
       money: cityTable.money,
       xp: cityTable.xp,
+      unlimitedMoney: cityTable.unlimitedMoney,
       uploadedAt: cityTable.uploadedAt,
       likeCount: sql<number>`count(${likesTable.id})`,
       user: {
@@ -836,6 +838,7 @@ export async function getContentCreatorCities(limit: number = 6) {
       population: cityTable.population,
       money: cityTable.money,
       xp: cityTable.xp,
+      unlimitedMoney: cityTable.unlimitedMoney,
       uploadedAt: cityTable.uploadedAt,
       user: {
         id: users.id,
@@ -873,6 +876,7 @@ export async function getCitiesByUser(userId: number) {
     population: cityTable.population,
     money: cityTable.money,
     xp: cityTable.xp,
+    unlimitedMoney: cityTable.unlimitedMoney,
     theme: cityTable.theme,
     gameMode: cityTable.gameMode,
     fileName: cityTable.fileName,
@@ -1075,6 +1079,7 @@ export async function searchCities(
       population: cityTable.population,
       money: cityTable.money,
       xp: cityTable.xp,
+      unlimitedMoney: cityTable.unlimitedMoney,
       theme: cityTable.theme,
       gameMode: cityTable.gameMode,
       uploadedAt: cityTable.uploadedAt,
@@ -1872,6 +1877,7 @@ export async function getUserFavorites(userId: number, limit: number = 12, offse
       population: cityTable.population,
       money: cityTable.money,
       xp: cityTable.xp,
+      unlimitedMoney: cityTable.unlimitedMoney,
       theme: cityTable.theme,
       gameMode: cityTable.gameMode,
       uploadedAt: cityTable.uploadedAt,

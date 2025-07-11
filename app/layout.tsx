@@ -3,6 +3,7 @@ import 'leaflet/dist/leaflet.css';
 
 import { GeistSans } from 'geist/font/sans';
 import { ThemeProvider } from './components/ThemeProvider';
+import { Footer } from './components/Footer';
 import Script from 'next/script';
 
 let title = 'Cities Collective';
@@ -36,11 +37,12 @@ export default function RootLayout({
       <body className={GeistSans.variable} suppressHydrationWarning>
         <ThemeProvider
           attribute="class"
-          defaultTheme="light"
+          defaultTheme="system"
           enableSystem={true}
           disableTransitionOnChange={false}
         >
           {children}
+          <Footer />
         </ThemeProvider>
       </body>
     </html>

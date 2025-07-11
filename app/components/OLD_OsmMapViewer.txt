@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useMap } from 'react-leaflet';
 import { ClientOsmProcessor, OsmCache, ProcessingProgress, OsmData, OsmNode, OsmWay, OsmRelation, OsmBounds } from '../utils/osmProcessor';
@@ -37,119 +37,6 @@ export function OsmMapViewer({ osmMapPath, cityName, cityId }: OsmMapViewerProps
   const [isRendering, setIsRendering] = useState(false);
   const [processingProgress, setProcessingProgress] = useState<ProcessingProgress | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isFullScreen, setIsFullScreen] = useState(false);
-  const mapRef = useRef<any>(null);
-  const canvasLayerRef = useRef<any>(null);
-
-  // Handle ESC key and fullscreen changes
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isFullScreen) {
-        exitFullScreen();
-      }
-    };
-
-    const handleFullscreenChange = () => {
-      // If browser exits fullscreen (F11, ESC, etc.), update our state
-      if (!document.fullscreenElement && isFullScreen) {
-        setIsFullScreen(false);
-      }
-    };
-
-    if (isFullScreen) {
-      document.addEventListener('keydown', handleKeyDown);
-      document.addEventListener('fullscreenchange', handleFullscreenChange);
-      return () => {
-        document.removeEventListener('keydown', handleKeyDown);
-        document.removeEventListener('fullscreenchange', handleFullscreenChange);
-      };
-    }
-  }, [isFullScreen]);
-
-  // Functions to handle browser fullscreen
-  const enterFullScreen = async () => {
-    try {
-      const mapElement = document.querySelector('.osm-fullscreen-container');
-      if (mapElement && mapElement.requestFullscreen) {
-        await mapElement.requestFullscreen();
-        setIsFullScreen(true);
-      }
-    } catch (err) {
-      console.error('Error entering fullscreen:', err);
-      // Fallback to modal fullscreen
-      setIsFullScreen(true);
-    }
-  };
-
-  const exitFullScreen = async () => {
-    try {
-      if (document.fullscreenElement && document.exitFullscreen) {
-        await document.exitFullscreen();
-      }
-      setIsFullScreen(false);
-    } catch (err) {
-      console.error('Error exiting fullscreen:', err);
-      setIsFullScreen(false);
-    }
-  };
-
-  // Force map to re-render when entering/exiting full screen
-  useEffect(() => {
-    if (typeof window !== 'undefined' && osmData) {
-      // Small delay to ensure DOM is updated
-      const timer = setTimeout(() => {
-        // Get the Leaflet map instance
-        const mapContainer = document.querySelector('.leaflet-container');
-        if (mapContainer && mapRef.current) {
-          const map = mapRef.current;
-          
-          // Force Leaflet to recalculate size and re-render
-          map.invalidateSize();
-          
-          // Trigger a resize event
-          window.dispatchEvent(new Event('resize'));
-          
-          // Force canvas layer to re-render
-          const canvas = mapContainer.querySelector('canvas.leaflet-canvas-layer') as HTMLCanvasElement;
-          if (canvas) {
-            canvas.style.zIndex = '10';
-            canvas.style.position = 'absolute';
-            canvas.style.pointerEvents = 'auto';
-            canvas.style.display = 'block';
-            
-            // Force canvas to resize to match container
-            const size = map.getSize();
-            canvas.width = size.x * (window.devicePixelRatio || 1);
-            canvas.height = size.y * (window.devicePixelRatio || 1);
-            canvas.style.width = size.x + 'px';
-            canvas.style.height = size.y + 'px';
-          }
-          
-          // Also check for any canvas in the map
-          const allCanvases = mapContainer.querySelectorAll('canvas');
-          allCanvases.forEach(canvas => {
-            const canvasElement = canvas as HTMLCanvasElement;
-            canvasElement.style.zIndex = '10';
-            canvasElement.style.position = 'absolute';
-            canvasElement.style.pointerEvents = 'auto';
-            canvasElement.style.display = 'block';
-            
-            // Force all canvases to resize
-            const size = map.getSize();
-            canvasElement.width = size.x * (window.devicePixelRatio || 1);
-            canvasElement.height = size.y * (window.devicePixelRatio || 1);
-            canvasElement.style.width = size.x + 'px';
-            canvasElement.style.height = size.y + 'px';
-          });
-          
-          // Force a re-render by triggering a view change
-          map.fire('viewreset');
-        }
-      }, 300); // Increased delay to ensure DOM is fully updated
-
-      return () => clearTimeout(timer);
-    }
-  }, [isFullScreen, osmData]);
 
   useEffect(() => {
     const loadOsmData = async () => {
@@ -608,70 +495,17 @@ export function OsmMapViewer({ osmMapPath, cityName, cityId }: OsmMapViewerProps
       )}
       
       {/* Enhanced Cities: Skylines 2 Map - Canvas Rendered */}
-      <div 
-        className={`osm-fullscreen-container ${isFullScreen ? 'fixed inset-0 z-[9998] bg-black w-screen h-screen' : 'w-full h-96 bg-white dark:bg-gray-800 rounded-t-lg overflow-hidden'} relative`}
-        style={{
-          ...(isFullScreen && document.fullscreenElement && {
-            width: '100vw',
-            height: '100vh',
-            backgroundColor: '#000'
-          })
-        }}
-      >
-        {/* Full-screen Toggle Button */}
-        {!isFullScreen && (
-          <button
-            onClick={enterFullScreen}
-                          className="absolute top-4 right-4 z-[1000] bg-white dark:bg-gray-800 rounded-lg p-2 shadow-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-            title="View in full screen"
-          >
-            <svg className="w-5 h-5 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-            </svg>
-          </button>
-        )}
-
-        {/* Full-screen Header */}
-        {isFullScreen && (
-          <div className="flex justify-between items-center p-4 bg-black bg-opacity-50 text-white">
-            <div>
-              <h2 className="text-xl font-semibold">
-                {cityName || 'City'} Map
-              </h2>
-              <p className="text-sm text-gray-300">
-                OSM Data: {osmData?.nodes.length.toLocaleString()} nodes, {osmData?.ways.length.toLocaleString()} ways
-              </p>
-            </div>
-            
-            {/* Close Button */}
-            <button
-              onClick={exitFullScreen}
-              className="text-white hover:text-gray-300 transition-colors"
-            >
-              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        )}
-        
+      <div className="w-full h-96 bg-white dark:bg-gray-800 rounded-t-lg overflow-hidden">
         <MapContainer
-          key={isFullScreen ? 'fullscreen' : 'normal'}
           {...{
             center: mapCenter,
             zoom: mapZoom,
-            style: { 
-              height: isFullScreen ? (document.fullscreenElement ? 'calc(100vh - 140px)' : 'calc(100vh - 140px)') : '100%', 
-              width: '100%',
-              backgroundColor: isFullScreen ? '#F1EEE8' : 'transparent'
-            },
+            style: { height: '100%', width: '100%' },
             scrollWheelZoom: true,
             preferCanvas: true, // Enable canvas rendering
             renderer: typeof window !== 'undefined' ? require('leaflet').canvas() : undefined
           } as any}
         >
-          {/* Map instance capture component */}
-          <MapInstanceCapture mapRef={mapRef} />
           {/* Base tile layer for coordinate system */}
           <TileLayer
             {...{
@@ -682,7 +516,6 @@ export function OsmMapViewer({ osmMapPath, cityName, cityId }: OsmMapViewerProps
           
           {/* Canvas-based OSM Renderer */}
           <CanvasOsmRenderer 
-            key={`osm-renderer-${isFullScreen ? 'fullscreen' : 'normal'}`}
             osmData={osmData}
             getLandUseColor={getLandUseColor}
             getBuildingColor={getBuildingColor}
@@ -694,44 +527,11 @@ export function OsmMapViewer({ osmMapPath, cityName, cityId }: OsmMapViewerProps
               setIsRendering(false);
               setRenderProgress(null);
             }}
-            canvasLayerRef={canvasLayerRef}
-            isFullScreen={isFullScreen}
           />
         </MapContainer>
-
-        {/* Full-screen Footer */}
-        {isFullScreen && (
-          <div className="p-4 bg-black bg-opacity-50 text-white">
-            <div className="flex justify-between items-center">
-              <div className="text-sm text-gray-300">
-                <span>Zoom: {mapZoom}</span>
-                <span className="mx-2">•</span>
-                <span>Center: {mapCenter[0].toFixed(4)}, {mapCenter[1].toFixed(4)}</span>
-              </div>
-              <div className="text-sm text-gray-300">
-                Press ESC to exit full screen
-              </div>
-            </div>
-          </div>
-        )}
       </div>
-
-
     </div>
   );
-}
-
-// Component to capture the map instance
-function MapInstanceCapture({ mapRef }: { mapRef: React.MutableRefObject<any> }) {
-  const map = useMap();
-  
-  useEffect(() => {
-    if (map) {
-      mapRef.current = map;
-    }
-  }, [map, mapRef]);
-  
-  return null;
 }
 
 // Canvas-based OSM renderer component with advanced performance optimizations
@@ -743,9 +543,7 @@ function CanvasOsmRenderer({
   getRoadWidth,
   onRenderProgress,
   onRenderStart,
-  onRenderComplete,
-  canvasLayerRef,
-  isFullScreen
+  onRenderComplete
 }: {
   osmData: OsmData;
   getLandUseColor: (tags: Record<string, string>) => string;
@@ -755,8 +553,6 @@ function CanvasOsmRenderer({
   onRenderProgress?: (progress: {current: number, total: number}) => void;
   onRenderStart?: () => void;
   onRenderComplete?: () => void;
-  canvasLayerRef: React.MutableRefObject<any>;
-  isFullScreen: boolean;
 }) {
   const map = useMap();
   
@@ -926,9 +722,6 @@ function CanvasOsmRenderer({
       initialize: function() {
         this._canvas = null;
         this._ctx = null;
-        this._preRenderCanvas = null;
-        this._preRenderCtx = null;
-        this._isPreRendered = false;
         this._lastZoom = null;
         this._lastBounds = null;
         this._animationFrame = null;
@@ -954,18 +747,6 @@ function CanvasOsmRenderer({
          this._canvas.style.height = size.y + 'px';
          this._ctx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
          
-
-         
-         // Remove debug border/background, set proper z-index and pointer events
-         this._canvas.style.position = 'absolute';
-         this._canvas.style.top = '0px';
-         this._canvas.style.left = '0px';
-         this._canvas.style.zIndex = '10';
-         this._canvas.style.pointerEvents = 'auto';
-         this._canvas.style.border = '';
-         this._canvas.style.background = '';
-         this._canvas.style.cursor = 'grab';
-         
          // Position canvas
          L.DomUtil.setPosition(this._canvas, L.point(0, 0));
          
@@ -976,6 +757,10 @@ function CanvasOsmRenderer({
          this._renderedElements = [];
          
          // Add click interactivity
+         this._canvas.style.cursor = 'pointer';
+         this._canvas.style.pointerEvents = 'auto';
+         this._canvas.style.position = 'absolute';
+         this._canvas.style.zIndex = '100';
          this._canvas.addEventListener('click', this._onCanvasClick.bind(this));
          this._canvas.addEventListener('mousemove', this._onCanvasMouseMove.bind(this));
          
@@ -999,8 +784,6 @@ function CanvasOsmRenderer({
          if (this._debounceTimeout) {
            clearTimeout(this._debounceTimeout);
          }
-         
-
          
          // Remove click listeners
          this._canvas.removeEventListener('click', this._onCanvasClick);
@@ -1039,7 +822,6 @@ function CanvasOsmRenderer({
          
          // Check if hovering over an interactive element
          const hoveredElement = this._getElementAtPoint(x, y);
-         // Set cursor: pointer for interactive, grab for default
          this._canvas.style.cursor = hoveredElement ? 'pointer' : 'grab';
        },
        
@@ -1227,8 +1009,6 @@ function CanvasOsmRenderer({
          }, 100);
        },
       
-
-      
       _onViewChange: function() {
         this._isDirty = true;
         // Debounce render calls to avoid excessive re-rendering during pan/zoom
@@ -1240,41 +1020,14 @@ function CanvasOsmRenderer({
       
       _onResize: function() {
         const size = this._map.getSize();
-        
-        // Clear the canvas context before resizing
-        this._ctx.clearRect(0, 0, this._canvas.width, this._canvas.height);
-        
-        // Resize canvas
         this._canvas.width = size.x * (window.devicePixelRatio || 1);
         this._canvas.height = size.y * (window.devicePixelRatio || 1);
         this._canvas.style.width = size.x + 'px';
         this._canvas.style.height = size.y + 'px';
-        
-        // Restore canvas context and scale
-        this._ctx = this._canvas.getContext('2d');
-        this._ctx.imageSmoothingEnabled = true;
-        this._ctx.imageSmoothingQuality = 'high';
         this._ctx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
-        
-        // Remove debug border/background, set proper z-index and pointer events
-        this._canvas.style.position = 'absolute';
-        this._canvas.style.top = '0px';
-        this._canvas.style.left = '0px';
-        this._canvas.style.zIndex = '10';
-        this._canvas.style.pointerEvents = 'auto';
-        this._canvas.style.border = '';
-        this._canvas.style.background = '';
-        // Don't set cursor here, let mousemove handler control it
-        
         this._isDirty = true;
         this._scheduleRender();
-        
-        // Force immediate re-render after resize
-        setTimeout(() => {
-          this._render();
-        }, 50);
-             },
-
+      },
       
              _scheduleRender: function() {
          if (this._animationFrame) return;
@@ -1290,7 +1043,7 @@ function CanvasOsmRenderer({
        },
       
              _render: function() {
-         if (!this._ctx || !osmData || !this._map) return;
+         if (!this._ctx || !osmData) return;
          
          const ctx = this._ctx;
          const map = this._map;
@@ -1301,29 +1054,6 @@ function CanvasOsmRenderer({
          // Position canvas correctly relative to map
          const topLeft = map.latLngToLayerPoint(bounds.getNorthWest());
          L.DomUtil.setPosition(this._canvas, topLeft);
-         // Helper function to convert lat/lng to canvas coordinates
-         const latLngToCanvasPoint = (lat: number, lng: number) => {
-           const layerPoint = map.latLngToLayerPoint([lat, lng]);
-           const canvasPoint = {
-             x: layerPoint.x - topLeft.x,
-             y: layerPoint.y - topLeft.y
-           };
-           return canvasPoint;
-         };
-
-         // Helper function for road importance (for rendering priority)
-         const getRoadImportance = (tags: Record<string, string>): number => {
-           if (tags.highway === 'motorway' || tags.highway === 'motorway_link') return 10;
-           if (tags.highway === 'trunk' || tags.highway === 'trunk_link') return 9;
-           if (tags.highway === 'primary' || tags.highway === 'primary_link') return 8;
-           if (tags.highway === 'secondary' || tags.highway === 'secondary_link') return 7;
-           if (tags.highway === 'tertiary' || tags.highway === 'tertiary_link') return 6;
-           if (tags.highway === 'residential' || tags.highway === 'unclassified') return 5;
-           if (tags.highway === 'service') return 4;
-           if (tags.highway === 'footway' || tags.highway === 'cycleway' || tags.highway === 'path') return 3;
-           if (tags.highway === 'track') return 2;
-           return 1;
-         };
          
          // Clear canvas
          ctx.clearRect(0, 0, this._canvas.width, this._canvas.height);
@@ -1361,12 +1091,22 @@ function CanvasOsmRenderer({
          // Start progressive rendering
          if (onRenderStart) onRenderStart();
          
-         // Always render at full quality since we have full OSM data loaded client-side
+         // Level of Detail (LOD): adjust rendering based on zoom (more permissive)
          const isHighDetail = zoom >= 13;
          const isMediumDetail = zoom >= 10;
          const isLowDetail = zoom >= 6;
          
-         // Optimized drawing functions with batching and progress tracking
+         // Helper function to convert lat/lng to canvas coordinates
+         const latLngToCanvasPoint = (lat: number, lng: number) => {
+           const layerPoint = map.latLngToLayerPoint([lat, lng]);
+           const canvasPoint = {
+             x: layerPoint.x - topLeft.x,
+             y: layerPoint.y - topLeft.y
+           };
+           return canvasPoint;
+         };
+        
+                 // Optimized drawing functions with batching and progress tracking
          const drawBatchedPolygons = (ways: any[], getColor: (tags: any) => string, strokeColor?: string, elementType: string = 'polygon') => {
            const colorGroups = new Map<string, any[]>();
            
@@ -2048,14 +1788,28 @@ function CanvasOsmRenderer({
        }
      });
     
+    // Helper function for road importance (for rendering priority)
+    function getRoadImportance(tags: Record<string, string>): number {
+      if (tags.highway === 'motorway' || tags.highway === 'motorway_link') return 10;
+      if (tags.highway === 'trunk' || tags.highway === 'trunk_link') return 9;
+      if (tags.highway === 'primary' || tags.highway === 'primary_link') return 8;
+      if (tags.highway === 'secondary' || tags.highway === 'secondary_link') return 7;
+      if (tags.highway === 'tertiary' || tags.highway === 'tertiary_link') return 6;
+      if (tags.highway === 'residential' || tags.highway === 'unclassified') return 5;
+      if (tags.highway === 'service') return 4;
+      if (tags.highway === 'footway' || tags.highway === 'cycleway' || tags.highway === 'path') return 3;
+      if (tags.highway === 'track') return 2;
+      return 1;
+    }
+    
     // Add canvas layer to map
-    canvasLayerRef.current = new CanvasLayer();
-    canvasLayerRef.current.addTo(map);
+    const canvasLayer = new CanvasLayer();
+    canvasLayer.addTo(map);
     
     // Cleanup function
     return () => {
-      if (canvasLayerRef.current && map.hasLayer(canvasLayerRef.current)) {
-        map.removeLayer(canvasLayerRef.current);
+      if (map.hasLayer(canvasLayer)) {
+        map.removeLayer(canvasLayer);
       }
     };
     };
@@ -2064,4 +1818,4 @@ function CanvasOsmRenderer({
   }, [osmData, map, getLandUseColor, getBuildingColor, getRoadColor, getRoadWidth, onRenderProgress, onRenderStart, onRenderComplete]);
   
   return null; // This component doesn't render anything directly
-}
+} 

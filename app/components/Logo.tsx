@@ -12,7 +12,7 @@ interface LogoProps {
 
 export function Logo({ className = '', height = 40, showText = true }: LogoProps) {
   const [mounted, setMounted] = useState(false);
-  const { theme } = useTheme();
+  const { resolvedTheme } = useTheme();
 
   useEffect(() => {
     setMounted(true);
@@ -28,7 +28,7 @@ export function Logo({ className = '', height = 40, showText = true }: LogoProps
     );
   }
 
-  const isDark = theme === 'dark';
+  const isDark = resolvedTheme === 'dark';
   const logoSrc = isDark 
     ? '/logo/default-monochrome-white.svg' 
     : '/logo/default-monochrome-black.svg';

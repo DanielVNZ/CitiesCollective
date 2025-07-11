@@ -83,12 +83,12 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
       {/* Header */}
       <Header session={session} isAdmin={isAdmin} />
 
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="w-full px-4 sm:px-6 lg:px-8 py-8">
         {/* Image Section - handles both gallery and management */}
         <ImageSection cityId={cityId} initialImages={images} isOwner={isOwner} />
 
-        {/* OSM Map Section */}
-        <div className="mb-8">
+        {/* OSM Map Section - Constrained width */}
+        <div className="mb-8 max-w-4xl mx-auto">
           <OsmMapManager 
             cityId={cityId} 
             initialOsmMapPath={city.osmMapPath} 
@@ -189,7 +189,7 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
             </div>
             <div className="text-center p-6 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
               <div className="text-2xl md:text-3xl lg:text-4xl font-bold text-yellow-700 dark:text-yellow-400 mb-2 break-words">
-                ${formatNumber(city.money)}
+                {city.unlimitedMoney ? '∞' : `$${formatNumber(city.money)}`}
               </div>
               <div className="text-lg text-yellow-600 dark:text-yellow-300">Money</div>
             </div>

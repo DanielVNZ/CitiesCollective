@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Session } from 'next-auth';
 import { NotificationsMenu } from './NotificationsMenu';
-import { ThemeToggle } from './ThemeToggle';
 import { SignOutButton } from './SignOutButton';
 
 interface ResponsiveNavigationProps {
@@ -91,7 +90,6 @@ export function ResponsiveNavigation({ session, isAdmin }: ResponsiveNavigationP
             )}
             <div className="flex items-center space-x-3 ml-4 pl-4 border-l border-gray-200 dark:border-gray-700">
               <NotificationsMenu />
-              <ThemeToggle />
               <SignOutButton />
             </div>
           </>
@@ -118,9 +116,7 @@ export function ResponsiveNavigation({ session, isAdmin }: ResponsiveNavigationP
               Sign Up
               <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-green-600 transition-all duration-200 group-hover:w-full"></span>
             </Link>
-            <div className="ml-4 pl-4 border-l border-gray-200 dark:border-gray-700">
-              <ThemeToggle />
-            </div>
+
           </>
         )}
       </nav>
@@ -128,7 +124,6 @@ export function ResponsiveNavigation({ session, isAdmin }: ResponsiveNavigationP
       {/* Mobile menu button */}
       <div className="lg:hidden flex items-center space-x-3">
         {session && <NotificationsMenu />}
-        <ThemeToggle />
         {session && <SignOutButton className="!px-3 !py-2" />}
         <button
           onClick={toggleMobileMenu}

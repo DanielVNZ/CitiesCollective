@@ -22,6 +22,7 @@ interface City {
   fileName: string | null;
   uploadedAt: Date | null;
   primaryImageThumbnail: string | null;
+  unlimitedMoney?: boolean;
 }
 
 export function UserCityManagement() {
@@ -213,7 +214,7 @@ export function UserCityManagement() {
                           </p>
                           <p className="text-sm text-gray-600 dark:text-gray-400">
                             Pop: {formatNumber(city.population)} | 
-                            Money: ${formatNumber(city.money)} | 
+                            Money: {city.unlimitedMoney ? '∞' : `$${formatNumber(city.money)}`} | 
                             XP: {formatNumber(city.xp)}
                           </p>
                           <p className="text-xs text-gray-500 dark:text-gray-500">

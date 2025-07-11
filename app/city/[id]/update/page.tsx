@@ -66,7 +66,7 @@ export default async function UpdateCityPage({ params }: UpdateCityPageProps) {
             </div>
             <div className="text-center p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
               <div className="text-lg font-semibold text-yellow-700 dark:text-yellow-400">
-                ${city.money?.toLocaleString() || '0'}
+                {city.unlimitedMoney ? '∞' : `$${city.money?.toLocaleString() || '0'}`}
               </div>
               <div className="text-sm text-yellow-600 dark:text-yellow-300">Current Money</div>
             </div>

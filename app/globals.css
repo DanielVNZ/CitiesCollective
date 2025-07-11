@@ -1,3 +1,23 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Support system color scheme preferences */
+:root {
+  color-scheme: light dark;
+}
+
+/* Ensure proper color scheme inheritance */
+html {
+  color-scheme: light dark;
+}
+
+/* Dark mode specific color scheme */
+html.dark {
+  color-scheme: dark;
+}
+
+/* Light mode specific color scheme */
+html.light {
+  color-scheme: light;
+}

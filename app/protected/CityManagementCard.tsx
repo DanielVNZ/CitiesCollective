@@ -16,6 +16,7 @@ interface City {
   fileName: string;
   downloadable: boolean;
   modsEnabled?: string[] | null;
+  unlimitedMoney?: boolean;
 }
 
 interface CityManagementCardProps {
@@ -143,7 +144,7 @@ export function CityManagementCard({ city }: CityManagementCardProps) {
           </div>
           <div className="text-center">
             <div className="text-sm md:text-lg font-semibold text-gray-900 dark:text-white break-words">
-              ${formatNumber(city.money)}
+              {city.unlimitedMoney ? '∞' : `$${formatNumber(city.money)}`}
             </div>
             <div className="text-xs text-gray-600 dark:text-gray-400">Money</div>
           </div>
