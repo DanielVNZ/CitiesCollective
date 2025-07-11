@@ -1807,10 +1807,8 @@ export async function getUserFavorites(userId: number, limit: number = 12, offse
       theme: cityTable.theme,
       gameMode: cityTable.gameMode,
       uploadedAt: cityTable.uploadedAt,
-      primaryImageThumbnail: cityImagesTable.thumbnailPath,
       favoritedAt: favoritesTable.createdAt,
       modsEnabled: cityTable.modsEnabled,
-      commentCount: sql<number>`COALESCE(COUNT(${commentsTable.id}), 0)`.as('commentCount'),
       user: {
         id: users.id,
         username: users.username,
@@ -1822,6 +1820,7 @@ export async function getUserFavorites(userId: number, limit: number = 12, offse
           WHERE i."cityId" = "City".id
         )
       `,
+      commentCount: sql<number>`(SELECT COUNT(*) FROM "comments" WHERE "cityId" = "City".id)`.as('commentCount'),
     })
     .from(favoritesTable)
     .innerJoin(cityTable, eq(favoritesTable.cityId, cityTable.id))
