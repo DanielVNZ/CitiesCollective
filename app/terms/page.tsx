@@ -1,28 +1,16 @@
 import Link from 'next/link';
+import { Header } from 'app/components/Header';
+import { auth } from 'app/auth';
+import { isUserAdmin } from 'app/db';
 
-export default function TermsAndConditions() {
+export default async function TermsAndConditions() {
+  const session = await auth();
+  const isAdmin = session?.user?.email ? await isUserAdmin(session.user.email) : false;
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Header */}
-      <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <Link href="/" className="text-2xl font-bold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400">
-                Cities Collective
-              </Link>
-            </div>
-            <nav className="flex items-center space-x-4">
-              <Link
-                href="/"
-                className="text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
-              >
-                ← Back to Home
-              </Link>
-            </nav>
-          </div>
-        </div>
-      </header>
+      <Header session={session} isAdmin={isAdmin} />
 
       {/* Main Content */}
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

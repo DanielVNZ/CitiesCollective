@@ -1,12 +1,13 @@
+import Link from 'next/link';
 import { auth } from 'app/auth';
 import { redirect } from 'next/navigation';
-import Link from 'next/link';
 import { isUserAdmin, getAllUsersWithStats, getTotalCityCount, getAllComments } from 'app/db';
 import { AdminUserManagement } from './AdminUserManagement';
 import { CommentModeration } from './CommentModeration';
 import { ModerationSettings } from './ModerationSettings';
 import { UserCityManagement } from './UserCityManagement';
 import ApiKeyManagement from './ApiKeyManagement';
+import { Header } from 'app/components/Header';
 
 export default async function AdminPage() {
   const session = await auth();
@@ -29,25 +30,7 @@ export default async function AdminPage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Header */}
-      <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <Link href="/" className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 mr-4">
-                ← Back to Home
-              </Link>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-                Admin Management
-              </h1>
-            </div>
-            <div className="flex items-center space-x-4">
-              <span className="px-3 py-1 bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400 text-sm rounded-full font-medium">
-                Admin Panel
-              </span>
-            </div>
-          </div>
-        </div>
-      </header>
+      <Header session={session} isAdmin={isAdmin} />
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

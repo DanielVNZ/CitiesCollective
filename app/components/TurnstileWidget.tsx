@@ -27,6 +27,10 @@ export default function TurnstileWidget({ siteKey, theme = 'light', onVerify }: 
     // Check if we're on localhost and disable if so
     if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
       setShouldRender(false);
+      // Provide a dummy token for localhost to pass validation
+      const dummyToken = 'localhost-development-token';
+      setToken(dummyToken);
+      onVerify?.(dummyToken);
       return;
     }
 
@@ -86,9 +90,15 @@ export default function TurnstileWidget({ siteKey, theme = 'light', onVerify }: 
     };
   }, [siteKey, theme, onVerify]);
 
-  // Don't render anything if we're on localhost
+  // Don't render the widget on localhost, but still provide the hidden input
   if (!shouldRender) {
-    return null;
+    return (
+      <input 
+        type="hidden" 
+        name="cf-turnstile-response" 
+        value={token} 
+      />
+    );
   }
 
   return (

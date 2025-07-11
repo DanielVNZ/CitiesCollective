@@ -12,6 +12,8 @@ import { MapLegend } from 'app/components/MapLegend';
 import { auth } from 'app/auth';
 import { ImageSection } from './ImageSection';
 import { getUsernameTextColor, getUsernameAvatarColor } from 'app/utils/userColors';
+import { Header } from 'app/components/Header';
+import { isUserAdmin } from 'app/db';
 
 // Force dynamic rendering to prevent caching
 export const dynamic = 'force-dynamic';
@@ -74,20 +76,12 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
   const usernameTextColor = getUsernameTextColor(username);
   const usernameAvatarColor = getUsernameAvatarColor(username);
 
+  const isAdmin = session?.user?.email ? await isUserAdmin(session.user.email) : false;
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Header */}
-      <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <Link href="/" className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">
-              ← Back to Cities
-            </Link>
-            <h1 className="text-xl font-semibold text-gray-900 dark:text-white">City Details</h1>
-            <div></div>
-          </div>
-        </div>
-      </header>
+      <Header session={session} isAdmin={isAdmin} />
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Image Section - handles both gallery and management */}

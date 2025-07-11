@@ -73,6 +73,13 @@ export function ResponsiveNavigation({ session, isAdmin }: ResponsiveNavigationP
               Dashboard
               <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-green-600 transition-all duration-200 group-hover:w-full"></span>
             </Link>
+            <Link
+              href={`/user/${session.user?.id || ''}`}
+              className="relative text-gray-700 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-indigo-400 font-medium transition-colors duration-200 group"
+            >
+              Profile
+              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-indigo-600 transition-all duration-200 group-hover:w-full"></span>
+            </Link>
             {isAdmin && (
               <Link
                 href="/admin"
@@ -170,6 +177,13 @@ export function ResponsiveNavigation({ session, isAdmin }: ResponsiveNavigationP
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
                   Dashboard
+                </Link>
+                <Link
+                  href={`/user/${session.user?.id || ''}`}
+                  className="block px-4 py-3 text-gray-700 hover:text-indigo-600 hover:bg-indigo-50 dark:text-gray-300 dark:hover:text-indigo-400 dark:hover:bg-indigo-900/20 transition-colors duration-200 font-medium"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  Profile
                 </Link>
                 {isAdmin && (
                   <Link

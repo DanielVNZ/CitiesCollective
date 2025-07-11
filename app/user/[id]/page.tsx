@@ -6,6 +6,8 @@ import { FollowButton } from 'app/components/FollowButton';
 import { SocialLinksDisplay } from 'app/components/SocialLinksDisplay';
 import { auth } from 'app/auth';
 import { getUsernameTextColor, getUsernameAvatarColor } from 'app/utils/userColors';
+import { Header } from 'app/components/Header';
+import { isUserAdmin } from 'app/db';
 
 interface UserProfilePageProps {
   params: {
@@ -79,68 +81,47 @@ export default async function UserProfilePage({ params }: UserProfilePageProps) 
   const usernameTextColor = getUsernameTextColor(username);
   const usernameAvatarColor = getUsernameAvatarColor(username);
 
+  const isAdmin = session?.user?.email ? await isUserAdmin(session.user.email) : false;
+
   return (
     <div className="min-h-screen min-w-[320px] bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200">
       {/* Header */}
-      <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <Link href="/" className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium">
-              ← Back to Cities
-            </Link>
-            <h1 className="text-xl font-semibold text-gray-900 dark:text-white">User Profile</h1>
-            <div></div>
-          </div>
-        </div>
-      </header>
+      <Header session={session} isAdmin={isAdmin} />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 min-w-[320px]">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* User Profile Header */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8 mb-8 border border-gray-200 dark:border-gray-700">
-          <div className="flex items-start justify-between mb-8">
-            <div className="flex items-center flex-1">
-              <div className={`flex items-center justify-center w-20 h-20 bg-gradient-to-br ${usernameAvatarColor} text-white rounded-full text-2xl font-bold shadow-lg`}>
+          <div className="flex flex-col md:flex-row md:items-start md:justify-between mb-8 gap-6">
+            {/* Left: Avatar, Name, Subtitle, Stats */}
+            <div className="flex flex-col items-start text-left gap-2 flex-1 min-w-[220px]">
+              <div className={`flex items-center justify-center w-24 h-24 bg-gradient-to-br ${usernameAvatarColor} text-white rounded-full text-3xl font-bold shadow-lg mb-2`}>
                 {(user.username || user.name || user.email || 'U').charAt(0).toUpperCase()}
               </div>
-              <div className="ml-6 flex-1">
-                <div className="flex items-center gap-4 mb-2">
-                  <h1 className={`text-3xl font-bold ${usernameTextColor}`}>
-                    {user.username || user.name || user.email || 'Unknown User'}
-                  </h1>
-                </div>
-                <p className="text-gray-600 dark:text-gray-400 mb-3">Cities Collective Builder</p>
-                
-                {/* Social Stats Row */}
-                <div className="flex items-center space-x-4 mb-4">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">
-                    {cities.length} {cities.length === 1 ? 'City' : 'Cities'}
-                  </span>
-                  <span className="text-sm text-gray-600 dark:text-gray-400">•</span>
-                  <span className="text-sm text-gray-600 dark:text-gray-400">
-                    {followerCount} {followerCount === 1 ? 'Follower' : 'Followers'}
-                  </span>
-                  <span className="text-sm text-gray-600 dark:text-gray-400">•</span>
-                  <span className="text-sm text-gray-600 dark:text-gray-400">
-                    {followingCount} Following
-                  </span>
-                </div>
-
-                {/* Social Links */}
-                <SocialLinksDisplay userId={userId} />
+              <h1 className={`text-3xl font-bold ${usernameTextColor}`}>{user.username || user.name || user.email || 'Unknown User'}</h1>
+              <p className="text-gray-600 dark:text-gray-400 mb-1">Cities Collective Builder</p>
+              <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600 dark:text-gray-400 mb-2">
+                <span>{cities.length} {cities.length === 1 ? 'City' : 'Cities'}</span>
+                <span>•</span>
+                <span>{followerCount} {followerCount === 1 ? 'Follower' : 'Followers'}</span>
+                <span>•</span>
+                <span>{followingCount} Following</span>
               </div>
+              {/* Follow Button - Below stats, left-aligned */}
+              {currentUser && currentUser.id !== userId && (
+                <div className="mt-2">
+                  <FollowButton
+                    targetUserId={userId}
+                    initialIsFollowing={isFollowing}
+                    initialFollowerCount={followerCount}
+                    className="min-w-[120px]"
+                  />
+                </div>
+              )}
             </div>
-
-            {/* Follow Button - Right Side */}
-            {currentUser && currentUser.id !== userId && (
-              <div className="ml-6 flex-shrink-0">
-                <FollowButton
-                  targetUserId={userId}
-                  initialIsFollowing={isFollowing}
-                  initialFollowerCount={followerCount}
-                  className="min-w-[120px]"
-                />
-              </div>
-            )}
+            {/* Right: Social Links */}
+            <div className="flex flex-col items-center md:items-center md:justify-start w-full md:w-auto md:ml-8">
+              <div className="md:mt-2"><SocialLinksDisplay userId={userId} /></div>
+            </div>
           </div>
 
           {/* City Statistics */}
@@ -185,8 +166,7 @@ export default async function UserProfilePage({ params }: UserProfilePageProps) 
               <p className="text-gray-600 dark:text-gray-400 mt-1">
                 {cities.length === 0 
                   ? 'This user hasn\'t shared any cities yet.' 
-                  : `Explore ${cities.length} amazing ${cities.length === 1 ? 'city' : 'cities'} created by this builder.`
-                }
+                  : `Explore ${cities.length} amazing ${cities.length === 1 ? 'city' : 'cities'} created by this builder.`                }
               </p>
             </div>
             {cities.length > 0 && (

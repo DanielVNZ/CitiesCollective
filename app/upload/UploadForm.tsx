@@ -190,17 +190,15 @@ export function UploadForm() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
-      <div className="max-w-4xl mx-auto px-4">
-        <div className="mb-8">
-          <Link href="/" className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">
-            ← Back to Home
-          </Link>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mt-4">Upload Your City</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-2">
-            Share your Cities: Skylines 2 creation with the Cities Collective
-          </p>
+    <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="mb-8">
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Upload Your City</h1>
         </div>
+        <p className="text-gray-600 dark:text-gray-400 mt-2">
+          Share your Cities: Skylines 2 creation with the Cities Collective
+        </p>
+      </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* City File Upload */}
@@ -451,7 +449,6 @@ export function UploadForm() {
             </div>
           </div>
         )}
-      </div>
-    </div>
+    </main>
   );
 } 

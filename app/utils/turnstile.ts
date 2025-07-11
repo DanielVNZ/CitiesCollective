@@ -5,6 +5,10 @@ export async function validateTurnstileToken(token: string): Promise<boolean> {
 
   // Skip validation on localhost for development
   if (process.env.NODE_ENV === 'development') {
+    // Accept dummy token for localhost
+    if (token === 'localhost-development-token') {
+      return true;
+    }
     return true;
   }
 

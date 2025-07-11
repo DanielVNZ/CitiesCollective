@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
+import { Logo } from 'app/components/Logo';
 
 export default function ResetPassword() {
   const [password, setPassword] = useState('');
@@ -74,6 +75,7 @@ export default function ResetPassword() {
       <div className="flex h-screen w-screen items-center justify-center bg-gray-50 dark:bg-gray-900">
         <div className="z-10 w-full max-w-md overflow-hidden rounded-2xl border border-gray-100 dark:border-gray-700 shadow-xl">
           <div className="flex flex-col items-center justify-center space-y-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-6 pt-8 text-center sm:px-16">
+            <Logo height={40} />
             <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Password Reset Successful!</h3>
             <p className="text-sm text-gray-500 dark:text-gray-400">
               Your password has been updated successfully
@@ -104,6 +106,7 @@ export default function ResetPassword() {
       <div className="flex h-screen w-screen items-center justify-center bg-gray-50 dark:bg-gray-900">
         <div className="z-10 w-full max-w-md overflow-hidden rounded-2xl border border-gray-100 dark:border-gray-700 shadow-xl">
           <div className="flex flex-col items-center justify-center space-y-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-6 pt-8 text-center sm:px-16">
+            <Logo height={40} />
             <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Invalid Reset Link</h3>
             <p className="text-sm text-gray-500 dark:text-gray-400">
               The password reset link is invalid or has expired
@@ -142,6 +145,7 @@ export default function ResetPassword() {
     <div className="flex h-screen w-screen items-center justify-center bg-gray-50 dark:bg-gray-900">
       <div className="z-10 w-full max-w-md overflow-hidden rounded-2xl border border-gray-100 dark:border-gray-700 shadow-xl">
         <div className="flex flex-col items-center justify-center space-y-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-6 pt-8 text-center sm:px-16">
+          <Logo height={40} />
           <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Set New Password</h3>
           <p className="text-sm text-gray-500 dark:text-gray-400">
             Enter your new password below
