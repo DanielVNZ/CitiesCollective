@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { client } from 'app/db';
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const userId = parseInt(params.id);
     
@@ -13,7 +10,7 @@ export async function GET(
     }
 
     const result = await client`
-      SELECT id, email, username, "pdxUsername", "discordUsername", "isAdmin"
+      SELECT id, email, username, "isAdmin"
       FROM "User" 
       WHERE id = ${userId}`;
 
@@ -21,16 +18,16 @@ export async function GET(
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    // Return only public information (exclude email and isAdmin)
     const user = result[0];
-    const publicUser = {
-      id: user.id,
-      username: user.username,
-      pdxUsername: user.pdxUsername,
-      discordUsername: user.discordUsername,
-    };
 
-    return NextResponse.json({ user: publicUser });
+    return NextResponse.json({ 
+      user: {
+        id: user.id,
+        email: user.email,
+        username: user.username,
+        isAdmin: user.isAdmin,
+      }
+    });
 
   } catch (error) {
     console.error('Error fetching user:', error);

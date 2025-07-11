@@ -1,13 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { SocialLinksEditor } from './SocialLinksEditor';
 
 interface UserProfile {
   id: number;
   email: string | null;
   username: string | null;
-  pdxUsername?: string | null;
-  discordUsername?: string | null;
   isAdmin: boolean | null;
 }
 
@@ -17,8 +16,6 @@ interface ProfileEditorProps {
 
 export default function ProfileEditor({ user }: ProfileEditorProps) {
   const [profile, setProfile] = useState<UserProfile>(user);
-  const [pdxUsername, setPdxUsername] = useState(user.pdxUsername || '');
-  const [discordUsername, setDiscordUsername] = useState(user.discordUsername || '');
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState<'success' | 'error'>('success');
@@ -34,10 +31,7 @@ export default function ProfileEditor({ user }: ProfileEditorProps) {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          pdxUsername: pdxUsername.trim() || null,
-          discordUsername: discordUsername.trim() || null,
-        }),
+        body: JSON.stringify({}),
       });
 
       const data = await response.json();
@@ -58,11 +52,10 @@ export default function ProfileEditor({ user }: ProfileEditorProps) {
     }
   };
 
-
-
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-      <h2 className="text-xl font-semibold mb-6">Profile Settings</h2>
+    <div className="space-y-6">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+        <h2 className="text-xl font-semibold mb-6">Profile Settings</h2>
       
       {message && (
         <div className={`mb-4 p-3 rounded-md ${
@@ -103,42 +96,6 @@ export default function ProfileEditor({ user }: ProfileEditorProps) {
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Username cannot be changed here</p>
         </div>
 
-        <div>
-          <label htmlFor="pdxUsername" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            PDX Username (Optional)
-          </label>
-          <input
-            type="text"
-            id="pdxUsername"
-            value={pdxUsername}
-            onChange={(e) => setPdxUsername(e.target.value)}
-            placeholder="Your PDX username"
-            maxLength={50}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            Your Paradox Interactive username (optional)
-          </p>
-        </div>
-
-        <div>
-          <label htmlFor="discordUsername" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Discord Username (Optional)
-          </label>
-          <input
-            type="text"
-            id="discordUsername"
-            value={discordUsername}
-            onChange={(e) => setDiscordUsername(e.target.value)}
-            placeholder="Your Discord username"
-            maxLength={50}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            Your Discord username (optional)
-          </p>
-        </div>
-
         <button
           type="submit"
           disabled={isLoading}
@@ -147,6 +104,10 @@ export default function ProfileEditor({ user }: ProfileEditorProps) {
           {isLoading ? 'Updating...' : 'Update Profile'}
         </button>
       </form>
+      </div>
+
+      {/* Social Links Editor */}
+      <SocialLinksEditor onSave={() => {}} />
     </div>
   );
 } 

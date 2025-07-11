@@ -10,24 +10,14 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { pdxUsername, discordUsername } = await request.json();
+    // For now, this endpoint doesn't update any profile fields
+    // It's kept for compatibility but doesn't perform any updates
 
-    // Validate input
-    if (pdxUsername && typeof pdxUsername !== 'string') {
-      return NextResponse.json({ error: 'PDX username must be a string' }, { status: 400 });
-    }
-    
-    if (discordUsername && typeof discordUsername !== 'string') {
-      return NextResponse.json({ error: 'Discord username must be a string' }, { status: 400 });
-    }
-
-    // Update user profile
+    // Get current user profile
     const result = await client`
-      UPDATE "User" 
-      SET "pdxUsername" = ${pdxUsername || null}, 
-          "discordUsername" = ${discordUsername || null}
-      WHERE email = ${session.user.email}
-      RETURNING id, email, username, "pdxUsername", "discordUsername", "isAdmin"`;
+      SELECT id, email, username, "isAdmin"
+      FROM "User" 
+      WHERE email = ${session.user.email}`;
 
     if (result.length === 0) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -53,7 +43,7 @@ export async function GET(request: NextRequest) {
     }
 
     const result = await client`
-      SELECT id, email, username, "pdxUsername", "discordUsername", "isAdmin"
+      SELECT id, email, username, "isAdmin"
       FROM "User" 
       WHERE email = ${session.user.email}`;
 

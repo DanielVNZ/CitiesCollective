@@ -173,6 +173,16 @@ const notificationsTable = pgTable('notifications', {
   createdAt: timestamp('createdAt').defaultNow(),
 });
 
+// User social links table
+const userSocialLinksTable = pgTable('userSocialLinks', {
+  id: serial('id').primaryKey(),
+  userId: integer('userId').notNull(),
+  platform: varchar('platform', { length: 50 }).notNull(), // 'facebook', 'twitter', 'instagram', etc.
+  url: varchar('url', { length: 500 }).notNull(),
+  createdAt: timestamp('createdAt').defaultNow(),
+  updatedAt: timestamp('updatedAt').defaultNow(),
+});
+
 // OSM Map Cache table removed - now using client-side caching with IndexedDB
 
 export async function getUser(email: string) {
@@ -278,7 +288,7 @@ export async function linkGithubAccount(userId: number, githubId: string, name?:
   return result[0];
 }
 
-export async function updateUser(userId: number, data: { username?: string; isAdmin?: boolean }) {
+export async function updateUser(userId: number, data: { username?: string; isAdmin?: boolean; isContentCreator?: boolean }) {
   const users = await ensureTableExists();
   
   if (data.username) {
@@ -324,6 +334,7 @@ export async function getAllUsersWithStats() {
     email: users.email,
     username: users.username,
     isAdmin: users.isAdmin,
+    isContentCreator: users.isContentCreator,
     cityCount: sql<number>`COUNT(${cityTable.id})`.as('cityCount'),
     totalPopulation: sql<number>`COALESCE(SUM(${cityTable.population}), 0)`.as('totalPopulation'),
     totalMoney: sql<number>`COALESCE(SUM(${cityTable.money}), 0)`.as('totalMoney'),
@@ -332,7 +343,7 @@ export async function getAllUsersWithStats() {
   })
     .from(users)
     .leftJoin(cityTable, eq(cityTable.userId, users.id))
-    .groupBy(users.id, users.email, users.username, users.isAdmin)
+    .groupBy(users.id, users.email, users.username, users.isAdmin, users.isContentCreator)
     .orderBy(desc(sql`COUNT(${cityTable.id})`));
   
   return userStats;
@@ -364,6 +375,7 @@ async function ensureTableExists() {
       pdxUsername: varchar('pdxUsername', { length: 50 }),
       discordUsername: varchar('discordUsername', { length: 50 }),
       isAdmin: boolean('isAdmin').default(false),
+      isContentCreator: boolean('isContentCreator').default(false),
     });
   }
   
@@ -541,6 +553,22 @@ async function ensureTableExists() {
         ALTER TABLE "User" ADD COLUMN "discordUsername" VARCHAR(50);`;
       console.log('discordUsername column added successfully');
     }
+
+    // Check if isContentCreator column exists, if not add it
+    const isContentCreatorColumnExists = await client`
+      SELECT EXISTS (
+        SELECT FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = 'User'
+        AND column_name = 'isContentCreator'
+      );`;
+    
+    if (!isContentCreatorColumnExists[0].exists) {
+      console.log('Adding isContentCreator column to existing User table...');
+      await client`
+        ALTER TABLE "User" ADD COLUMN "isContentCreator" BOOLEAN DEFAULT FALSE;`;
+      console.log('isContentCreator column added successfully');
+    }
   }
 
   // Mark as initialized
@@ -558,6 +586,7 @@ async function ensureTableExists() {
     pdxUsername: varchar('pdxUsername', { length: 50 }),
     discordUsername: varchar('discordUsername', { length: 50 }),
     isAdmin: boolean('isAdmin').default(false),
+    isContentCreator: boolean('isContentCreator').default(false),
   });
 
   return table;
@@ -790,6 +819,46 @@ export async function getTopCitiesByLikes(limit: number = 3) {
   return topCities;
 }
 
+export async function getContentCreatorCities(limit: number = 6) {
+  await ensureCityTableExists();
+  const users = await ensureTableExists();
+  
+  // Get current date as seed for daily randomization
+  const today = new Date();
+  const dateSeed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
+  
+  const cities = await db
+    .select({
+      id: cityTable.id,
+      userId: cityTable.userId,
+      cityName: cityTable.cityName,
+      mapName: cityTable.mapName,
+      population: cityTable.population,
+      money: cityTable.money,
+      xp: cityTable.xp,
+      uploadedAt: cityTable.uploadedAt,
+      user: {
+        id: users.id,
+        username: users.username,
+      },
+      images: sql<Array<{ id: number; fileName: string; isPrimary: boolean; mediumPath: string; largePath: string; thumbnailPath: string }>>`
+        (
+          SELECT COALESCE(json_agg(json_build_object('id', i.id, 'fileName', i."fileName", 'isPrimary', i."isPrimary", 'mediumPath', i."mediumPath", 'largePath', i."largePath", 'thumbnailPath', i."thumbnailPath")), '[]'::json)
+          FROM "cityImages" i
+          WHERE i."cityId" = "City".id
+        )
+      `,
+      commentCount: sql<number>`(SELECT COUNT(*) FROM "comments" WHERE "cityId" = "City".id)`.as('commentCount'),
+    })
+    .from(cityTable)
+    .leftJoin(users, eq(cityTable.userId, users.id))
+    .where(eq(users.isContentCreator, true))
+    .orderBy(sql`RANDOM() * ${dateSeed}`)
+    .limit(limit);
+
+  return cities;
+}
+
 export async function getCitiesByUser(userId: number) {
   await ensureCityTableExists();
   await ensureCityImagesTableExists();
@@ -887,9 +956,8 @@ export async function getUserById(id: number) {
     username: users.username,
     name: users.name,
     avatar: users.avatar,
-    pdxUsername: users.pdxUsername,
-    discordUsername: users.discordUsername,
     isAdmin: users.isAdmin,
+    isContentCreator: users.isContentCreator,
   }).from(users).where(eq(users.id, id)).limit(1);
   return result[0] || null;
 }
@@ -2326,6 +2394,97 @@ export async function notifyFollowersOfNewCity(userId: number, cityId: number, c
   );
   
   await Promise.all(notificationPromises);
+}
+
+// Social Links Functions
+async function ensureUserSocialLinksTableExists() {
+  const cacheKey = 'userSocialLinks';
+  
+  if (tableInitCache.has(cacheKey)) {
+    return userSocialLinksTable;
+  }
+  
+  const result = await client`
+    SELECT EXISTS (
+      SELECT FROM information_schema.tables 
+      WHERE table_schema = 'public' 
+      AND table_name = 'userSocialLinks'
+    );`;
+
+  if (!result[0].exists) {
+    await client`
+      CREATE TABLE "userSocialLinks" (
+        id SERIAL PRIMARY KEY,
+        "userId" INTEGER NOT NULL,
+        platform VARCHAR(50) NOT NULL,
+        url VARCHAR(500) NOT NULL,
+        "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        UNIQUE("userId", platform)
+      );`;
+  }
+  
+  tableInitCache.add(cacheKey);
+  return userSocialLinksTable;
+}
+
+export async function getUserSocialLinks(userId: number) {
+  await ensureUserSocialLinksTableExists();
+  
+  const links = await db.select({
+    id: userSocialLinksTable.id,
+    platform: userSocialLinksTable.platform,
+    url: userSocialLinksTable.url,
+  })
+    .from(userSocialLinksTable)
+    .where(eq(userSocialLinksTable.userId, userId))
+    .orderBy(userSocialLinksTable.platform);
+  
+  return links;
+}
+
+export async function upsertUserSocialLink(userId: number, platform: string, url: string) {
+  await ensureUserSocialLinksTableExists();
+  
+  // Check if link already exists
+  const existing = await db.select()
+    .from(userSocialLinksTable)
+    .where(and(
+      eq(userSocialLinksTable.userId, userId),
+      eq(userSocialLinksTable.platform, platform)
+    ))
+    .limit(1);
+  
+  if (existing.length > 0) {
+    // Update existing link
+    const result = await db.update(userSocialLinksTable)
+      .set({ url, updatedAt: new Date() })
+      .where(and(
+        eq(userSocialLinksTable.userId, userId),
+        eq(userSocialLinksTable.platform, platform)
+      ))
+      .returning();
+    return result[0];
+  } else {
+    // Insert new link
+    const result = await db.insert(userSocialLinksTable)
+      .values({ userId, platform, url })
+      .returning();
+    return result[0];
+  }
+}
+
+export async function deleteUserSocialLink(userId: number, platform: string) {
+  await ensureUserSocialLinksTableExists();
+  
+  const result = await db.delete(userSocialLinksTable)
+    .where(and(
+      eq(userSocialLinksTable.userId, userId),
+      eq(userSocialLinksTable.platform, platform)
+    ))
+    .returning();
+  
+  return result[0] || null;
 }
 
 // OSM Map Cache Functions removed - now using client-side caching with IndexedDB

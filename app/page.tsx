@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { getRecentCities, getTopCitiesByLikes, isUserAdmin } from 'app/db';
+import { getRecentCities, getTopCitiesByLikes, getContentCreatorCities, isUserAdmin } from 'app/db';
 import { CityCard } from 'app/components/CityCard';
 import { QuickSearch } from 'app/components/QuickSearch';
 import { ResponsiveNavigationWrapper } from 'app/components/ResponsiveNavigationWrapper';
@@ -8,6 +8,7 @@ import { auth } from 'app/auth';
 export default async function Page() {
   const cities = await getRecentCities(12);
   const topCities = await getTopCitiesByLikes(3);
+  const contentCreatorCities = await getContentCreatorCities(6);
   const session = await auth();
   const isAdmin = session?.user?.email ? await isUserAdmin(session.user.email) : false;
 
@@ -68,7 +69,7 @@ export default async function Page() {
             <div className="flex items-center space-x-2">
               <span className="bg-white text-orange-600 px-2 py-1 rounded text-xs font-bold">BETA</span>
               <span className="text-sm sm:text-base">
-                🚧 Cities Collective is in beta! Upload limit: 3 cities per user. This may expand in future
+                🚧 Cities Collective is in beta! Upload limit: 3 cities per user. This may expand in future.
               </span>
             </div>
           </div>
@@ -121,9 +122,11 @@ export default async function Page() {
                <Link
                  key={link.href}
                  href={link.href}
-                 className="group block p-6 bg-gray-50 dark:bg-gray-700/50 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-300 transform hover:-translate-y-1"
+                 className="group block p-6 bg-gray-50 dark:bg-gray-700/50 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-300 transform hover:-translate-y-1 text-center"
                >
-                 {link.icon}
+                 <div className="flex justify-center">
+                   {link.icon}
+                 </div>
                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{link.title}</h3>
                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{link.description}</p>
                </Link>
@@ -132,9 +135,18 @@ export default async function Page() {
         </section>
 
         {/* Creator Spotlight Section */}
-        <section className="mb-16 sm:mb-24 text-center bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-2xl p-10 shadow-lg">
-          <h2 className="text-3xl font-bold mb-2">Creator Spotlight</h2>
-          <p className="text-lg max-w-3xl mx-auto">We&apos;ll be featuring your favourite creators&apos; cities here, encourage them to upload their cities! *cough cough* Biffa and City Planner Plays...</p>
+        <section className="mb-16 sm:mb-24 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-2xl p-10 shadow-lg">
+          <div className="text-center mb-8">
+            <h2 className="text-3xl font-bold mb-2">Creator Spotlight</h2>
+            <p className="text-lg max-w-3xl mx-auto">We&apos;ll be featuring your favourite creators&apos; cities here, encourage them to upload their cities! *cough cough* Biffa and City Planner Plays...</p>
+          </div>
+          {contentCreatorCities.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {contentCreatorCities.map((city) => (
+                <CityCard key={city.id} city={city} />
+              ))}
+            </div>
+          )}
         </section>
 
         {/* Recently Shared Cities Section */}

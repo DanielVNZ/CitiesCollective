@@ -8,6 +8,7 @@ interface UserStats {
   email: string | null;
   username: string | null;
   isAdmin: boolean | null;
+  isContentCreator: boolean | null;
   cityCount: number;
   totalPopulation: number;
   totalMoney: number;
@@ -21,6 +22,7 @@ interface AdminUserManagementProps {
 
 export function AdminUserManagement({ users }: AdminUserManagementProps) {
   const [updatingUser, setUpdatingUser] = useState<number | null>(null);
+  const [updatingContentCreator, setUpdatingContentCreator] = useState<number | null>(null);
 
   const formatNumber = (num: number) => {
     // For very large numbers, use abbreviations
@@ -69,6 +71,32 @@ export function AdminUserManagement({ users }: AdminUserManagementProps) {
     }
   };
 
+  const toggleContentCreatorStatus = async (userId: number, currentStatus: boolean) => {
+    setUpdatingContentCreator(userId);
+    
+    try {
+      const response = await fetch(`/api/admin/users/${userId}/toggle-content-creator`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ isContentCreator: !currentStatus }),
+      });
+
+      if (response.ok) {
+        // Refresh the page to show updated data
+        window.location.reload();
+      } else {
+        const error = await response.json();
+        alert(`Failed to update content creator status: ${error.error}`);
+      }
+    } catch (error) {
+      alert('Failed to update content creator status. Please try again.');
+    } finally {
+      setUpdatingContentCreator(null);
+    }
+  };
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
       <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">User Management</h2>
@@ -81,7 +109,10 @@ export function AdminUserManagement({ users }: AdminUserManagementProps) {
                 User
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                Status
+                Admin Status
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                Creator Status
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                 Cities
@@ -132,6 +163,15 @@ export function AdminUserManagement({ users }: AdminUserManagementProps) {
                     {user.isAdmin ? 'Admin' : 'User'}
                   </span>
                 </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                    user.isContentCreator 
+                      ? 'bg-purple-100 dark:bg-purple-900/20 text-purple-800 dark:text-purple-400'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300'
+                  }`}>
+                    {user.isContentCreator ? 'Creator' : 'Regular'}
+                  </span>
+                </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                   {user.cityCount}
                 </td>
@@ -148,31 +188,49 @@ export function AdminUserManagement({ users }: AdminUserManagementProps) {
                   {formatDate(user.lastUpload)}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                  <div className="flex space-x-2">
+                  <div className="flex flex-col space-y-2">
                     <Link
                       href={`/user/${user.id}`}
                       className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
                     >
                       View Profile
                     </Link>
-                                         {user.email !== 'danielveerkamp@live.com' && (
-                       <button
-                         onClick={() => toggleAdminStatus(user.id, user.isAdmin || false)}
-                         disabled={updatingUser === user.id}
-                         className={`text-sm px-3 py-1 rounded-md transition-colors ${
-                           user.isAdmin
-                             ? 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/30'
-                             : 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/30'
-                         } ${updatingUser === user.id ? 'opacity-50 cursor-not-allowed' : ''}`}
-                       >
-                         {updatingUser === user.id 
-                           ? 'Updating...' 
-                           : user.isAdmin 
-                             ? 'Remove Admin' 
-                             : 'Make Admin'
-                         }
-                       </button>
-                     )}
+                    <div className="flex flex-wrap gap-2">
+                      {user.email !== 'danielveerkamp@live.com' && (
+                        <button
+                          onClick={() => toggleAdminStatus(user.id, user.isAdmin || false)}
+                          disabled={updatingUser === user.id}
+                          className={`text-xs px-2 py-1 rounded-md transition-colors ${
+                            user.isAdmin
+                              ? 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/30'
+                              : 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/30'
+                          } ${updatingUser === user.id ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                          {updatingUser === user.id 
+                            ? 'Updating...' 
+                            : user.isAdmin 
+                              ? 'Remove Admin' 
+                              : 'Make Admin'
+                          }
+                        </button>
+                      )}
+                      <button
+                        onClick={() => toggleContentCreatorStatus(user.id, user.isContentCreator || false)}
+                        disabled={updatingContentCreator === user.id}
+                        className={`text-xs px-2 py-1 rounded-md transition-colors ${
+                          user.isContentCreator
+                            ? 'bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 hover:bg-orange-200 dark:hover:bg-orange-900/30'
+                            : 'bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400 hover:bg-purple-200 dark:hover:bg-purple-900/30'
+                        } ${updatingContentCreator === user.id ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        {updatingContentCreator === user.id 
+                          ? 'Updating...' 
+                          : user.isContentCreator 
+                            ? 'Remove Creator' 
+                            : 'Make Creator'
+                        }
+                      </button>
+                    </div>
                   </div>
                 </td>
               </tr>

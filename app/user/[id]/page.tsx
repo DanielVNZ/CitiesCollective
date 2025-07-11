@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { getCitiesByUser, getUserById, getFollowerCount, getFollowingCount } from 'app/db';
 import { CityCard } from 'app/components/CityCard';
 import { FollowButton } from 'app/components/FollowButton';
+import { SocialLinksDisplay } from 'app/components/SocialLinksDisplay';
 import { auth } from 'app/auth';
 import { getUsernameTextColor, getUsernameAvatarColor } from 'app/utils/userColors';
 
@@ -110,47 +111,22 @@ export default async function UserProfilePage({ params }: UserProfilePageProps) 
                 <p className="text-gray-600 dark:text-gray-400 mb-3">Cities Collective Builder</p>
                 
                 {/* Social Stats Row */}
-                <div className="flex items-center gap-6 mb-3">
-                  <div className="flex items-center gap-1">
-                    <span className="font-semibold text-gray-900 dark:text-white">{cities.length}</span>
-                    <span className="text-sm text-gray-600 dark:text-gray-400">Cities</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span className="font-semibold text-gray-900 dark:text-white">{followerCount}</span>
-                    <span className="text-sm text-gray-600 dark:text-gray-400">Followers</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span className="font-semibold text-gray-900 dark:text-white">{followingCount}</span>
-                    <span className="text-sm text-gray-600 dark:text-gray-400">Following</span>
-                  </div>
+                <div className="flex items-center space-x-4 mb-4">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                    {cities.length} {cities.length === 1 ? 'City' : 'Cities'}
+                  </span>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">•</span>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                    {followerCount} {followerCount === 1 ? 'Follower' : 'Followers'}
+                  </span>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">•</span>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                    {followingCount} Following
+                  </span>
                 </div>
 
-                {/* Platform Badges */}
-                {(user.pdxUsername || user.discordUsername) && (
-                  <div className="flex flex-wrap gap-2">
-                    {user.pdxUsername && (
-                      <a
-                        href={`https://mods.paradoxplaza.com/authors/${user.pdxUsername}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors duration-200"
-                      >
-                        <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M10 12L8 10l2-2 2 2-2 2z"/>
-                        </svg>
-                        PDX: {user.pdxUsername}
-                      </a>
-                    )}
-                    {user.discordUsername && (
-                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300">
-                        <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M10 2L3 7v11l7-5 7 5V7l-7-5z"/>
-                        </svg>
-                        Discord: {user.discordUsername}
-                      </span>
-                    )}
-                  </div>
-                )}
+                {/* Social Links */}
+                <SocialLinksDisplay userId={userId} />
               </div>
             </div>
 
