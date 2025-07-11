@@ -3,6 +3,7 @@ import { pgTable, serial, varchar, integer, boolean, json, text, timestamp } fro
 import { eq, desc, and, ilike, gte, lte, or, asc, sql } from 'drizzle-orm';
 import postgres from 'postgres';
 import { genSaltSync, hashSync } from 'bcrypt-ts';
+import { getDownloadUrl } from 'app/utils/r2';
 
 // Optionally, if not using email/pass login, you can
 // use the Drizzle adapter for Auth.js / NextAuth
@@ -682,149 +683,118 @@ async function ensureCityTableExists() {
 
 export async function getRecentCities(limit: number = 12) {
   await ensureCityTableExists();
-  await ensureCityImagesTableExists();
-  await ensureCommentsTableExists();
+  const users = await ensureTableExists();
   
-  const userTable = await ensureTableExists();
-  
-  // Get cities with their primary images, author information, and comment counts
-  const cities = await db.select({
-    id: cityTable.id,
-    userId: cityTable.userId,
-    cityName: cityTable.cityName,
-    mapName: cityTable.mapName,
-    population: cityTable.population,
-    money: cityTable.money,
-    xp: cityTable.xp,
-    theme: cityTable.theme,
-    gameMode: cityTable.gameMode,
-    uploadedAt: cityTable.uploadedAt,
-    primaryImageThumbnail: cityImagesTable.thumbnailPath,
-    authorUsername: userTable.username,
-    modsEnabled: cityTable.modsEnabled,
-    commentCount: sql<number>`COALESCE(COUNT(${commentsTable.id}), 0)`.as('commentCount'),
-  })
+  const cities = await db
+    .select({
+      id: cityTable.id,
+      userId: cityTable.userId,
+      cityName: cityTable.cityName,
+      mapName: cityTable.mapName,
+      population: cityTable.population,
+      money: cityTable.money,
+      xp: cityTable.xp,
+      uploadedAt: cityTable.uploadedAt,
+      user: {
+        id: users.id,
+        username: users.username,
+      },
+      images: sql<Array<{ id: number; fileName: string; isPrimary: boolean; mediumPath: string; largePath: string; thumbnailPath: string }>>`
+        (
+          SELECT COALESCE(json_agg(json_build_object('id', i.id, 'fileName', i."fileName", 'isPrimary', i."isPrimary", 'mediumPath', i."mediumPath", 'largePath', i."largePath", 'thumbnailPath', i."thumbnailPath")), '[]'::json)
+          FROM "cityImages" i
+          WHERE i."cityId" = "City".id
+        )
+      `,
+      commentCount: sql<number>`(SELECT COUNT(*) FROM "comments" WHERE "cityId" = "City".id)`.as('commentCount'),
+    })
     .from(cityTable)
-    .leftJoin(cityImagesTable, and(
-      eq(cityImagesTable.cityId, cityTable.id),
-      eq(cityImagesTable.isPrimary, true)
-    ))
-    .leftJoin(userTable, eq(cityTable.userId, userTable.id))
-    .leftJoin(commentsTable, eq(commentsTable.cityId, cityTable.id))
-    .groupBy(
-      cityTable.id,
-      cityTable.userId,
-      cityTable.cityName,
-      cityTable.mapName,
-      cityTable.population,
-      cityTable.money,
-      cityTable.xp,
-      cityTable.theme,
-      cityTable.gameMode,
-      cityTable.uploadedAt,
-      cityImagesTable.thumbnailPath,
-      userTable.username,
-      cityTable.modsEnabled
-    )
+    .leftJoin(users, eq(cityTable.userId, users.id))
     .orderBy(desc(cityTable.uploadedAt))
     .limit(limit);
-  
+
   return cities;
 }
 
 export async function getTopCitiesByMoney(limit: number = 3) {
   await ensureCityTableExists();
-  await ensureCityImagesTableExists();
+  const users = await ensureTableExists();
   
-  const userTable = await ensureTableExists();
-  
-  // Get cities with highest money, including their primary images and author information
-  const cities = await db.select({
-    id: cityTable.id,
-    userId: cityTable.userId,
-    cityName: cityTable.cityName,
-    mapName: cityTable.mapName,
-    population: cityTable.population,
-    money: cityTable.money,
-    xp: cityTable.xp,
-    theme: cityTable.theme,
-    gameMode: cityTable.gameMode,
-    uploadedAt: cityTable.uploadedAt,
-    primaryImageThumbnail: cityImagesTable.thumbnailPath,
-    authorUsername: userTable.username,
-    modsEnabled: cityTable.modsEnabled,
-  })
+  const cities = await db
+    .select({
+      id: cityTable.id,
+      userId: cityTable.userId,
+      cityName: cityTable.cityName,
+      mapName: cityTable.mapName,
+      population: cityTable.population,
+      money: cityTable.money,
+      xp: cityTable.xp,
+      uploadedAt: cityTable.uploadedAt,
+      user: {
+        id: users.id,
+        username: users.username,
+      },
+      images: sql<Array<{ id: number; fileName: string; isPrimary: boolean; mediumPath: string; largePath: string; thumbnailPath: string }>>`
+        (
+          SELECT COALESCE(json_agg(json_build_object('id', i.id, 'fileName', i."fileName", 'isPrimary', i."isPrimary", 'mediumPath', i."mediumPath", 'largePath', i."largePath", 'thumbnailPath', i."thumbnailPath")), '[]'::json)
+          FROM "cityImages" i
+          WHERE i."cityId" = "City".id
+        )
+      `,
+      commentCount: sql<number>`(SELECT COUNT(*) FROM "comments" WHERE "cityId" = "City".id)`.as('commentCount'),
+    })
     .from(cityTable)
-    .leftJoin(cityImagesTable, and(
-      eq(cityImagesTable.cityId, cityTable.id),
-      eq(cityImagesTable.isPrimary, true)
-    ))
-    .leftJoin(userTable, eq(cityTable.userId, userTable.id))
+    .leftJoin(users, eq(cityTable.userId, users.id))
     .orderBy(desc(cityTable.money))
     .limit(limit);
-  
+
   return cities;
 }
 
 export async function getTopCitiesByLikes(limit: number = 3) {
   await ensureCityTableExists();
-  await ensureCityImagesTableExists();
   await ensureLikesTableExists();
-  await ensureCommentsTableExists();
-  
-  const userTable = await ensureTableExists();
-  
-  // Get cities with most likes, including their primary images, author information, and comment counts
-  const cities = await db.select({
-    id: cityTable.id,
-    userId: cityTable.userId,
-    cityName: cityTable.cityName,
-    mapName: cityTable.mapName,
-    population: cityTable.population,
-    money: cityTable.money,
-    xp: cityTable.xp,
-    theme: cityTable.theme,
-    gameMode: cityTable.gameMode,
-    uploadedAt: cityTable.uploadedAt,
-    primaryImageThumbnail: cityImagesTable.thumbnailPath,
-    authorUsername: userTable.username,
-    modsEnabled: cityTable.modsEnabled,
-    likeCount: sql<number>`COUNT(${likesTable.id})`.as('likeCount'),
-    commentCount: sql<number>`COALESCE(COUNT(DISTINCT ${commentsTable.id}), 0)`.as('commentCount'),
-  })
+  const users = await ensureTableExists();
+
+  const topCities = await db
+    .select({
+      id: cityTable.id,
+      userId: cityTable.userId,
+      cityName: cityTable.cityName,
+      mapName: cityTable.mapName,
+      population: cityTable.population,
+      money: cityTable.money,
+      xp: cityTable.xp,
+      uploadedAt: cityTable.uploadedAt,
+      likeCount: sql<number>`count(${likesTable.id})`,
+      user: {
+        id: users.id,
+        username: users.username,
+      },
+      images: sql<Array<{ id: number; fileName: string; isPrimary: boolean; mediumPath: string; largePath: string; thumbnailPath: string }>>`
+        (
+          SELECT COALESCE(json_agg(json_build_object('id', i.id, 'fileName', i."fileName", 'isPrimary', i."isPrimary", 'mediumPath', i."mediumPath", 'largePath', i."largePath", 'thumbnailPath', i."thumbnailPath")), '[]'::json)
+          FROM "cityImages" i
+          WHERE i."cityId" = "City".id
+        )
+      `,
+      commentCount: sql<number>`(SELECT COUNT(*) FROM "comments" WHERE "cityId" = "City".id)`.as('commentCount'),
+    })
     .from(cityTable)
-    .leftJoin(cityImagesTable, and(
-      eq(cityImagesTable.cityId, cityTable.id),
-      eq(cityImagesTable.isPrimary, true)
-    ))
-    .leftJoin(userTable, eq(cityTable.userId, userTable.id))
-    .leftJoin(likesTable, eq(likesTable.cityId, cityTable.id))
-    .leftJoin(commentsTable, eq(commentsTable.cityId, cityTable.id))
-    .groupBy(
-      cityTable.id,
-      cityTable.userId,
-      cityTable.cityName,
-      cityTable.mapName,
-      cityTable.population,
-      cityTable.money,
-      cityTable.xp,
-      cityTable.theme,
-      cityTable.gameMode,
-      cityTable.uploadedAt,
-      cityImagesTable.thumbnailPath,
-      userTable.username,
-      cityTable.modsEnabled
-    )
-    .orderBy(desc(sql`COUNT(${likesTable.id})`))
+    .leftJoin(likesTable, eq(cityTable.id, likesTable.cityId))
+    .leftJoin(users, eq(cityTable.userId, users.id))
+    .groupBy(cityTable.id, users.id)
+    .orderBy(desc(sql`count(${likesTable.id})`))
     .limit(limit);
-  
-  return cities;
+
+  return topCities;
 }
 
 export async function getCitiesByUser(userId: number) {
   await ensureCityTableExists();
   await ensureCityImagesTableExists();
   await ensureCommentsTableExists();
+  const users = await ensureTableExists();
   
   const cities = await db.select({
     id: cityTable.id,
@@ -840,34 +810,23 @@ export async function getCitiesByUser(userId: number) {
     filePath: cityTable.filePath,
     downloadable: cityTable.downloadable,
     uploadedAt: cityTable.uploadedAt,
-    primaryImageThumbnail: cityImagesTable.thumbnailPath,
     modsEnabled: cityTable.modsEnabled,
-    commentCount: sql<number>`COALESCE(COUNT(${commentsTable.id}), 0)`.as('commentCount'),
+    user: {
+      id: users.id,
+      username: users.username,
+    },
+    images: sql<Array<{ id: number; fileName: string; isPrimary: boolean; mediumPath: string; largePath: string; thumbnailPath: string }>>`
+      (
+        SELECT COALESCE(json_agg(json_build_object('id', i.id, 'fileName', i."fileName", 'isPrimary', i."isPrimary", 'mediumPath', i."mediumPath", 'largePath', i."largePath", 'thumbnailPath', i."thumbnailPath")), '[]'::json)
+        FROM "cityImages" i
+        WHERE i."cityId" = "City".id
+      )
+    `,
+    commentCount: sql<number>`(SELECT COUNT(*) FROM "comments" WHERE "cityId" = "City".id)`.as('commentCount'),
   })
     .from(cityTable)
-    .leftJoin(cityImagesTable, and(
-      eq(cityImagesTable.cityId, cityTable.id),
-      eq(cityImagesTable.isPrimary, true)
-    ))
-    .leftJoin(commentsTable, eq(commentsTable.cityId, cityTable.id))
+    .leftJoin(users, eq(cityTable.userId, users.id))
     .where(eq(cityTable.userId, userId))
-    .groupBy(
-      cityTable.id,
-      cityTable.userId,
-      cityTable.cityName,
-      cityTable.mapName,
-      cityTable.population,
-      cityTable.money,
-      cityTable.xp,
-      cityTable.theme,
-      cityTable.gameMode,
-      cityTable.fileName,
-      cityTable.filePath,
-      cityTable.downloadable,
-      cityTable.uploadedAt,
-      cityImagesTable.thumbnailPath,
-      cityTable.modsEnabled
-    )
     .orderBy(desc(cityTable.uploadedAt));
   
   return cities;
@@ -1001,179 +960,85 @@ export async function searchCities(
   offset: number = 0
 ) {
   await ensureCityTableExists();
-  await ensureCityImagesTableExists();
-  await ensureCommentsTableExists();
-  
   const userTable = await ensureTableExists();
-  
   const conditions = [];
-  
-  // Text search in city name, map name, and username (case-insensitive with better partial matching)
+
+  // Build filter conditions
   if (filters.query) {
     const searchTerm = filters.query.toLowerCase().trim();
-    
     if (searchTerm) {
-      // Split the search term into words and create conditions for each
       const words = searchTerm.split(/\s+/);
       const wordConditions = words.map(word => 
         or(
           ilike(cityTable.cityName, `%${word}%`),
           ilike(cityTable.mapName, `%${word}%`),
-          ilike(userTable.username, `%${word}%`),
-          ilike(userTable.email, `%${word}%`)
+          ilike(userTable.username, `%${word}%`)
         )
       );
-      
-      // All words must match (AND logic)
-      if (wordConditions.length > 1) {
-        conditions.push(and(...wordConditions));
-      } else {
-        conditions.push(wordConditions[0]);
-      }
+      conditions.push(and(...wordConditions));
     }
   }
-  
-  // Theme filter (case-insensitive)
-  if (filters.theme) {
-    conditions.push(eq(cityTable.theme, filters.theme));
-  }
-  
-  // Game mode filter (case-insensitive)
-  if (filters.gameMode) {
-    conditions.push(eq(cityTable.gameMode, filters.gameMode));
-  }
-  
-  // Population range
-  if (filters.minPopulation !== undefined) {
-    conditions.push(gte(cityTable.population, filters.minPopulation));
-  }
-  if (filters.maxPopulation !== undefined) {
-    conditions.push(lte(cityTable.population, filters.maxPopulation));
-  }
-  
-  // Money range
-  if (filters.minMoney !== undefined) {
-    conditions.push(gte(cityTable.money, filters.minMoney));
-  }
-  if (filters.maxMoney !== undefined) {
-    conditions.push(lte(cityTable.money, filters.maxMoney));
-  }
-  
+  if (filters.theme) conditions.push(eq(cityTable.theme, filters.theme));
+  if (filters.gameMode) conditions.push(eq(cityTable.gameMode, filters.gameMode));
+  if (filters.minPopulation) conditions.push(gte(cityTable.population, filters.minPopulation));
+  if (filters.maxPopulation) conditions.push(lte(cityTable.population, filters.maxPopulation));
+  if (filters.minMoney) conditions.push(gte(cityTable.money, filters.minMoney));
+  if (filters.maxMoney) conditions.push(lte(cityTable.money, filters.maxMoney));
+
   // Determine sorting
   const sortBy = filters.sortBy || 'newest';
   const sortOrder = filters.sortOrder || 'desc';
-  
   let orderByClause;
   switch (sortBy) {
-    case 'newest':
-      orderByClause = sortOrder === 'desc' ? desc(cityTable.uploadedAt) : asc(cityTable.uploadedAt);
-      break;
-    case 'oldest':
-      orderByClause = sortOrder === 'desc' ? desc(cityTable.uploadedAt) : asc(cityTable.uploadedAt);
-      break;
-    case 'population':
-      orderByClause = sortOrder === 'desc' ? desc(cityTable.population) : asc(cityTable.population);
-      break;
-    case 'money':
-      orderByClause = sortOrder === 'desc' ? desc(cityTable.money) : asc(cityTable.money);
-      break;
-    case 'xp':
-      orderByClause = sortOrder === 'desc' ? desc(cityTable.xp) : asc(cityTable.xp);
-      break;
-    case 'name':
-      orderByClause = sortOrder === 'desc' ? desc(cityTable.cityName) : asc(cityTable.cityName);
-      break;
-    default:
-      orderByClause = desc(cityTable.uploadedAt);
+    case 'population': orderByClause = sortOrder === 'desc' ? desc(cityTable.population) : asc(cityTable.population); break;
+    case 'money': orderByClause = sortOrder === 'desc' ? desc(cityTable.money) : asc(cityTable.money); break;
+    case 'xp': orderByClause = sortOrder === 'desc' ? desc(cityTable.xp) : asc(cityTable.xp); break;
+    case 'name': orderByClause = sortOrder === 'desc' ? desc(cityTable.cityName) : asc(cityTable.cityName); break;
+    default: orderByClause = sortOrder === 'desc' ? desc(cityTable.uploadedAt) : asc(cityTable.uploadedAt);
+  }
+
+  // Base query with subqueries to prevent row duplication
+  const query = db
+    .select({
+      id: cityTable.id,
+      userId: cityTable.userId,
+      cityName: cityTable.cityName,
+      mapName: cityTable.mapName,
+      population: cityTable.population,
+      money: cityTable.money,
+      xp: cityTable.xp,
+      theme: cityTable.theme,
+      gameMode: cityTable.gameMode,
+      uploadedAt: cityTable.uploadedAt,
+      modsEnabled: cityTable.modsEnabled,
+      authorUsername: userTable.username,
+      user: {
+        id: userTable.id,
+        username: userTable.username,
+      },
+      // Subquery for images to prevent row duplication
+      images: sql<Array<{ id: number; fileName: string; isPrimary: boolean; mediumPath: string; largePath: string; thumbnailPath: string }>>`
+        (
+          SELECT COALESCE(json_agg(json_build_object('id', i.id, 'fileName', i."fileName", 'isPrimary', i."isPrimary", 'mediumPath', i."mediumPath", 'largePath', i."largePath", 'thumbnailPath', i."thumbnailPath")), '[]'::json)
+          FROM "cityImages" i
+          WHERE i."cityId" = "City".id
+        )
+      `,
+      // Subquery for comment count
+      commentCount: sql<number>`(SELECT COUNT(*) FROM "comments" WHERE "cityId" = "City".id)`.as('commentCount'),
+    })
+    .from(cityTable)
+    .leftJoin(userTable, eq(cityTable.userId, userTable.id))
+    .orderBy(orderByClause)
+    .limit(limit)
+    .offset(offset);
+
+  // Apply conditions if they exist
+  if (conditions.length > 0) {
+    return await query.where(and(...conditions));
   }
   
-  // Build and execute the query with image data and comment counts
-  if (conditions.length > 0) {
-    return await db.select({
-      id: cityTable.id,
-      userId: cityTable.userId,
-      cityName: cityTable.cityName,
-      mapName: cityTable.mapName,
-      population: cityTable.population,
-      money: cityTable.money,
-      xp: cityTable.xp,
-      theme: cityTable.theme,
-      gameMode: cityTable.gameMode,
-      uploadedAt: cityTable.uploadedAt,
-      primaryImageThumbnail: cityImagesTable.thumbnailPath,
-      authorUsername: userTable.username,
-      modsEnabled: cityTable.modsEnabled,
-      commentCount: sql<number>`COALESCE(COUNT(${commentsTable.id}), 0)`.as('commentCount'),
-    })
-      .from(cityTable)
-      .leftJoin(cityImagesTable, and(
-        eq(cityImagesTable.cityId, cityTable.id),
-        eq(cityImagesTable.isPrimary, true)
-      ))
-      .leftJoin(userTable, eq(cityTable.userId, userTable.id))
-      .leftJoin(commentsTable, eq(commentsTable.cityId, cityTable.id))
-      .where(and(...conditions))
-      .groupBy(
-        cityTable.id,
-        cityTable.userId,
-        cityTable.cityName,
-        cityTable.mapName,
-        cityTable.population,
-        cityTable.money,
-        cityTable.xp,
-        cityTable.theme,
-        cityTable.gameMode,
-        cityTable.uploadedAt,
-        cityImagesTable.thumbnailPath,
-        userTable.username,
-        cityTable.modsEnabled
-      )
-      .orderBy(orderByClause)
-      .limit(limit)
-      .offset(offset);
-  } else {
-    return await db.select({
-      id: cityTable.id,
-      userId: cityTable.userId,
-      cityName: cityTable.cityName,
-      mapName: cityTable.mapName,
-      population: cityTable.population,
-      money: cityTable.money,
-      xp: cityTable.xp,
-      theme: cityTable.theme,
-      gameMode: cityTable.gameMode,
-      uploadedAt: cityTable.uploadedAt,
-      primaryImageThumbnail: cityImagesTable.thumbnailPath,
-      authorUsername: userTable.username,
-      modsEnabled: cityTable.modsEnabled,
-      commentCount: sql<number>`COALESCE(COUNT(${commentsTable.id}), 0)`.as('commentCount'),
-    })
-      .from(cityTable)
-      .leftJoin(cityImagesTable, and(
-        eq(cityImagesTable.cityId, cityTable.id),
-        eq(cityImagesTable.isPrimary, true)
-      ))
-      .leftJoin(userTable, eq(cityTable.userId, userTable.id))
-      .leftJoin(commentsTable, eq(commentsTable.cityId, cityTable.id))
-      .groupBy(
-        cityTable.id,
-        cityTable.userId,
-        cityTable.cityName,
-        cityTable.mapName,
-        cityTable.population,
-        cityTable.money,
-        cityTable.xp,
-        cityTable.theme,
-        cityTable.gameMode,
-        cityTable.uploadedAt,
-        cityImagesTable.thumbnailPath,
-        userTable.username,
-        cityTable.modsEnabled
-      )
-      .orderBy(orderByClause)
-      .limit(limit)
-      .offset(offset);
-  }
+  return await query;
 }
 
 export async function getSearchCitiesCount(filters: SearchFilters = {}) {
@@ -1928,49 +1793,44 @@ export async function getUserFavorites(userId: number, limit: number = 12, offse
   await ensureCityImagesTableExists();
   await ensureCommentsTableExists();
   
-  const favorites = await db.select({
-    id: cityTable.id,
-    userId: cityTable.userId,
-    cityName: cityTable.cityName,
-    mapName: cityTable.mapName,
-    population: cityTable.population,
-    money: cityTable.money,
-    xp: cityTable.xp,
-    theme: cityTable.theme,
-    gameMode: cityTable.gameMode,
-    uploadedAt: cityTable.uploadedAt,
-    primaryImageThumbnail: cityImagesTable.thumbnailPath,
-    favoritedAt: favoritesTable.createdAt,
-    modsEnabled: cityTable.modsEnabled,
-    commentCount: sql<number>`COALESCE(COUNT(${commentsTable.id}), 0)`.as('commentCount'),
-  })
+  const users = await ensureTableExists();
+
+  const favorites = await db
+    .select({
+      id: cityTable.id,
+      userId: cityTable.userId,
+      cityName: cityTable.cityName,
+      mapName: cityTable.mapName,
+      population: cityTable.population,
+      money: cityTable.money,
+      xp: cityTable.xp,
+      theme: cityTable.theme,
+      gameMode: cityTable.gameMode,
+      uploadedAt: cityTable.uploadedAt,
+      primaryImageThumbnail: cityImagesTable.thumbnailPath,
+      favoritedAt: favoritesTable.createdAt,
+      modsEnabled: cityTable.modsEnabled,
+      commentCount: sql<number>`COALESCE(COUNT(${commentsTable.id}), 0)`.as('commentCount'),
+      user: {
+        id: users.id,
+        username: users.username,
+      },
+      images: sql<Array<{ id: number; fileName: string; isPrimary: boolean; mediumPath: string; largePath: string; thumbnailPath: string }>>`
+        (
+          SELECT COALESCE(json_agg(json_build_object('id', i.id, 'fileName', i."fileName", 'isPrimary', i."isPrimary", 'mediumPath', i."mediumPath", 'largePath', i."largePath", 'thumbnailPath', i."thumbnailPath")), '[]'::json)
+          FROM "cityImages" i
+          WHERE i."cityId" = "City".id
+        )
+      `,
+    })
     .from(favoritesTable)
     .innerJoin(cityTable, eq(favoritesTable.cityId, cityTable.id))
-    .leftJoin(cityImagesTable, and(
-      eq(cityImagesTable.cityId, cityTable.id),
-      eq(cityImagesTable.isPrimary, true)
-    ))
-    .leftJoin(commentsTable, eq(commentsTable.cityId, cityTable.id))
+    .leftJoin(users, eq(cityTable.userId, users.id))
     .where(eq(favoritesTable.userId, userId))
-    .groupBy(
-      cityTable.id,
-      cityTable.userId,
-      cityTable.cityName,
-      cityTable.mapName,
-      cityTable.population,
-      cityTable.money,
-      cityTable.xp,
-      cityTable.theme,
-      cityTable.gameMode,
-      cityTable.uploadedAt,
-      cityImagesTable.thumbnailPath,
-      favoritesTable.createdAt,
-      cityTable.modsEnabled
-    )
     .orderBy(desc(favoritesTable.createdAt))
     .limit(limit)
     .offset(offset);
-  
+
   return favorites;
 }
 

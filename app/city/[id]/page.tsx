@@ -11,6 +11,7 @@ import { OsmMapManager } from 'app/components/OsmMapManager';
 import { MapLegend } from 'app/components/MapLegend';
 import { auth } from 'app/auth';
 import { ImageSection } from './ImageSection';
+import { getUsernameTextColor, getUsernameAvatarColor } from 'app/utils/userColors';
 
 // Force dynamic rendering to prevent caching
 export const dynamic = 'force-dynamic';
@@ -68,6 +69,11 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
 
   const simulationDate = city.simulationDate as any;
 
+  // Get user colors
+  const username = user?.username || user?.email || 'Unknown User';
+  const usernameTextColor = getUsernameTextColor(username);
+  const usernameAvatarColor = getUsernameAvatarColor(username);
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Header */}
@@ -114,14 +120,14 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
               {/* Creator Information */}
               {user && (
                 <div className="flex items-center space-x-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                  <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold">
+                  <div className={`w-10 h-10 bg-gradient-to-br ${usernameAvatarColor} rounded-full flex items-center justify-center text-white font-bold`}>
                     {(user.username || user.email || 'U').charAt(0).toUpperCase()}
                   </div>
                   <div>
                     <p className="text-sm text-gray-600 dark:text-gray-400">Created by</p>
                     <Link 
                       href={`/user/${user.id}`}
-                      className="text-lg font-semibold text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 hover:underline"
+                      className={`text-lg font-semibold ${usernameTextColor} hover:underline`}
                     >
                       {user.username || user.email || 'Unknown User'}
                     </Link>

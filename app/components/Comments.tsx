@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { getUsernameTextColor, getUsernameAvatarColor } from '../utils/userColors';
 
 interface Comment {
   id: number;
@@ -29,11 +30,7 @@ export function Comments({ cityId }: CommentsProps) {
   const [sortBy, setSortBy] = useState<'recent' | 'likes'>('likes');
   const router = useRouter();
 
-  useEffect(() => {
-    fetchComments();
-  }, [cityId, sortBy]);
-
-  const fetchComments = async () => {
+  const fetchComments = useCallback(async () => {
     setLoading(true);
     try {
       const response = await fetch(`/api/cities/${cityId}/comments?sortBy=${sortBy}`);
@@ -46,7 +43,11 @@ export function Comments({ cityId }: CommentsProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [cityId, sortBy]);
+
+  useEffect(() => {
+    fetchComments();
+  }, [fetchComments]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -261,18 +262,23 @@ export function Comments({ cityId }: CommentsProps) {
         </div>
       ) : (
         <div className="space-y-4">
-          {comments.map((comment) => (
+          {comments.map((comment) => {
+          const username = getUserDisplayName(comment);
+          const usernameTextColor = getUsernameTextColor(username);
+          const usernameAvatarColor = getUsernameAvatarColor(username);
+          
+          return (
             <div key={comment.id} className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
               <div className="flex items-start space-x-3">
                 <div className="flex-shrink-0">
-                  <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-bold">
+                  <div className={`w-8 h-8 bg-gradient-to-br ${usernameAvatarColor} rounded-full flex items-center justify-center text-white text-sm font-bold`}>
                     {getUserInitial(comment)}
                   </div>
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
-                      <span className="font-medium text-gray-900 dark:text-white">
+                      <span className={`font-medium ${usernameTextColor}`}>
                         {getUserDisplayName(comment)}
                       </span>
                       <span className="text-sm text-gray-500 dark:text-gray-400">
@@ -319,7 +325,8 @@ export function Comments({ cityId }: CommentsProps) {
                 </div>
               </div>
             </div>
-          ))}
+          );
+        })}
         </div>
       )}
     </div>

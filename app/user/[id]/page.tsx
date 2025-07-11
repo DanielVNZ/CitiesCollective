@@ -4,6 +4,7 @@ import { getCitiesByUser, getUserById, getFollowerCount, getFollowingCount } fro
 import { CityCard } from 'app/components/CityCard';
 import { FollowButton } from 'app/components/FollowButton';
 import { auth } from 'app/auth';
+import { getUsernameTextColor, getUsernameAvatarColor } from 'app/utils/userColors';
 
 interface UserProfilePageProps {
   params: {
@@ -60,19 +61,30 @@ export default async function UserProfilePage({ params }: UserProfilePageProps) 
 
   const formatDate = (date: Date | null) => {
     if (!date) return 'Unknown';
-    return new Date(date).toLocaleDateString();
+    const d = new Date(date);
+    // Use explicit locale to ensure consistency between server and client
+    return d.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
   };
 
   // Get the most recent upload date
   const lastUpload = cities.length > 0 ? cities[0].uploadedAt : null;
 
+  // Get user colors
+  const username = user.username || user.name || user.email || 'Unknown User';
+  const usernameTextColor = getUsernameTextColor(username);
+  const usernameAvatarColor = getUsernameAvatarColor(username);
+
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen min-w-[320px] bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200">
       {/* Header */}
-      <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
+      <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <Link href="/" className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">
+            <Link href="/" className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium">
               ← Back to Cities
             </Link>
             <h1 className="text-xl font-semibold text-gray-900 dark:text-white">User Profile</h1>
@@ -81,17 +93,17 @@ export default async function UserProfilePage({ params }: UserProfilePageProps) 
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 min-w-[320px]">
         {/* User Profile Header */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-8 mb-8">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8 mb-8 border border-gray-200 dark:border-gray-700">
           <div className="flex items-start justify-between mb-8">
             <div className="flex items-center flex-1">
-              <div className="flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-full text-2xl font-bold shadow-lg">
+              <div className={`flex items-center justify-center w-20 h-20 bg-gradient-to-br ${usernameAvatarColor} text-white rounded-full text-2xl font-bold shadow-lg`}>
                 {(user.username || user.name || user.email || 'U').charAt(0).toUpperCase()}
               </div>
               <div className="ml-6 flex-1">
                 <div className="flex items-center gap-4 mb-2">
-                  <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                  <h1 className={`text-3xl font-bold ${usernameTextColor}`}>
                     {user.username || user.name || user.email || 'Unknown User'}
                   </h1>
                 </div>
@@ -157,19 +169,19 @@ export default async function UserProfilePage({ params }: UserProfilePageProps) 
 
           {/* City Statistics */}
           <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">City Statistics</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Total City Statistics</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="text-center p-4 bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 rounded-xl border border-green-200 dark:border-green-800">
-                <div className="text-2xl font-bold text-green-700 dark:text-green-400 mb-1">
+              <div className="text-center p-4 bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 rounded-xl border border-orange-200 dark:border-orange-800">
+                <div className="text-2xl font-bold text-orange-700 dark:text-orange-400 mb-1">
                   {formatNumber(totalPopulation)}
                 </div>
-                <div className="text-sm font-medium text-green-600 dark:text-green-300">Total Population</div>
+                <div className="text-sm font-medium text-orange-600 dark:text-orange-300">Total Population</div>
               </div>
-              <div className="text-center p-4 bg-gradient-to-br from-yellow-50 to-yellow-100 dark:from-yellow-900/20 dark:to-yellow-800/20 rounded-xl border border-yellow-200 dark:border-yellow-800">
-                <div className="text-2xl font-bold text-yellow-700 dark:text-yellow-400 mb-1">
+              <div className="text-center p-4 bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 rounded-xl border border-green-200 dark:border-green-800">
+                <div className="text-2xl font-bold text-green-700 dark:text-green-400 mb-1">
                   ${formatNumber(totalMoney)}
                 </div>
-                <div className="text-sm font-medium text-yellow-600 dark:text-yellow-300">Total Money</div>
+                <div className="text-sm font-medium text-green-600 dark:text-green-300">Total Money</div>
               </div>
               <div className="text-center p-4 bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 rounded-xl border border-purple-200 dark:border-purple-800">
                 <div className="text-2xl font-bold text-purple-700 dark:text-purple-400 mb-1">
@@ -188,11 +200,11 @@ export default async function UserProfilePage({ params }: UserProfilePageProps) 
         </div>
 
         {/* Cities Section */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-8">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8 border border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between mb-6">
             <div>
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                Cities by {user.username || user.name || user.email || 'Unknown User'}
+                Cities by <span className={usernameTextColor}>{user.username || user.name || user.email || 'Unknown User'}</span>
               </h2>
               <p className="text-gray-600 dark:text-gray-400 mt-1">
                 {cities.length === 0 
@@ -219,7 +231,7 @@ export default async function UserProfilePage({ params }: UserProfilePageProps) 
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {cities.map((city: any) => (
                 <CityCard key={city.id} city={city} />
               ))}

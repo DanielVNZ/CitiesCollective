@@ -1,0 +1,13 @@
+<svg width="800" height="450" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" preserveAspectRatio="none">
+  <defs>
+    <style type="text/css">
+      #holder_18d3d8e8b2d text { fill:#999;font-weight:normal;font-family:var(--bs-font-sans-serif),-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol";font-size:40pt } 
+    </style>
+  </defs>
+  <g id="holder_18d3d8e8b2d">
+    <rect width="800" height="450" fill="#373940"></rect>
+    <g>
+      <text x="285.4921875" y="243.6">800x450</text>
+    </g>
+  </g>
+</svg> 
