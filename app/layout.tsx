@@ -3,6 +3,7 @@ import 'leaflet/dist/leaflet.css';
 
 import { GeistSans } from 'geist/font/sans';
 import { ThemeProvider } from './components/ThemeProvider';
+import Script from 'next/script';
 
 let title = 'Cities Collective';
 let description =
@@ -26,6 +27,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <Script
+          src="https://challenges.cloudflare.com/turnstile/v0/api.js"
+          async
+          defer
+        />
+      </head>
       <body className={GeistSans.variable} suppressHydrationWarning>
         <ThemeProvider
           attribute="class"

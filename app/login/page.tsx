@@ -152,6 +152,18 @@ export default function Login({
                 Forgot your password?
               </Link>
             </div>
+            
+            {/* Cloudflare Turnstile - disabled on localhost */}
+            {typeof window !== 'undefined' && window.location.hostname !== 'localhost' && (
+              <div className="flex justify-center">
+                <div 
+                  className="cf-turnstile" 
+                  data-sitekey={process.env.NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY}
+                  data-theme="light"
+                ></div>
+              </div>
+            )}
+            
             <SubmitButton>Sign in</SubmitButton>
             <p className="text-center text-sm text-gray-600 dark:text-gray-400">
               Don&apos;t have an account?{' '}

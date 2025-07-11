@@ -176,10 +176,12 @@ export default async function Page() {
       <footer className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 mt-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="text-center text-gray-600 dark:text-gray-400">
-            <p className="mb-4">Join the Cities Collective and share your Cities: Skylines 2 creations with builders worldwide!</p>
-            <p className="text-sm">
+            <p className="text-sm mb-2">
               <Link href="/privacy" className="hover:text-blue-600 dark:hover:text-blue-400">Privacy Policy</Link> •{' '}
               <Link href="/terms" className="hover:text-blue-600 dark:hover:text-blue-400">Terms of Service</Link>
+            </p>
+            <p className="text-sm">
+              © Cities Collective • Created by DanielVNZ
             </p>
           </div>
         </div>

@@ -54,8 +54,10 @@ export default function PrivacyPolicy() {
               <ul className="list-disc list-inside text-gray-700 dark:text-gray-300 mb-4 space-y-1">
                 <li>Email address (required for account creation)</li>
                 <li>Username (chosen by you)</li>
-                <li>Password (encrypted and stored securely)</li>
-                <li>Optional profile information (PDX username, Discord username)</li>
+                <li>Password (encrypted and stored securely) - for email/password accounts</li>
+                <li>Name and avatar (when using Google or GitHub OAuth login)</li>
+                <li>Google ID or GitHub ID (when using OAuth login)</li>
+                <li>Optional profile information (social media links, bio)</li>
               </ul>
 
               <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">2.2 Content You Upload</h3>
@@ -63,10 +65,12 @@ export default function PrivacyPolicy() {
                 When you use our services, we collect:
               </p>
               <ul className="list-disc list-inside text-gray-700 dark:text-gray-300 mb-4 space-y-1">
-                <li>Cities: Skylines 2 save files (.cok files)</li>
-                <li>Screenshots and images of your cities</li>
-                <li>Metadata extracted from save files (city name, population, etc.)</li>
+                <li>Cities: Skylines 2 save files (.cok files) - up to 3GB per file</li>
+                <li>City screenshots and images (processed into multiple sizes for optimization)</li>
+                <li>Optional OpenStreetMap (.osm) files for custom map data</li>
+                <li>Metadata extracted from save files (city name, population, money, XP, etc.)</li>
                 <li>Comments and interactions with other users&apos; content</li>
+                <li>Likes, favorites, and social interactions</li>
               </ul>
 
               <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">2.3 Usage Information</h3>
@@ -100,10 +104,13 @@ export default function PrivacyPolicy() {
                 We implement appropriate security measures to protect your information:
               </p>
               <ul className="list-disc list-inside text-gray-700 dark:text-gray-300 mb-4 space-y-1">
-                <li>Passwords are encrypted using industry-standard hashing</li>
-                <li>Save files and images are stored securely using Cloudflare R2</li>
-                <li>Our website is hosted on Vercel with SSL encryption</li>
+                <li>Passwords are encrypted using industry-standard bcrypt hashing</li>
+                <li>OAuth tokens are stored securely and encrypted</li>
+                <li>Save files (.cok), images, and OSM files are stored securely using Cloudflare R2</li>
+                <li>Images are automatically processed into optimized formats (WebP) and multiple sizes</li>
+                <li>Our website uses SSL encryption for secure data transmission</li>
                 <li>Database access is restricted and monitored</li>
+                <li>File uploads are validated and scanned for security</li>
               </ul>
               <p className="text-gray-700 dark:text-gray-300">
                 However, no method of transmission over the internet is 100% secure. We cannot guarantee absolute security of your information.
@@ -129,12 +136,14 @@ export default function PrivacyPolicy() {
                 Our website uses the following third-party services:
               </p>
               <ul className="list-disc list-inside text-gray-700 dark:text-gray-300 mb-4 space-y-1">
-                <li><strong>Vercel:</strong> Website hosting and deployment</li>
-                <li><strong>Cloudflare R2:</strong> File storage for save files and images</li>
-                <li><strong>Neon Database:</strong> Database hosting</li>
+                <li><strong>Cloudflare R2:</strong> File storage for save files, images, and OSM files</li>
+                <li><strong>Neon Database:</strong> Database hosting for user data and metadata</li>
+                <li><strong>NextAuth.js:</strong> Authentication service supporting email/password, Google OAuth, and GitHub OAuth</li>
+                <li><strong>Google OAuth:</strong> For Google account login (subject to Google&apos;s privacy policy)</li>
+                <li><strong>GitHub OAuth:</strong> For GitHub account login (subject to GitHub&apos;s privacy policy)</li>
               </ul>
               <p className="text-gray-700 dark:text-gray-300">
-                These services have their own privacy policies and terms of service.
+                These services have their own privacy policies and terms of service. When you use OAuth login, we receive basic profile information (name, email, avatar) from the respective service.
               </p>
             </section>
 
@@ -177,7 +186,10 @@ export default function PrivacyPolicy() {
               </p>
               <ul className="list-disc list-inside text-gray-700 dark:text-gray-300 mb-4 space-y-1">
                 <li>Account information: Until you delete your account</li>
-                <li>Uploaded content: Until you remove it or delete your account</li>
+                <li>Uploaded save files (.cok): Until you remove them or delete your account</li>
+                <li>Uploaded images: Until you remove them or delete your account</li>
+                <li>Uploaded OSM files: Until you remove them or delete your account</li>
+                <li>OAuth tokens: Until you disconnect your account or delete your account</li>
                 <li>Usage logs: Up to 12 months for security and analytics</li>
               </ul>
             </section>
