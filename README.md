@@ -108,10 +108,6 @@ Cities Collective is more than just a file sharing platform—it's a vibrant com
 - **Community**: Join discussions and share feedback
 - **Support**: Contact us for technical support or questions
 
-## 📄 License
-
-This project is proprietary software. All rights reserved.
-
 ---
 
 **Join the Cities Collective community today and share your urban creations with the world! 🏙️✨**
