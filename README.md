@@ -1,36 +1,117 @@
-# Next.js + PostgreSQL Auth Starter
+# Cities Collective 🏙️
 
-This is a [Next.js](https://nextjs.org/) starter kit that uses [NextAuth.js](https://next-auth.js.org/) for simple email + password login, [Drizzle](https://orm.drizzle.team) as the ORM, and a [Neon Postgres](https://vercel.com/postgres) database to persist the data.
+A comprehensive web platform for sharing and exploring Cities: Skylines 2 creations. Upload your save files, showcase your cities, and discover amazing urban designs from creators around the world.
 
-## Deploy Your Own
+## 🌟 About
 
-You can clone & deploy it to Vercel with one click:
+Cities Collective is a community-driven platform where Cities: Skylines 2 players can share their city creations with the world. Whether you're a casual player or a content creator, our platform provides the tools to showcase your urban masterpieces and connect with fellow city builders.
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?demo-title=Next.js%20Prisma%20PostgreSQL%20Auth%20Starter&demo-description=Simple%20Next.js%2013%20starter%20kit%20that%20uses%20Next-Auth%20for%20auth%20and%20Prisma%20PostgreSQL%20as%20a%20database.&demo-url=https%3A%2F%2Fnextjs-postgres-auth.vercel.app%2F&demo-image=%2F%2Fimages.ctfassets.net%2Fe5382hct74si%2F7rsVQ1ZBSiWe9JGO6FUeZZ%2F210cba91036ca912b2770e0bd5d6cc5d%2Fthumbnail.png&project-name=Next.js%%20Prisma%20PostgreSQL%20Auth%20Starter&repository-name=nextjs-postgres-auth-starter&repository-url=https%3A%2F%2Fgithub.com%2Fvercel%2Fnextjs-postgres-auth-starter&from=templates&skippable-integrations=1&env=AUTH_SECRET&envDescription=Generate%20a%20random%20secret%3A&envLink=https://generate-secret.vercel.app/&stores=%5B%7B"type"%3A"postgres"%7D%5D)
+## ✨ Key Features
 
-## Developing Locally
+### 🎮 City Sharing
+- **Save File Upload**: Upload your .cok save files directly to share your cities
+- **Automatic Metadata Parsing**: City statistics, population, money, and game settings automatically extracted
+- **Image Galleries**: Upload multiple screenshots of your city with drag-and-drop management
+- **Interactive OSM Maps**: Upload and display OpenStreetMap files showing your city's layout
 
-You can clone & create this repo with the following command
+### 🌐 Community Features
+- **Like System**: Heart cities you love and see what's popular
+- **Comment System**: Engage with creators through comments and discussions
+- **Favorites**: Save cities to your personal collection
+- **Follow System**: Follow your favorite creators and get notified of new uploads
+- **User Profiles**: Discover creators and their complete city collections
 
-```bash
-npx create-next-app nextjs-typescript-starter --example "https://github.com/vercel/nextjs-postgres-auth-starter"
-```
+### 🔍 Discovery & Search
+- **Advanced Search**: Find cities by name, creator, population, theme, and more
+- **Recent Updates**: See the latest city uploads and updates
+- **Creator Spotlight**: Discover featured content from highlighted creators
+- **Categorized Browsing**: Explore cities by various filters and criteria
 
-## Getting Started
+### 🎨 Rich Content Display
+- **City Cards**: Beautiful grid layout showcasing city thumbnails and key stats
+- **Detailed City Pages**: Comprehensive city information with full image galleries
+- **Markdown Descriptions**: Rich text descriptions with full formatting support
+- **Download System**: Download save files to play cities yourself
 
-First, run the development server:
+### 👥 User Experience
+- **User Authentication**: Secure account system with username support
+- **Personal Dashboard**: Manage your cities, view statistics, and edit your profile
+- **Social Links**: Connect your PDX and Discord accounts
+- **Notification System**: Stay updated with likes, comments, and follower activity
 
-```bash
-pnpm dev
-```
+### 🔧 Advanced Features
+- **API Access**: External API for developers with secure key management
+- **Admin Panel**: Comprehensive moderation and user management tools
+- **Content Creator System**: Special recognition for featured creators
+- **Password Reset**: Secure password recovery via email
+- **Multi-format Support**: Images, save files, and map data all supported
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🚀 Platform Highlights
 
-## Learn More
+### For Players
+- **Easy Sharing**: Upload your cities in just a few clicks
+- **Community Engagement**: Connect with other players and get feedback
+- **Inspiration**: Discover new building techniques and creative ideas
+- **Personal Collection**: Keep track of your favorite cities
 
-To learn more about Next.js, take a look at the following resources:
+### For Content Creators
+- **Showcase Platform**: Professional presentation of your creations
+- **Audience Building**: Follower system and creator spotlight features
+- **Rich Media**: Multiple images, descriptions, and map integration
+- **Analytics**: Track likes, comments, and community engagement
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### For Developers
+- **RESTful API**: Access city data and user information programmatically
+- **Secure Authentication**: API key system with usage tracking
+- **Comprehensive Documentation**: Full API documentation with examples
+- **CORS Support**: Cross-origin requests for web applications
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
+## 🛠️ Technology Stack
+
+Built with modern web technologies for performance and scalability:
+- **Frontend**: Next.js 14 with TypeScript and Tailwind CSS
+- **Backend**: Node.js with RESTful API architecture
+- **Database**: PostgreSQL with Drizzle ORM
+- **Authentication**: NextAuth.js with secure session management
+- **File Storage**: Cloud storage with image optimization
+- **Email**: Integrated email system for notifications
+- **Maps**: Leaflet integration for interactive map display
+
+## 🌍 Community
+
+Cities Collective is more than just a file sharing platform—it's a vibrant community of city builders, urban planners, and creative minds. Join thousands of players who share their passion for city building and urban design.
+
+### Community Guidelines
+- Be respectful and constructive in comments and interactions
+- Share original creations and give credit where appropriate
+- Help newcomers learn and improve their building skills
+- Report inappropriate content to help maintain a positive environment
+
+## 📊 Platform Statistics
+
+- **Active Users**: Growing community of city builders
+- **Cities Shared**: Thousands of unique city creations
+- **Community Interactions**: Likes, comments, and favorites
+- **Content Creators**: Featured creators with highlighted content
+- **API Access**: External developer integrations
+
+## 🔐 Privacy & Security
+
+- **Data Protection**: User information and uploads are securely stored
+- **Authentication**: Industry-standard security practices
+- **Content Moderation**: Admin tools for maintaining community standards
+- **Privacy Controls**: Users control their profile visibility and data
+
+## 📞 Contact & Support
+
+- **Issues**: Report bugs or request features through GitHub Issues
+- **Community**: Join discussions and share feedback
+- **Support**: Contact us for technical support or questions
+
+## 📄 License
+
+This project is proprietary software. All rights reserved.
+
+---
+
+**Join the Cities Collective community today and share your urban creations with the world! 🏙️✨**
