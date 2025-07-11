@@ -4,11 +4,13 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { SubmitButton } from 'app/submit-button';
 import TurnstileWidget from 'app/components/TurnstileWidget';
+import { validateTurnstileToken } from 'app/utils/turnstile';
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -16,12 +18,24 @@ export default function ForgotPassword() {
     setMessage('');
 
     try {
+      // Validate Turnstile token
+      const isValidToken = await validateTurnstileToken(turnstileToken);
+      
+      if (!isValidToken) {
+        setMessage('Please complete the security check');
+        setIsLoading(false);
+        return;
+      }
+
       const response = await fetch('/api/auth/forgot-password', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ 
+          email,
+          'cf-turnstile-response': turnstileToken 
+        }),
       });
 
       const data = await response.json();
@@ -29,6 +43,7 @@ export default function ForgotPassword() {
       if (response.ok) {
         setMessage(data.message);
         setEmail('');
+        setTurnstileToken('');
       } else {
         setMessage(data.error || 'An error occurred. Please try again.');
       }
@@ -85,6 +100,7 @@ export default function ForgotPassword() {
             <TurnstileWidget 
               siteKey={process.env.NEXT_PUBLIC_CLOUDFLARE_TURNSTILE_SITE_KEY || 'test-key'}
               theme="light"
+              onVerify={(token) => setTurnstileToken(token)}
             />
             
             <button

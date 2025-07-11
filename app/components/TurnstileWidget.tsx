@@ -21,6 +21,7 @@ export default function TurnstileWidget({ siteKey, theme = 'light', onVerify }: 
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string | null>(null);
   const [shouldRender, setShouldRender] = useState(true);
+  const [token, setToken] = useState<string>('');
 
   useEffect(() => {
     // Check if we're on localhost and disable if so
@@ -38,15 +39,18 @@ export default function TurnstileWidget({ siteKey, theme = 'light', onVerify }: 
           widgetIdRef.current = window.turnstile.render(containerRef.current, {
             sitekey: siteKey,
             theme: theme,
-            callback: (token: string) => {
-              console.log('Turnstile verified:', token);
-              onVerify?.(token);
+            callback: (verificationToken: string) => {
+              console.log('Turnstile verified:', verificationToken);
+              setToken(verificationToken);
+              onVerify?.(verificationToken);
             },
             'expired-callback': () => {
               console.log('Turnstile expired');
+              setToken('');
             },
             'error-callback': () => {
               console.log('Turnstile error');
+              setToken('');
             }
           });
         } catch (error) {
@@ -88,8 +92,16 @@ export default function TurnstileWidget({ siteKey, theme = 'light', onVerify }: 
   }
 
   return (
-    <div className="flex justify-center">
-      <div ref={containerRef} className="turnstile-widget-container"></div>
-    </div>
+    <>
+      <div className="flex justify-center">
+        <div ref={containerRef} className="turnstile-widget-container"></div>
+      </div>
+      <input 
+        type="hidden" 
+        name="cf-turnstile-response" 
+        value={token} 
+        required 
+      />
+    </>
   );
 } 

@@ -1,10 +1,11 @@
 import Link from 'next/link';
-import { redirect } from 'next/navigation';
-import { createUser, getUser, client } from 'app/db';
 import { signIn } from 'app/auth';
 import { SubmitButton } from 'app/submit-button';
 import { getRedirectUrl } from 'app/utils/redirect';
 import TurnstileWidget from 'app/components/TurnstileWidget';
+import { validateTurnstileToken } from 'app/utils/turnstile';
+import { redirect } from 'next/navigation';
+import { createUser, getUser, client } from 'app/db';
 
 export default function Register({
   searchParams,
@@ -14,6 +15,16 @@ export default function Register({
   const redirectTo = getRedirectUrl(new URLSearchParams(searchParams as Record<string, string>));
   async function register(formData: FormData) {
     'use server';
+    
+    // Validate Turnstile token
+    const turnstileToken = formData.get('cf-turnstile-response') as string;
+    const isValidToken = await validateTurnstileToken(turnstileToken);
+    
+    if (!isValidToken) {
+      // Redirect back with error
+      redirect('/register?error=Please complete the security check');
+    }
+    
     let email = formData.get('email') as string;
     let password = formData.get('password') as string;
     let username = formData.get('username') as string;

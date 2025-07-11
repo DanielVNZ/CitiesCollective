@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { signIn } from 'app/auth';
 import { getRedirectUrl } from 'app/utils/redirect';
 import TurnstileWidget from 'app/components/TurnstileWidget';
+import { validateTurnstileToken } from 'app/utils/turnstile';
+import { redirect } from 'next/navigation';
 
 export default function Login({
   searchParams,
@@ -100,6 +102,16 @@ export default function Login({
           <form
             action={async (formData: FormData) => {
               'use server';
+              
+              // Validate Turnstile token
+              const turnstileToken = formData.get('cf-turnstile-response') as string;
+              const isValidToken = await validateTurnstileToken(turnstileToken);
+              
+              if (!isValidToken) {
+                // Redirect back with error
+                redirect('/login?error=Please complete the security check');
+              }
+              
               await signIn('credentials', {
                 redirectTo,
                 email: formData.get('email') as string,
