@@ -61,6 +61,20 @@ export default async function Page() {
         </div>
       </header>
       
+      {/* Beta Banner */}
+      <div className="bg-gradient-to-r from-orange-500 to-red-500 text-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+          <div className="flex items-center justify-center text-center">
+            <div className="flex items-center space-x-2">
+              <span className="bg-white text-orange-600 px-2 py-1 rounded text-xs font-bold">BETA</span>
+              <span className="text-sm sm:text-base">
+                🚧 Cities Collective is in beta! Upload limit: 3 cities per user. This may expand in future
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+      
       {/* Hero Section */}
       <section className="relative bg-gray-800 text-white">
         <div className="absolute inset-0 bg-gradient-to-br from-purple-600/70 via-blue-500/70 to-green-400/70"></div>
