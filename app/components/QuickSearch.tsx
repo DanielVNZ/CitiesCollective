@@ -40,7 +40,7 @@ export function QuickSearch() {
         </div>
         <input
           type="text"
-          placeholder="Search for cities, maps, or creators..."
+          placeholder="Search city, creator, map..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyPress={handleKeyPress}

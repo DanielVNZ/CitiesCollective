@@ -4,6 +4,7 @@ import { CityCard } from 'app/components/CityCard';
 import { QuickSearch } from 'app/components/QuickSearch';
 import { ResponsiveNavigationWrapper } from 'app/components/ResponsiveNavigationWrapper';
 import { auth } from 'app/auth';
+import { HeroCarousel } from 'app/components/HeroCarousel';
 
 export default async function Page() {
   const cities = await getRecentCities(12);
@@ -77,20 +78,8 @@ export default async function Page() {
       </div>
       
       {/* Hero Section */}
-      <section className="relative bg-gray-800 text-white">
-        <div className="absolute inset-0 bg-gradient-to-br from-purple-600/70 via-blue-500/70 to-green-400/70"></div>
-        <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center py-20 sm:py-32">
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white">
-            Discover & Share Incredible Cities
-          </h1>
-          <p className="mt-6 text-xl text-gray-200 max-w-3xl mx-auto">
-            The ultimate hub for Cities: Skylines 2 creators. Upload your save files, showcase your work, and explore masterpieces from the community.
-          </p>
-          <div className="mt-10 max-w-xl mx-auto">
-            <QuickSearch />
-            <p className="mt-3 text-sm text-gray-300">Search by city name, map, or creator.</p>
-          </div>
-        </div>
+      <section className="relative bg-gray-800 text-white overflow-hidden">
+        <HeroCarousel topCities={topCities} />
       </section>
 
       {/* Main Content */}
