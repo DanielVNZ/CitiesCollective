@@ -3,7 +3,6 @@
 import { useState, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import axios from 'axios';
 
 interface UploadedCity {
   id: number;
