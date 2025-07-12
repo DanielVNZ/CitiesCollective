@@ -144,7 +144,7 @@ export function Comments({ cityId }: CommentsProps) {
               ? {
                   ...comment,
                   isLikedByUser: data.liked,
-                  likesCount: data.liked ? comment.likesCount + 1 : comment.likesCount - 1
+                  likesCount: data.liked ? Number(comment.likesCount) + 1 : Number(comment.likesCount) - 1
                 }
               : comment
           )

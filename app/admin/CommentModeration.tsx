@@ -92,10 +92,12 @@ export function CommentModeration({ comments }: CommentModerationProps) {
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-      <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-        Comment Moderation ({filteredComments.length} comments)
-      </h2>
+    <div>
+      <div className="mb-4">
+        <span className="text-sm text-gray-500 dark:text-gray-400">
+          {filteredComments.length} comments
+        </span>
+      </div>
 
       {/* Filters and Search */}
       <div className="flex flex-col sm:flex-row gap-4 mb-6">

@@ -107,8 +107,7 @@ export function UserCityManagement() {
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-      <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">User City Management</h2>
+    <div>
       
       {/* User Search */}
       <div className="mb-6">

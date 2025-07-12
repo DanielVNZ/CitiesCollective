@@ -13,8 +13,8 @@ export async function GET(
     }
 
     // Check if user is admin
-    const adminCheck = await isUserAdmin(session.user.email);
-    if (!adminCheck) {
+    const isAdmin = await isUserAdmin(session.user.email);
+    if (!isAdmin) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -30,11 +30,8 @@ export async function GET(
       success: true,
       apiKeys
     });
-
   } catch (error) {
-    console.error('Error getting API keys:', error);
-    return NextResponse.json({ 
-      error: 'Internal server error' 
-    }, { status: 500 });
+    console.error('Error fetching user API keys:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 } 

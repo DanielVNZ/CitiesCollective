@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
 
 interface UserStats {
@@ -20,9 +20,21 @@ interface AdminUserManagementProps {
   users: UserStats[];
 }
 
+type SortField = 'username' | 'email' | 'isAdmin' | 'isContentCreator' | 'cityCount' | 'totalPopulation' | 'totalMoney' | 'totalXP' | 'lastUpload';
+type SortDirection = 'asc' | 'desc';
+
 export function AdminUserManagement({ users }: AdminUserManagementProps) {
   const [updatingUser, setUpdatingUser] = useState<number | null>(null);
   const [updatingContentCreator, setUpdatingContentCreator] = useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortField, setSortField] = useState<SortField>('username');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [adminFilter, setAdminFilter] = useState<'all' | 'admin' | 'user'>('all');
+  const [creatorFilter, setCreatorFilter] = useState<'all' | 'creator' | 'regular'>('all');
+  const [cityCountFilter, setCityCountFilter] = useState<'all' | 'active' | 'inactive'>('all');
+
+  const ITEMS_PER_PAGE = 15;
 
   const formatNumber = (num: number) => {
     // For very large numbers, use abbreviations
@@ -44,6 +56,101 @@ export function AdminUserManagement({ users }: AdminUserManagementProps) {
     const year = d.getFullYear();
     return `${month}/${day}/${year}`;
   };
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+    setCurrentPage(1); // Reset to first page when sorting
+  };
+
+  const filteredAndSortedUsers = useMemo(() => {
+    let filtered = users.filter((user) => {
+      // Search filter
+      const username = user.username || '';
+      const email = user.email || '';
+      const searchMatch = username.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                         email.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      // Admin filter
+      const adminMatch = adminFilter === 'all' || 
+                        (adminFilter === 'admin' && user.isAdmin) ||
+                        (adminFilter === 'user' && !user.isAdmin);
+      
+      // Creator filter
+      const creatorMatch = creatorFilter === 'all' ||
+                          (creatorFilter === 'creator' && user.isContentCreator) ||
+                          (creatorFilter === 'regular' && !user.isContentCreator);
+      
+      // City count filter
+      const cityCountMatch = cityCountFilter === 'all' ||
+                            (cityCountFilter === 'active' && user.cityCount > 0) ||
+                            (cityCountFilter === 'inactive' && user.cityCount === 0);
+      
+      return searchMatch && adminMatch && creatorMatch && cityCountMatch;
+    });
+
+    // Sort filtered results
+    filtered.sort((a, b) => {
+      let aValue: any;
+      let bValue: any;
+
+      switch (sortField) {
+        case 'username':
+          aValue = (a.username || a.email || '').toLowerCase();
+          bValue = (b.username || b.email || '').toLowerCase();
+          break;
+        case 'email':
+          aValue = (a.email || '').toLowerCase();
+          bValue = (b.email || '').toLowerCase();
+          break;
+        case 'isAdmin':
+          aValue = a.isAdmin ? 1 : 0;
+          bValue = b.isAdmin ? 1 : 0;
+          break;
+        case 'isContentCreator':
+          aValue = a.isContentCreator ? 1 : 0;
+          bValue = b.isContentCreator ? 1 : 0;
+          break;
+        case 'cityCount':
+          aValue = a.cityCount;
+          bValue = b.cityCount;
+          break;
+        case 'totalPopulation':
+          aValue = a.totalPopulation;
+          bValue = b.totalPopulation;
+          break;
+        case 'totalMoney':
+          aValue = a.totalMoney;
+          bValue = b.totalMoney;
+          break;
+        case 'totalXP':
+          aValue = a.totalXP;
+          bValue = b.totalXP;
+          break;
+        case 'lastUpload':
+          aValue = a.lastUpload ? new Date(a.lastUpload).getTime() : 0;
+          bValue = b.lastUpload ? new Date(b.lastUpload).getTime() : 0;
+          break;
+        default:
+          return 0;
+      }
+
+      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return filtered;
+  }, [users, searchQuery, sortField, sortDirection, adminFilter, creatorFilter, cityCountFilter]);
+
+  const totalPages = Math.ceil(filteredAndSortedUsers.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const currentUsers = filteredAndSortedUsers.slice(startIndex, endIndex);
 
   const toggleAdminStatus = async (userId: number, currentStatus: boolean) => {
     setUpdatingUser(userId);
@@ -97,37 +204,193 @@ export function AdminUserManagement({ users }: AdminUserManagementProps) {
     }
   };
 
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) {
+      return (
+        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
+        </svg>
+      );
+    }
+    
+    return sortDirection === 'asc' ? (
+      <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+      </svg>
+    ) : (
+      <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+      </svg>
+    );
+  };
+
+  const clearFilters = () => {
+    setSearchQuery('');
+    setAdminFilter('all');
+    setCreatorFilter('all');
+    setCityCountFilter('all');
+    setSortField('username');
+    setSortDirection('asc');
+    setCurrentPage(1);
+  };
+
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-      <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">User Management</h2>
+    <div>
+      <div className="flex justify-between items-center mb-6">
+        <div className="text-sm text-gray-500 dark:text-gray-400">
+          Showing {startIndex + 1}-{Math.min(endIndex, filteredAndSortedUsers.length)} of {filteredAndSortedUsers.length} users
+        </div>
+      </div>
+
+      {/* Search and Filters */}
+      <div className="mb-6 space-y-4">
+        {/* Search */}
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex-1">
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+              <input
+                type="text"
+                placeholder="Search by username or email..."
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+          <button
+            onClick={clearFilters}
+            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-colors"
+          >
+            Clear Filters
+          </button>
+        </div>
+
+        {/* Filter Dropdowns */}
+        <div className="flex flex-wrap gap-4">
+          <select
+            value={adminFilter}
+            onChange={(e) => {
+              setAdminFilter(e.target.value as 'all' | 'admin' | 'user');
+              setCurrentPage(1);
+            }}
+            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="all">All Admin Status</option>
+            <option value="admin">Admin Only</option>
+            <option value="user">Users Only</option>
+          </select>
+
+          <select
+            value={creatorFilter}
+            onChange={(e) => {
+              setCreatorFilter(e.target.value as 'all' | 'creator' | 'regular');
+              setCurrentPage(1);
+            }}
+            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="all">All Creator Status</option>
+            <option value="creator">Creators Only</option>
+            <option value="regular">Regular Only</option>
+          </select>
+
+          <select
+            value={cityCountFilter}
+            onChange={(e) => {
+              setCityCountFilter(e.target.value as 'all' | 'active' | 'inactive');
+              setCurrentPage(1);
+            }}
+            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="all">All Activity</option>
+            <option value="active">Active (Has Cities)</option>
+            <option value="inactive">Inactive (No Cities)</option>
+          </select>
+        </div>
+      </div>
       
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
           <thead className="bg-gray-50 dark:bg-gray-700">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                User
+              <th 
+                className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                onClick={() => handleSort('username')}
+              >
+                <div className="flex items-center space-x-1">
+                  <span>User</span>
+                  <SortIcon field="username" />
+                </div>
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                Admin Status
+              <th 
+                className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                onClick={() => handleSort('isAdmin')}
+              >
+                <div className="flex items-center space-x-1">
+                  <span>Admin Status</span>
+                  <SortIcon field="isAdmin" />
+                </div>
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                Creator Status
+              <th 
+                className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                onClick={() => handleSort('isContentCreator')}
+              >
+                <div className="flex items-center space-x-1">
+                  <span>Creator Status</span>
+                  <SortIcon field="isContentCreator" />
+                </div>
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                Cities
+              <th 
+                className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                onClick={() => handleSort('cityCount')}
+              >
+                <div className="flex items-center space-x-1">
+                  <span>Cities</span>
+                  <SortIcon field="cityCount" />
+                </div>
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                Total Population
+              <th 
+                className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                onClick={() => handleSort('totalPopulation')}
+              >
+                <div className="flex items-center space-x-1">
+                  <span>Total Population</span>
+                  <SortIcon field="totalPopulation" />
+                </div>
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                Total Money
+              <th 
+                className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                onClick={() => handleSort('totalMoney')}
+              >
+                <div className="flex items-center space-x-1">
+                  <span>Total Money</span>
+                  <SortIcon field="totalMoney" />
+                </div>
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                Total XP
+              <th 
+                className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                onClick={() => handleSort('totalXP')}
+              >
+                <div className="flex items-center space-x-1">
+                  <span>Total XP</span>
+                  <SortIcon field="totalXP" />
+                </div>
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                Last Upload
+              <th 
+                className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                onClick={() => handleSort('lastUpload')}
+              >
+                <div className="flex items-center space-x-1">
+                  <span>Last Upload</span>
+                  <SortIcon field="lastUpload" />
+                </div>
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                 Actions
@@ -135,7 +398,7 @@ export function AdminUserManagement({ users }: AdminUserManagementProps) {
             </tr>
           </thead>
           <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-            {users.map((user) => (
+            {currentUsers.map((user) => (
               <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center">
@@ -238,6 +501,50 @@ export function AdminUserManagement({ users }: AdminUserManagementProps) {
           </tbody>
         </table>
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between mt-6">
+          <div className="text-sm text-gray-500 dark:text-gray-400">
+            Page {currentPage} of {totalPages}
+          </div>
+          <div className="flex space-x-2">
+            <button
+              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+            
+            {/* Page number buttons */}
+            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+              const pageNum = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;
+              return (
+                <button
+                  key={pageNum}
+                  onClick={() => setCurrentPage(pageNum)}
+                  className={`px-3 py-1 text-sm font-medium rounded-md ${
+                    currentPage === pageNum
+                      ? 'bg-blue-600 text-white'
+                      : 'text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  {pageNum}
+                </button>
+              );
+            })}
+            
+            <button
+              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 } 

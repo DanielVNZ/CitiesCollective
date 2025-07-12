@@ -1,14 +1,22 @@
 import Link from 'next/link';
-import { getRecentCities, getTopCitiesByLikes, getContentCreatorCities, isUserAdmin } from 'app/db';
+import { getRecentCities, getTopCitiesWithImages, getContentCreatorCities, isUserAdmin, getTotalCityCount } from 'app/db';
 import { CityCard } from 'app/components/CityCard';
 import { QuickSearch } from 'app/components/QuickSearch';
 import { Header } from 'app/components/Header';
 import { auth } from 'app/auth';
 import { HeroCarousel } from 'app/components/HeroCarousel';
+import { CommunityFavorites } from 'app/components/CommunityFavorites';
 
-export default async function Page() {
-  const cities = await getRecentCities(12);
-  const topCities = await getTopCitiesByLikes(3);
+export default async function Page({ searchParams }: { searchParams?: { page?: string } }) {
+  const currentPage = Math.max(1, parseInt(searchParams?.page || '1'));
+  const citiesPerPage = 9;
+  const offset = (currentPage - 1) * citiesPerPage;
+  
+  const cities = await getRecentCities(citiesPerPage, offset);
+  const totalCities = await getTotalCityCount();
+  const totalPages = Math.ceil(totalCities / citiesPerPage);
+  
+  const topCitiesWithImages = await getTopCitiesWithImages(25);
   const contentCreatorCities = await getContentCreatorCities(6);
   const session = await auth();
   const isAdmin = session?.user?.email ? await isUserAdmin(session.user.email) : false;
@@ -68,29 +76,13 @@ export default async function Page() {
       
       {/* Hero Section */}
       <section className="relative bg-gray-800 text-white overflow-hidden">
-        <HeroCarousel topCities={topCities} />
+        <HeroCarousel topCities={topCitiesWithImages} />
       </section>
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 min-w-[320px]">
-        {/* Most Liked Cities Section */}
-        {topCities.length > 0 && (
-          <section className="mb-16 sm:mb-24">
-            <div className="text-center mb-12">
-              <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-2">
-                Community Favorites
-              </h2>
-              <p className="text-lg text-gray-600 dark:text-gray-400">
-                The most beloved cities, ranked by the community.
-              </p>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {topCities.map((city, index) => (
-                <CityCard key={city.id} city={city} ranking={index + 1} />
-              ))}
-            </div>
-          </section>
-        )}
+        {/* Community Favorites Section */}
+        <CommunityFavorites cities={topCitiesWithImages} />
 
         {/* Quick Links Section */}
         <section className="mb-16 sm:mb-24 bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700">
@@ -152,11 +144,77 @@ export default async function Page() {
               </Link>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {cities.map((city) => (
-                <CityCard key={city.id} city={city} />
-              ))}
-            </div>
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {cities.map((city) => (
+                  <CityCard key={city.id} city={city} />
+                ))}
+              </div>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="mt-12 flex justify-center items-center space-x-2">
+                  {/* Previous Button */}
+                  <Link
+                    href={`/?page=${currentPage - 1}`}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                      currentPage === 1
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed dark:bg-gray-800 dark:text-gray-600'
+                        : 'bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600'
+                    }`}
+                    {...(currentPage === 1 && { 'aria-disabled': true })}
+                  >
+                    Previous
+                  </Link>
+
+                  {/* Page Numbers */}
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNumber;
+                    if (totalPages <= 5) {
+                      pageNumber = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNumber = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNumber = totalPages - 4 + i;
+                    } else {
+                      pageNumber = currentPage - 2 + i;
+                    }
+
+                    return (
+                      <Link
+                        key={pageNumber}
+                        href={`/?page=${pageNumber}`}
+                        className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                          currentPage === pageNumber
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600'
+                        }`}
+                      >
+                        {pageNumber}
+                      </Link>
+                    );
+                  })}
+
+                  {/* Next Button */}
+                  <Link
+                    href={`/?page=${currentPage + 1}`}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                      currentPage === totalPages
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed dark:bg-gray-800 dark:text-gray-600'
+                        : 'bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600'
+                    }`}
+                    {...(currentPage === totalPages && { 'aria-disabled': true })}
+                  >
+                    Next
+                  </Link>
+                </div>
+              )}
+
+              {/* Page Info */}
+              <div className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
+                Showing {offset + 1} to {Math.min(offset + citiesPerPage, totalCities)} of {totalCities} cities
+              </div>
+            </>
           )}
         </section>
       </main>

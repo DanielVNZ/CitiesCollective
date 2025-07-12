@@ -95,10 +95,12 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
             isOwner={isOwner} 
           />
           
-          {/* Map Legend - Inline below map */}
-          <div className="mt-4 bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
-            <MapLegend />
-          </div>
+          {/* Map Legend - Only show if OSM map exists */}
+          {city.osmMapPath && (
+            <div className="mt-4 bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
+              <MapLegend />
+            </div>
+          )}
         </div>
 
         {/* City Header */}

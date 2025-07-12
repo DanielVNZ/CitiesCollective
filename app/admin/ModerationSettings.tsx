@@ -152,7 +152,7 @@ export function ModerationSettings({}: ModerationSettingsProps) {
 
   if (loading) {
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+      <div>
         <div className="text-center py-8">
           <div className="text-gray-500 dark:text-gray-400">Loading moderation settings...</div>
         </div>
@@ -161,10 +161,7 @@ export function ModerationSettings({}: ModerationSettingsProps) {
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-      <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">
-        Moderation Settings
-      </h2>
+    <div>
 
       {/* Message */}
       {message && (

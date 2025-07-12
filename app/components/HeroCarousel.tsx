@@ -30,7 +30,7 @@ export function HeroCarousel({ topCities }: HeroCarouselProps) {
         arrows={true}
         className="w-full h-[500px] sm:h-[600px]"
       >
-        {topCities.map((city) => {
+        {topCities.map((city, index) => {
           const primaryImage = city.images?.find((img: { isPrimary: boolean }) => img.isPrimary) || city.images?.[0];
           
           return (
@@ -43,6 +43,12 @@ export function HeroCarousel({ topCities }: HeroCarouselProps) {
                 className="w-full h-full object-cover brightness-50"
                 priority
               />
+              
+              {/* Ranking Badge */}
+              <div className="absolute top-4 right-4 bg-gradient-to-r from-purple-600 to-blue-500 text-white rounded-full w-12 h-12 flex items-center justify-center font-bold text-lg shadow-lg border-2 border-white">
+                #{index + 1}
+              </div>
+              
               <div className="absolute bottom-0 left-0 right-0 flex items-center justify-center text-center px-4 pb-8">
                 <span className="text-2xl sm:text-3xl font-bold text-white mr-4">
                   {city.cityName} by {city.user?.username || 'Anonymous'}

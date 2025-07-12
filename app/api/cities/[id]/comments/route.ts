@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from 'app/auth';
-import { addComment, getCityComments } from 'app/db';
+import { addComment, getCityComments, notifyNewComment } from 'app/db';
 import { moderateComment, shouldRejectComment, getModerationMessage } from 'app/utils/commentModeration';
 
 export async function GET(
@@ -89,6 +89,14 @@ export async function POST(
     const finalContent = moderationResult.isClean ? content.trim() : moderationResult.filteredContent;
     
     const comment = await addComment(userId, cityId, finalContent);
+    
+    // Send notification to city owner (if it's not their own comment)
+    try {
+      await notifyNewComment(userId, cityId, comment.id, finalContent);
+    } catch (notificationError) {
+      // Log the error but don't fail the comment creation
+      console.error('Failed to send comment notification:', notificationError);
+    }
     
     // Return moderation info if content was filtered
     const response: any = { comment };

@@ -335,7 +335,7 @@ export async function getAllUsersWithStats() {
     username: users.username,
     isAdmin: users.isAdmin,
     isContentCreator: users.isContentCreator,
-    cityCount: sql<number>`COUNT(${cityTable.id})`.as('cityCount'),
+    cityCount: sql<number>`COALESCE(COUNT(CASE WHEN ${cityTable.id} IS NOT NULL THEN 1 END), 0)`.as('cityCount'),
     totalPopulation: sql<number>`COALESCE(SUM(${cityTable.population}), 0)`.as('totalPopulation'),
     totalMoney: sql<number>`COALESCE(SUM(${cityTable.money}), 0)`.as('totalMoney'),
     totalXP: sql<number>`COALESCE(SUM(${cityTable.xp}), 0)`.as('totalXP'),
@@ -344,7 +344,7 @@ export async function getAllUsersWithStats() {
     .from(users)
     .leftJoin(cityTable, eq(cityTable.userId, users.id))
     .groupBy(users.id, users.email, users.username, users.isAdmin, users.isContentCreator)
-    .orderBy(desc(sql`COUNT(${cityTable.id})`));
+    .orderBy(desc(sql`COALESCE(COUNT(CASE WHEN ${cityTable.id} IS NOT NULL THEN 1 END), 0)`));
   
   return userStats;
 }
@@ -710,7 +710,7 @@ async function ensureCityTableExists() {
   return cityTable;
 }
 
-export async function getRecentCities(limit: number = 12) {
+export async function getRecentCities(limit: number = 12, offset: number = 0) {
   await ensureCityTableExists();
   const users = await ensureTableExists();
   
@@ -741,7 +741,8 @@ export async function getRecentCities(limit: number = 12) {
     .from(cityTable)
     .leftJoin(users, eq(cityTable.userId, users.id))
     .orderBy(desc(cityTable.uploadedAt))
-    .limit(limit);
+    .limit(limit)
+    .offset(offset);
 
   return cities;
 }
@@ -816,6 +817,48 @@ export async function getTopCitiesByLikes(limit: number = 3) {
     .leftJoin(users, eq(cityTable.userId, users.id))
     .groupBy(cityTable.id, users.id)
     .orderBy(desc(sql`count(${likesTable.id})`))
+    .limit(limit);
+
+  return topCities;
+}
+
+export async function getTopCitiesWithImages(limit: number = 25) {
+  await ensureCityTableExists();
+  await ensureLikesTableExists();
+  await ensureCityImagesTableExists();
+  const users = await ensureTableExists();
+
+  const topCities = await db
+    .select({
+      id: cityTable.id,
+      userId: cityTable.userId,
+      cityName: cityTable.cityName,
+      mapName: cityTable.mapName,
+      population: cityTable.population,
+      money: cityTable.money,
+      xp: cityTable.xp,
+      unlimitedMoney: cityTable.unlimitedMoney,
+      uploadedAt: cityTable.uploadedAt,
+      likeCount: sql<number>`(SELECT COUNT(*) FROM "likes" WHERE "cityId" = "City".id)`.as('likeCount'),
+      user: {
+        id: users.id,
+        username: users.username,
+      },
+      images: sql<Array<{ id: number; fileName: string; isPrimary: boolean; mediumPath: string; largePath: string; thumbnailPath: string }>>`
+        (
+          SELECT COALESCE(json_agg(json_build_object('id', i.id, 'fileName', i."fileName", 'isPrimary', i."isPrimary", 'mediumPath', i."mediumPath", 'largePath', i."largePath", 'thumbnailPath', i."thumbnailPath")), '[]'::json)
+          FROM "cityImages" i
+          WHERE i."cityId" = "City".id
+        )
+      `,
+      commentCount: sql<number>`(SELECT COUNT(*) FROM "comments" WHERE "cityId" = "City".id)`.as('commentCount'),
+    })
+    .from(cityTable)
+    .leftJoin(users, eq(cityTable.userId, users.id))
+    .innerJoin(cityImagesTable, eq(cityTable.id, cityImagesTable.cityId))
+    .where(eq(cityImagesTable.isPrimary, true))
+    .groupBy(cityTable.id, users.id)
+    .orderBy(desc(sql`(SELECT COUNT(*) FROM "likes" WHERE "cityId" = "City".id)`))
     .limit(limit);
 
   return topCities;
@@ -2400,6 +2443,56 @@ export async function notifyFollowersOfNewCity(userId: number, cityId: number, c
   );
   
   await Promise.all(notificationPromises);
+}
+
+// Function to notify when someone comments on your city
+export async function notifyNewComment(commenterId: number, cityId: number, commentId: number, commentContent: string) {
+  const users = await ensureTableExists();
+  const cities = await ensureCityTableExists();
+  
+  // Get city info and owner
+  const cityInfo = await db.select({ 
+    cityName: cities.cityName,
+    userId: cities.userId 
+  })
+    .from(cities)
+    .where(eq(cities.id, cityId))
+    .limit(1);
+  
+  if (cityInfo.length === 0) return;
+  
+  const city = cityInfo[0];
+  const cityOwnerId = city.userId;
+  
+  // Don't notify if the city owner is commenting on their own city
+  if (cityOwnerId === commenterId) return;
+  
+  // Get commenter info for the notification
+  const commenterInfo = await db.select({ username: users.username, name: users.name })
+    .from(users)
+    .where(eq(users.id, commenterId))
+    .limit(1);
+  
+  if (commenterInfo.length === 0) return;
+  
+  const commenter = commenterInfo[0];
+  const commenterDisplayName = commenter.username || commenter.name || 'Unknown User';
+  
+  // Truncate comment content for notification (max 50 characters)
+  const truncatedComment = commentContent.length > 50 
+    ? commentContent.substring(0, 50) + '...' 
+    : commentContent;
+  
+  // Create notification for the city owner
+  await createNotification({
+    userId: cityOwnerId!,
+    type: 'new_comment',
+    title: 'New Comment',
+    message: `${commenterDisplayName} commented on your city "${city.cityName}": "${truncatedComment}"`,
+    relatedUserId: commenterId,
+    relatedCityId: cityId,
+    relatedCommentId: commentId
+  });
 }
 
 // Social Links Functions
