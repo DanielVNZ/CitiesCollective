@@ -94,7 +94,7 @@ export function CityDescription({ cityId, initialDescription, isOwner }: CityDes
         <div className="space-y-4">
           <div>
             <label htmlFor="description" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Description (Markdown supported)
+              Description (Text formatting supported)
             </label>
             <textarea
               id="description"
@@ -102,10 +102,10 @@ export function CityDescription({ cityId, initialDescription, isOwner }: CityDes
               onChange={(e) => setDescription(e.target.value)}
               rows={8}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-              placeholder="Write a description of your city... (Markdown supported)"
+              placeholder="Write a description of your city... (Text formatting supported)"
             />
             <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              You can use Markdown formatting like **bold**, *italic*, [links](url), and more.
+              You can use text formatting like **bold**, *italic*, [links](url), and more. Images are not supported.
             </p>
           </div>
           <div className="flex justify-end space-x-3">
@@ -127,7 +127,15 @@ export function CityDescription({ cityId, initialDescription, isOwner }: CityDes
       ) : (
         <div className="prose dark:prose-invert max-w-none text-gray-700 dark:text-gray-300">
           {description ? (
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            <ReactMarkdown 
+              remarkPlugins={[remarkGfm]}
+              components={{
+                // Disable image rendering
+                img: () => null,
+                // Disable image references
+                image: () => null,
+              }}
+            >
               {description}
             </ReactMarkdown>
           ) : (

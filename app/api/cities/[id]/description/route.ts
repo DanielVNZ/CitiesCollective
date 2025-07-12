@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from 'app/auth';
 import { getUser, updateCityDescription, getCityById } from 'app/db';
 
+// Function to strip image markdown from text
+function stripImageMarkdown(text: string): string {
+  // Remove image markdown syntax: ![alt text](url)
+  return text.replace(/!\[([^\]]*)\]\([^)]*\)/g, '');
+}
+
 export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -32,8 +38,11 @@ export async function PUT(
       return NextResponse.json({ error: 'Description must be a string' }, { status: 400 });
     }
 
+    // Strip image markdown from description
+    const cleanDescription = stripImageMarkdown(description);
+
     // Update the city description
-    const updatedCity = await updateCityDescription(cityId, user.id, description);
+    const updatedCity = await updateCityDescription(cityId, user.id, cleanDescription);
     
     if (!updatedCity) {
       return NextResponse.json({ error: 'City not found or unauthorized' }, { status: 404 });
