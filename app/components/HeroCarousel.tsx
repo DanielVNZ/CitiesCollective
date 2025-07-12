@@ -32,23 +32,30 @@ export function HeroCarousel({ topCities }: HeroCarouselProps) {
       >
         {topCities.map((city, index) => {
           const primaryImage = city.images?.find((img: { isPrimary: boolean }) => img.isPrimary) || city.images?.[0];
+          const imagePath = primaryImage?.mediumPath;
+          const isPlaceholder = !imagePath || imagePath.includes('placeholder-image.png');
           
           return (
             <div key={city.id} className="relative h-[500px] sm:h-[600px] w-full">
-              <Image
-                src={primaryImage?.mediumPath || '/placeholder-image.png'}
-                alt={city.cityName || 'City image'}
-                width={1200}
-                height={600}
-                className="w-full h-full object-cover brightness-50"
-                priority
-              />
-              
+              {isPlaceholder ? (
+                <div className="w-full h-full flex flex-col items-center justify-center bg-gray-900/80 text-white text-2xl sm:text-3xl font-bold select-none" style={{height: '100%', minHeight: 500}}>
+                  <span className="text-6xl mb-4">🏙️</span>
+                  <span>This city is so mysterious, they didn&apos;t even upload a picture!</span>
+                </div>
+              ) : (
+                <Image
+                  src={imagePath}
+                  alt={city.cityName || 'City image'}
+                  width={1200}
+                  height={600}
+                  className="w-full h-full object-cover brightness-50"
+                  priority
+                />
+              )}
               {/* Ranking Badge */}
               <div className="absolute top-4 left-4 bg-gradient-to-r from-purple-600 to-blue-500 text-white rounded-full w-12 h-12 flex items-center justify-center font-bold text-lg shadow-lg border-2 border-white">
                 #{index + 1}
               </div>
-              
               <div className="absolute bottom-0 left-0 right-0 flex items-center justify-center text-center px-4 pb-8">
                 <span className="text-2xl sm:text-3xl font-bold text-white mr-4">
                   {city.cityName} by {city.user?.username || 'Anonymous'}

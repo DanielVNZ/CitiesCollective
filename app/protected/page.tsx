@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { auth } from 'app/auth';
 import { getUser, getCitiesByUser } from 'app/db';
 import Link from 'next/link';

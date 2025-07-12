@@ -29,6 +29,8 @@ const formatDate = (date: string | Date) => {
 
 export function CityCard({ city, ranking }: { city: any; ranking?: number }) {
   const primaryImage = city.images?.find((img: any) => img.isPrimary) || city.images?.[0];
+  const imagePath = primaryImage?.mediumPath;
+  const isPlaceholder = !imagePath || imagePath.includes('placeholder-image.png');
   const username = city.user?.username;
   const usernameTextColor = getUsernameTextColor(username);
   const usernameAvatarColor = getUsernameAvatarColor(username);
@@ -41,17 +43,23 @@ export function CityCard({ city, ranking }: { city: any; ranking?: number }) {
           #{ranking}
         </div>
       )}
-      
       <div className="relative">
         <Link href={`/city/${city.id}`} className="block">
           <div className="relative w-full h-48">
-            <Image
-              src={primaryImage?.mediumPath || '/placeholder-image.png'}
-              alt={`Image of ${city.cityName}`}
-              fill
-              style={{ objectFit: 'cover' }}
-              className="group-hover:scale-105 transition-transform duration-300"
-            />
+            {isPlaceholder ? (
+              <div className="w-full h-full flex flex-col items-center justify-center bg-gray-900/80 text-white select-none" style={{height: '100%'}}>
+                <span className="text-4xl mb-2">🏙️</span>
+                <span className="text-sm text-center">This city is so mysterious,<br/>no pictures to see here!</span>
+              </div>
+            ) : (
+              <Image
+                src={imagePath}
+                alt={`Image of ${city.cityName}`}
+                fill
+                style={{ objectFit: 'cover' }}
+                className="group-hover:scale-105 transition-transform duration-300"
+              />
+            )}
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
           </div>
         </Link>
