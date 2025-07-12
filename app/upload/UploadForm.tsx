@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import axios from 'axios';
 
 interface UploadedCity {
   id: number;
@@ -26,12 +27,15 @@ export function UploadForm() {
   const [copySuccess, setCopySuccess] = useState(false);
   const [downloadable, setDownloadable] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [imageUploadProgress, setImageUploadProgress] = useState(0);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
     setLoading(true);
     setMetadata(null);
+    setUploadProgress(0);
     const form = e.currentTarget;
     const formData = new FormData(form);
     const file = formData.get('file') as File;
@@ -42,11 +46,8 @@ export function UploadForm() {
       return;
     }
     
-    console.log('Starting upload...', file.name, file.size, 'bytes');
-    
     try {
       // Step 1: Get presigned URL
-      console.log('Getting presigned URL...');
       const presignedResponse = await fetch('/api/upload/presigned-url', {
         method: 'POST',
         headers: {
@@ -58,30 +59,32 @@ export function UploadForm() {
           fileType: file.type,
         }),
       });
-      
       if (!presignedResponse.ok) {
         const errorData = await presignedResponse.json();
         throw new Error(errorData.error || 'Failed to get upload URL');
       }
-      
       const { uploadUrl, key, fileName } = await presignedResponse.json();
-      console.log('Got presigned URL, uploading to R2...');
-      
-      // Step 2: Upload file directly to R2
-      const uploadResponse = await fetch(uploadUrl, {
-        method: 'PUT',
-        body: file,
-        headers: {
-          'Content-Type': file.type,
-        },
+      // Step 2: Upload file directly to R2 with progress
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('PUT', uploadUrl);
+        xhr.setRequestHeader('Content-Type', file.type);
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            setUploadProgress(Math.round((event.loaded / event.total) * 100));
+          }
+        };
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            setUploadProgress(100);
+            resolve();
+          } else {
+            reject(new Error(`Upload failed: ${xhr.status} ${xhr.statusText}`));
+          }
+        };
+        xhr.onerror = () => reject(new Error('Upload failed'));
+        xhr.send(file);
       });
-      
-      if (!uploadResponse.ok) {
-        throw new Error(`Upload failed: ${uploadResponse.status} ${uploadResponse.statusText}`);
-      }
-      
-      console.log('File uploaded successfully, processing metadata...');
-      
       // Step 3: Process metadata
       const metadataResponse = await fetch('/api/upload/process-metadata', {
         method: 'POST',
@@ -94,59 +97,60 @@ export function UploadForm() {
           downloadable: downloadable,
         }),
       });
-      
       if (!metadataResponse.ok) {
         const errorData = await metadataResponse.json();
         throw new Error(errorData.error || 'Failed to process metadata');
       }
-      
       const data = await metadataResponse.json();
-      console.log('Metadata processed successfully:', data);
       setMetadata(data.city);
-      
       // If images are selected, upload them automatically
       if (images.length > 0) {
         await uploadImages(data.city.id);
       }
-      
     } catch (error) {
-      console.error('Upload error:', error);
       setError(error instanceof Error ? error.message : 'Upload failed');
     } finally {
       setLoading(false);
+      setUploadProgress(0);
     }
   }
 
   async function uploadImages(cityId: number) {
     if (images.length === 0) return;
-    
     setImageLoading(true);
     setImageError(null);
     setImageSuccess(false);
-    
+    setImageUploadProgress(0);
     try {
       const formData = new FormData();
       images.forEach((image) => {
         formData.append('images', image);
       });
-      
-      const response = await fetch(`/api/cities/${cityId}/images`, {
-        method: 'POST',
-        body: formData,
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `/api/cities/${cityId}/images`);
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            setImageUploadProgress(Math.round((event.loaded / event.total) * 100));
+          }
+        };
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            setImageUploadProgress(100);
+            resolve();
+          } else {
+            reject(new Error(`Upload failed: ${xhr.status} ${xhr.statusText}`));
+          }
+        };
+        xhr.onerror = () => reject(new Error('Upload failed'));
+        xhr.send(formData);
       });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to upload images');
-      }
-      
-      const result = await response.json();
       setImageSuccess(true);
-      console.log('Images uploaded successfully:', result);
     } catch (error) {
       setImageError(error instanceof Error ? error.message : 'Failed to upload images');
     } finally {
       setImageLoading(false);
+      setImageUploadProgress(0);
     }
   }
 
@@ -284,6 +288,14 @@ export function UploadForm() {
                 When enabled, other users can download your .cok save file. You can change this later in your dashboard.
               </p>
               
+              {uploadProgress > 0 && loading && (
+                <div className="w-full bg-gray-200 rounded h-4 mt-2">
+                  <div
+                    className="bg-blue-500 h-4 rounded"
+                    style={{ width: `${uploadProgress}%` }}
+                  />
+                </div>
+              )}
               <button 
                 type="submit" 
                 className="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" 
@@ -379,7 +391,7 @@ export function UploadForm() {
             {/* Image Upload Status */}
             {imageLoading && (
               <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
-                <p className="text-blue-700 dark:text-blue-400 text-sm">Uploading images...</p>
+                <p className="text-blue-700 dark:text-blue-400 text-sm">Uploading images... (you can leave this page now)</p>
               </div>
             )}
             {imageError && (
@@ -390,6 +402,14 @@ export function UploadForm() {
             {imageSuccess && (
               <div className="mt-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md">
                 <p className="text-green-700 dark:text-green-400 text-sm">Images uploaded successfully!</p>
+              </div>
+            )}
+            {imageUploadProgress > 0 && imageLoading && (
+              <div className="w-full bg-gray-200 rounded h-4 mt-2">
+                <div
+                  className="bg-blue-500 h-4 rounded"
+                  style={{ width: `${imageUploadProgress}%` }}
+                />
               </div>
             )}
           </div>
