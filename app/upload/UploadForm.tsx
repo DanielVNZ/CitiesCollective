@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 
 interface UploadedCity {
   id: number;
@@ -352,10 +353,13 @@ export function UploadForm() {
                 <div className="grid grid-cols-2 gap-2">
                   {images.map((image, index) => (
                     <div key={index} className="relative group">
-                      <img
+                      <Image
                         src={URL.createObjectURL(image)}
                         alt={`Preview ${index + 1}`}
+                        width={200}
+                        height={96}
                         className="w-full h-24 object-cover rounded-md"
+                        style={{ objectFit: 'cover' }}
                       />
                       <button
                         onClick={() => removeImage(index)}

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 
 interface User {
   id: number;
@@ -193,9 +194,11 @@ export function UserCityManagement() {
                     <div className="flex-1">
                       <div className="flex items-center gap-4">
                         {city.primaryImageThumbnail && (
-                          <img
+                          <Image
                             src={city.primaryImageThumbnail}
                             alt={city.cityName || 'City'}
+                            width={64}
+                            height={64}
                             className="w-16 h-16 object-cover rounded-lg"
                           />
                         )}

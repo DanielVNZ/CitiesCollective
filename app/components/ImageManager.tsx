@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 
 interface CityImage {
   id: number;
@@ -35,14 +36,6 @@ export function ImageManager({ cityId, images, onImagesChange }: ImageManagerPro
   useEffect(() => {
     setImageList(images);
   }, [images]);
-
-  // Only update from props if the images array length changes (new uploads)
-  // This prevents the component from reverting to the original order
-  useEffect(() => {
-    if (images.length !== imageList.length) {
-      setImageList(images);
-    }
-  }, [images.length, imageList.length]);
 
   const handleDragStart = (e: React.DragEvent, index: number) => {
     setDraggedIndex(index);
@@ -252,10 +245,12 @@ export function ImageManager({ cityId, images, onImagesChange }: ImageManagerPro
               >
                 {/* Image */}
                 <div className="aspect-square relative">
-                  <img
+                  <Image
                     src={image.mediumPath || image.thumbnailPath || ''}
                     alt={image.originalName || 'City image'}
-                    className="w-full h-full object-cover"
+                    fill
+                    style={{ objectFit: 'cover' }}
+                    className="w-full h-full"
                   />
                   
                   {/* Primary Badge */}

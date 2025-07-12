@@ -79,9 +79,11 @@ export function ImageGallery({ images }: ImageGalleryProps) {
             className="relative aspect-square cursor-pointer group overflow-hidden rounded-lg"
             onClick={() => openLightbox(image, index)}
           >
-            <img
+            <Image
               src={image.mediumPath!}
               alt={image.originalName!}
+              width={400}
+              height={400}
               className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
             />
             
@@ -154,9 +156,11 @@ export function ImageGallery({ images }: ImageGalleryProps) {
             )}
 
             {/* Image */}
-            <img
+            <Image
               src={selectedImage.largePath}
               alt={selectedImage.originalName}
+              width={1200}
+              height={800}
               className="max-w-full max-h-full object-contain"
               onClick={(e) => e.stopPropagation()}
             />

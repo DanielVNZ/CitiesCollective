@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useTheme } from 'next-themes';
 import { useEffect, useState } from 'react';
 
@@ -35,7 +36,7 @@ export function Logo({ className = '', height = 40, showText = true }: LogoProps
 
   return (
     <Link href="/" className={`flex items-center ${className}`}>
-      <img 
+      <Image 
         src={logoSrc} 
         alt="Cities Collective" 
         height={height}

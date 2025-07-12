@@ -2061,7 +2061,7 @@ function CanvasOsmRenderer({
     };
     
     initializeMap();
-  }, [osmData, map, getLandUseColor, getBuildingColor, getRoadColor, getRoadWidth, onRenderProgress, onRenderStart, onRenderComplete]);
+  }, [osmData, map, getLandUseColor, getBuildingColor, getRoadColor, getRoadWidth, onRenderProgress, onRenderStart, onRenderComplete, canvasLayerRef]);
   
   return null; // This component doesn't render anything directly
 }

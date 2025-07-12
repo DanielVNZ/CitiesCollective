@@ -1,4 +1,5 @@
 import { getUserSocialLinks } from 'app/db';
+import Image from 'next/image';
 
 interface SocialLink {
   id: number;
@@ -84,10 +85,11 @@ const SocialIcons = {
     </svg>
   ),
   paradoxmods: (
-    <img 
+    <Image 
       src="/Icons/paradox-interactive.svg" 
       alt="Paradox Interactive" 
-      className="w-5 h-5" 
+      width={20}
+      height={20}
     />
   ),
 };

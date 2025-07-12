@@ -58,6 +58,7 @@ export function CityCard({ city, ranking }: { city: any; ranking?: number }) {
                 fill
                 style={{ objectFit: 'cover' }}
                 className="group-hover:scale-105 transition-transform duration-300"
+                priority
               />
             )}
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
