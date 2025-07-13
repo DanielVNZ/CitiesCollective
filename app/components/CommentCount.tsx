@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 interface CommentCountProps {
   cityId: number;
@@ -32,7 +32,7 @@ export function CommentCount({ cityId, initialCount = 0 }: CommentCountProps) {
   }, [cityId]);
 
   // Function to refresh comment count (can be called from parent components)
-  const refreshCount = async () => {
+  const refreshCount = useCallback(async () => {
     try {
       const response = await fetch(`/api/cities/${cityId}/comment-count`);
       if (response.ok) {
@@ -42,7 +42,7 @@ export function CommentCount({ cityId, initialCount = 0 }: CommentCountProps) {
     } catch (error) {
       console.error('Error refreshing comment count:', error);
     }
-  };
+  }, [cityId]);
 
   // Expose refresh function to parent components via ref
   useEffect(() => {
