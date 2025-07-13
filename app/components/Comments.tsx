@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { getUsernameTextColor, getUsernameAvatarColor } from '../utils/userColors';
+import { refreshCommentCount } from './CommentCount';
 
 interface Comment {
   id: number;
@@ -83,6 +84,9 @@ export function Comments({ cityId }: CommentsProps) {
         setNewComment('');
         fetchComments(); // Refresh comments
         
+        // Refresh comment count on city cards
+        refreshCommentCount(cityId);
+        
         // Clear moderation message after 5 seconds
         if (data.moderationInfo) {
           setTimeout(() => {
@@ -117,6 +121,9 @@ export function Comments({ cityId }: CommentsProps) {
 
       if (response.ok) {
         fetchComments(); // Refresh comments
+        
+        // Refresh comment count on city cards
+        refreshCommentCount(cityId);
       }
     } catch (error) {
       console.error('Error deleting comment:', error);

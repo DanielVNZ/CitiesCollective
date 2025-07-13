@@ -4,6 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { LikeButton } from './LikeButton';
 import { FavoriteButton } from './FavoriteButton';
+import { CommentCount } from './CommentCount';
 import { getUsernameTextColor, getUsernameAvatarColor, getUsernameRingColor } from '../utils/userColors';
 
 // Helper function to format large numbers
@@ -128,7 +129,7 @@ export function CityCard({ city, ranking }: { city: any; ranking?: number }) {
               <span>{formatDate(city.uploadedAt)}</span>
             </div>
             <div className="flex items-center gap-1">
-              <span>{city.commentCount} {city.commentCount === 1 ? 'comment' : 'comments'}</span>
+              <CommentCount cityId={city.id} initialCount={city.commentCount} />
             </div>
           </div>
           <Link href={`/city/${city.id}`} className="block w-full text-center bg-blue-600 text-white font-semibold py-2 rounded-lg hover:bg-blue-700 transition-colors">

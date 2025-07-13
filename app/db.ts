@@ -68,6 +68,7 @@ export const cityTable = pgTable('City', {
   simulationDate: json('simulationDate'),
   contentPrerequisites: text('contentPrerequisites').array(),
   modsEnabled: text('modsEnabled').array(),
+  modsNotes: text('modsNotes'), // JSON string containing mod notes
   fileName: varchar('fileName', { length: 255 }),
   filePath: varchar('filePath', { length: 500 }),
   downloadable: boolean('downloadable').default(true),
@@ -181,6 +182,16 @@ const userSocialLinksTable = pgTable('userSocialLinks', {
   url: varchar('url', { length: 500 }).notNull(),
   createdAt: timestamp('createdAt').defaultNow(),
   updatedAt: timestamp('updatedAt').defaultNow(),
+});
+
+// Mod compatibility cache table
+const modCompatibilityTable = pgTable('modCompatibility', {
+  id: serial('id').primaryKey(),
+  modId: varchar('modId', { length: 50 }).unique().notNull(), // Steam Workshop ID
+  name: varchar('name', { length: 255 }).notNull(),
+  notes: json('notes').$type<string[]>(), // Array of compatibility notes
+  lastUpdated: timestamp('lastUpdated').defaultNow(),
+  createdAt: timestamp('createdAt').defaultNow(),
 });
 
 // OSM Map Cache table removed - now using client-side caching with IndexedDB
@@ -628,9 +639,10 @@ async function ensureCityTableExists() {
         "unlimitedMoney" BOOLEAN,
         "unlockMapTiles" BOOLEAN,
         "simulationDate" JSONB,
-        "contentPrerequisites" TEXT[],
-        "modsEnabled" TEXT[],
-        "fileName" VARCHAR(255),
+              "contentPrerequisites" TEXT[],
+      "modsEnabled" TEXT[],
+      "modsNotes" TEXT,
+      "fileName" VARCHAR(255),
         "filePath" VARCHAR(500),
         "downloadable" BOOLEAN DEFAULT TRUE,
         description TEXT,
@@ -701,6 +713,22 @@ async function ensureCityTableExists() {
       await client`
         ALTER TABLE "City" ADD COLUMN "osmMapPath" VARCHAR(500);`;
       console.log('osmMapPath column added successfully');
+    }
+
+    // Check if modsNotes column exists, if not add it
+    const modsNotesColumnExists = await client`
+      SELECT EXISTS (
+        SELECT FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = 'City'
+        AND column_name = 'modsNotes'
+      );`;
+    
+    if (!modsNotesColumnExists[0].exists) {
+      console.log('Adding modsNotes column to existing City table...');
+      await client`
+        ALTER TABLE "City" ADD COLUMN "modsNotes" TEXT;`;
+      console.log('modsNotes column added successfully');
     }
   }
 
@@ -984,6 +1012,7 @@ export async function getCityById(id: number) {
     simulationDate: cityTable.simulationDate,
     contentPrerequisites: cityTable.contentPrerequisites,
     modsEnabled: cityTable.modsEnabled,
+    modsNotes: cityTable.modsNotes,
     fileName: cityTable.fileName,
     filePath: cityTable.filePath,
     downloadable: cityTable.downloadable,
@@ -2584,6 +2613,154 @@ export async function deleteUserSocialLink(userId: number, platform: string) {
     .returning();
   
   return result[0] || null;
+}
+
+// Mod compatibility functions
+async function ensureModCompatibilityTableExists() {
+  if (tableInitCache.has('modCompatibility')) {
+    return modCompatibilityTable;
+  }
+  
+  try {
+    const result = await client`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'modCompatibility'
+      );`;
+
+    if (!result[0].exists) {
+      await client`
+        CREATE TABLE "modCompatibility" (
+          id SERIAL PRIMARY KEY,
+          "modId" VARCHAR(50) UNIQUE NOT NULL,
+          name VARCHAR(255) NOT NULL,
+          notes JSONB,
+          "lastUpdated" TIMESTAMP DEFAULT NOW(),
+          "createdAt" TIMESTAMP DEFAULT NOW()
+        );`;
+    }
+  } catch (error: any) {
+    // If table already exists, that's fine - just continue
+    if (error.code !== '42P07') { // 42P07 is "relation already exists"
+      throw error;
+    }
+  }
+  
+  tableInitCache.add('modCompatibility');
+  return modCompatibilityTable;
+}
+
+export async function upsertModCompatibility(modId: string, name: string, notes?: string[]) {
+  await ensureModCompatibilityTableExists();
+  
+  const result = await db.insert(modCompatibilityTable)
+    .values({
+      modId,
+      name,
+      notes: notes || [],
+      lastUpdated: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: modCompatibilityTable.modId,
+      set: {
+        name: name,
+        notes: notes || [],
+        lastUpdated: new Date(),
+      },
+    })
+    .returning();
+  
+  return result[0];
+}
+
+export async function getModCompatibility(modId: string) {
+  await ensureModCompatibilityTableExists();
+  
+  const result = await db.select()
+    .from(modCompatibilityTable)
+    .where(eq(modCompatibilityTable.modId, modId))
+    .limit(1);
+  
+  return result[0] || null;
+}
+
+export async function getAllModCompatibility() {
+  await ensureModCompatibilityTableExists();
+  
+  return await db.select()
+    .from(modCompatibilityTable)
+    .orderBy(modCompatibilityTable.lastUpdated);
+}
+
+export async function updateModCompatibilityNotes(modId: string, notes: string[]) {
+  await ensureModCompatibilityTableExists();
+  
+  const result = await db.update(modCompatibilityTable)
+    .set({
+      notes: notes,
+      lastUpdated: new Date(),
+    })
+    .where(eq(modCompatibilityTable.modId, modId))
+    .returning();
+  
+  return result[0];
+}
+
+// Function to update all cities that use a specific mod with new compatibility notes
+export async function updateCitiesWithModNotes(modId: string, newNotes: string[]) {
+  await ensureCityTableExists();
+  
+  // Find all cities that use this mod
+  const cities = await db.select({
+    id: cityTable.id,
+    modsEnabled: cityTable.modsEnabled,
+    modsNotes: cityTable.modsNotes,
+  })
+    .from(cityTable)
+    .where(
+      sql`${cityTable.modsEnabled} @> ARRAY[${modId}]::text[]`
+    );
+  
+  // Update each city's mod notes
+  const updatePromises = cities.map(async (city) => {
+    if (!city.modsEnabled || !city.modsEnabled.some(mod => mod.includes(modId))) {
+      return;
+    }
+    
+    // Parse existing notes
+    let existingNotes: { [key: string]: string[] } = {};
+    if (city.modsNotes) {
+      try {
+        existingNotes = JSON.parse(city.modsNotes);
+      } catch (error) {
+        console.error('Failed to parse existing mod notes for city', city.id, error);
+      }
+    }
+    
+    // Update notes for this mod
+    if (newNotes.length > 0) {
+      existingNotes[modId] = newNotes;
+    } else {
+      delete existingNotes[modId];
+    }
+    
+    // Update city with new notes
+    const updatedNotesJson = Object.keys(existingNotes).length > 0 
+      ? JSON.stringify(existingNotes) 
+      : null;
+    
+    await db.update(cityTable)
+      .set({
+        modsNotes: updatedNotesJson,
+        updatedAt: new Date(),
+      })
+      .where(eq(cityTable.id, city.id));
+  });
+  
+  await Promise.all(updatePromises);
+  
+  return cities.length;
 }
 
 // OSM Map Cache Functions removed - now using client-side caching with IndexedDB

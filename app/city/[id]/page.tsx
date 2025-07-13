@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { getCityById, getUserById, getCityImages, getUser } from 'app/db';
+import { getCityById, getUserById, getCityImages, getUser, getModCompatibility } from 'app/db';
 import { ImageGallery } from './ImageGallery';
 import { ImageManager } from 'app/components/ImageManager';
 import { LikeButton } from 'app/components/LikeButton';
@@ -39,6 +39,9 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
     notFound();
   }
 
+  // No need to parse modsEnabled - it should already be an array from the database
+  // Just use city.modsEnabled directly like the old working code
+
   // Get the user who uploaded this city
   const user = city.userId ? await getUserById(city.userId) : null;
 
@@ -68,6 +71,77 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
     if (!date) return 'Unknown';
     return new Date(date).toLocaleDateString('en-GB');
   };
+
+  // Helper function to parse mod string and extract ID if available
+  const parseModString = (modString: string) => {
+    // Try to extract mod ID from the string (format: "ModName, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null")
+    // For Skyve mods, we might have stored them with a special format that includes the ID
+    const match = modString.match(/^(\d+):\s*(.+?)(?:\s+(\d+\.\d+\.\d+\.\d+))?$/);
+    if (match) {
+      // This is a Skyve mod with ID
+      return {
+        id: match[1],
+        name: match[2].trim(),
+        version: match[3] || undefined,
+        isSkyveMod: true
+      };
+    }
+    
+    // Regular mod string - extract name and version
+    const nameMatch = modString.match(/^(.+?)(?:,\s*Version=([^,]+))?/);
+    if (nameMatch) {
+      return {
+        id: null,
+        name: nameMatch[1].trim(),
+        version: nameMatch[2] || undefined,
+        isSkyveMod: false
+      };
+    }
+    
+    // Fallback
+    return {
+      id: null,
+      name: modString,
+      version: undefined,
+      isSkyveMod: false
+    };
+  };
+
+  // Get mod compatibility data from cache, with fallback to city-specific notes
+  let modNotes: { [key: string]: string[] } = {};
+  
+  // First, try to get cached compatibility data
+  if (city.modsEnabled && city.modsEnabled.length > 0) {
+    // Get all mod IDs from the city
+    const modIds = city.modsEnabled
+      .map((mod: string) => parseModString(mod))
+      .filter((parsed: any) => parsed.isSkyveMod && parsed.id)
+      .map((parsed: any) => parsed.id!);
+    
+    // Fetch compatibility data for all mods
+    const modCompatibilityPromises = modIds.map(async (modId: string) => {
+      const compatibility = await getModCompatibility(modId);
+      return { modId, compatibility };
+    });
+    
+    const modCompatibilityResults = await Promise.all(modCompatibilityPromises);
+    
+    // Build notes object from cached data
+    modCompatibilityResults.forEach(({ modId, compatibility }: any) => {
+      if (compatibility && compatibility.notes && compatibility.notes.length > 0) {
+        modNotes[modId] = compatibility.notes;
+      }
+    });
+  }
+  
+  // Fallback to city-specific notes if cached data isn't available
+  if (Object.keys(modNotes).length === 0 && city.modsNotes) {
+    try {
+      modNotes = JSON.parse(city.modsNotes);
+    } catch (error) {
+      console.error('Failed to parse city-specific mod notes:', error);
+    }
+  }
 
   const simulationDate = city.simulationDate as any;
 
@@ -284,14 +358,51 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
             {city.modsEnabled && city.modsEnabled.length > 0 ? (
               <div className="max-h-96 overflow-y-auto">
                 <div className="space-y-2">
-                  {city.modsEnabled.map((mod: string, index: number) => (
-                    <div
-                      key={index}
-                      className="p-3 bg-gray-50 dark:bg-gray-700 rounded text-sm text-gray-700 dark:text-gray-300"
-                    >
-                      {mod.replace(', Version=', ' v').replace(', Culture=neutral, PublicKeyToken=null', '')}
-                    </div>
-                  ))}
+                  {city.modsEnabled.map((mod: string, index: number) => {
+                    const parsedMod = parseModString(mod);
+                    return (
+                      <div
+                        key={index}
+                        className="p-3 bg-gray-50 dark:bg-gray-700 rounded text-sm text-gray-700 dark:text-gray-300"
+                      >
+                        {parsedMod.isSkyveMod && parsedMod.id ? (
+                          <div>
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1">
+                                <a
+                                  href={`https://mods.paradoxplaza.com/mods/${parsedMod.id}/Windows`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
+                                >
+                                  {parsedMod.name}
+                                </a>
+                                {parsedMod.version && (
+                                  <span className="text-gray-500 dark:text-gray-400 ml-2">v{parsedMod.version}</span>
+                                )}
+                              </div>
+                              <span className="text-gray-400 dark:text-gray-500 text-xs">#{parsedMod.id}</span>
+                            </div>
+                            {/* Show mod notes if available */}
+                            {modNotes[parsedMod.id] && (
+                              <div className="mt-2 pl-4 border-l-2 border-orange-300 dark:border-orange-600">
+                                {modNotes[parsedMod.id].map((note, noteIndex) => (
+                                  <div key={noteIndex} className="text-xs text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-900/20 p-2 rounded mb-1">
+                                    <span className="font-medium">⚠️ Note:</span> {note}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div>
+                            {/* For non-Skyve mods, use the simple format from the old working code */}
+                            {mod.replace(', Version=', ' v').replace(', Culture=neutral, PublicKeyToken=null', '')}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             ) : (
@@ -302,6 +413,18 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
                 </p>
                 <p className="text-sm text-gray-500 dark:text-gray-500 mt-2">
                   This save file will work without any additional mods or dependencies.
+                </p>
+              </div>
+            )}
+            
+            {/* Skyve logs message */}
+            {city.modsEnabled && city.modsEnabled.length > 0 && city.modsEnabled.some((mod: string) => {
+              const parsedMod = parseModString(mod);
+              return parsedMod.isSkyveMod && parsedMod.id;
+            }) && (
+              <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-700">
+                <p className="text-sm text-blue-700 dark:text-blue-300">
+                  Skyve logs are produced from Skyve. Compatibility data is cached and synchronized across all cities - notes are automatically updated when newer compatibility information is available.
                 </p>
               </div>
             )}

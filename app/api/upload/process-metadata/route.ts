@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from 'app/auth';
-import { cityTable, getUser, db, ensureCityTableExists, generateUniqueId, getCityCountByUser, notifyFollowersOfNewCity } from 'app/db';
+import { cityTable, getUser, db, ensureCityTableExists, generateUniqueId, getCityCountByUser, notifyFollowersOfNewCity, upsertModCompatibility, getModCompatibility, updateCitiesWithModNotes } from 'app/db';
 import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import AdmZip from 'adm-zip';
 
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    const { key, fileName, downloadable = true } = await request.json();
+    const { key, fileName, downloadable = true, skyveMods = null } = await request.json();
 
     if (!key || !fileName) {
       return NextResponse.json({ error: 'Missing key or fileName' }, { status: 400 });
@@ -119,6 +119,52 @@ export async function POST(request: NextRequest) {
     // Generate unique city ID
     const cityId = await generateUniqueId(cityTable, cityTable.id);
 
+    // Prepare mods data - use Skyve mods if provided, otherwise use metadata mods
+    let modsEnabled = metadata.modsEnabled;
+    let modsNotes = null;
+    
+    if (skyveMods && Array.isArray(skyveMods)) {
+      // Convert Skyve mods to a special format that preserves the mod ID
+      modsEnabled = skyveMods.map(mod => `${mod.id}: ${mod.name}`);
+      
+      // Process each mod for caching and note extraction
+      const notesData: { [key: string]: string[] } = {};
+      const modUpdatePromises = skyveMods.map(async (mod) => {
+        // Check if mod exists in cache
+        const cachedMod = await getModCompatibility(mod.id);
+        
+        // Check if notes have changed
+        const newNotes = mod.notes || [];
+        const cachedNotes = cachedMod?.notes || [];
+        
+        // Compare notes arrays
+        const notesChanged = JSON.stringify(newNotes) !== JSON.stringify(cachedNotes);
+        
+        if (!cachedMod) {
+          // New mod - add to cache
+          await upsertModCompatibility(mod.id, mod.name, newNotes);
+        } else if (notesChanged) {
+          // Existing mod with changed notes - update cache and sync to other cities
+          await upsertModCompatibility(mod.id, mod.name, newNotes);
+          
+          // Update all cities that use this mod with the new notes
+          await updateCitiesWithModNotes(mod.id, newNotes);
+        }
+        
+        // Store notes for this city
+        if (newNotes.length > 0) {
+          notesData[mod.id] = newNotes;
+        }
+      });
+      
+      // Wait for all mod updates to complete
+      await Promise.all(modUpdatePromises);
+      
+      if (Object.keys(notesData).length > 0) {
+        modsNotes = JSON.stringify(notesData);
+      }
+    }
+
     // Prepare city data for insertion
     const cityData = {
       id: cityId,
@@ -141,7 +187,8 @@ export async function POST(request: NextRequest) {
       unlockMapTiles: metadata.options?.unlockMapTiles,
       simulationDate: metadata.simulationDate,
       contentPrerequisites: metadata.contentPrerequisites,
-      modsEnabled: metadata.modsEnabled,
+      modsEnabled: modsEnabled,
+      modsNotes: modsNotes,
       fileName: fileName,
       filePath: key, // Store the R2 key
       downloadable: downloadable,
