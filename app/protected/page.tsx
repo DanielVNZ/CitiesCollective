@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { CityManagementCard } from './CityManagementCard';
 import { UserProfileSection } from 'app/components/UserProfileSection';
 import ProfileEditor from 'app/components/ProfileEditor';
+import HoFCreatorIdEditor from 'app/components/HoFCreatorIdEditor';
 import { SignOutButton } from 'app/components/SignOutButton';
 import { Header } from 'app/components/Header';
 
@@ -52,6 +53,13 @@ export default async function ProtectedPage() {
         {/* Profile Settings */}
         <div className="mb-8">
           <ProfileEditor user={user} />
+        </div>
+
+        {/* HoF Creator ID Settings */}
+        <div className="mb-8">
+          <HoFCreatorIdEditor 
+            currentHoFCreatorId={user.hofCreatorId} 
+          />
         </div>
         {/* Cities Management */}
         <div className="mb-8">

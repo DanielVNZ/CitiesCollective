@@ -299,7 +299,7 @@ export async function linkGithubAccount(userId: number, githubId: string, name?:
   return result[0];
 }
 
-export async function updateUser(userId: number, data: { username?: string; isAdmin?: boolean; isContentCreator?: boolean }) {
+export async function updateUser(userId: number, data: { username?: string; isAdmin?: boolean; isContentCreator?: boolean; hofCreatorId?: string }) {
   const users = await ensureTableExists();
   
   if (data.username) {
@@ -334,6 +334,17 @@ export async function isUserAdmin(email: string): Promise<boolean> {
     .limit(1);
   
   return user[0]?.isAdmin || false;
+}
+
+export async function isUserContentCreator(email: string): Promise<boolean> {
+  const users = await ensureTableExists();
+  
+  const user = await db.select({ isContentCreator: users.isContentCreator })
+    .from(users)
+    .where(eq(users.email, email))
+    .limit(1);
+  
+  return user[0]?.isContentCreator || false;
 }
 
 export async function getAllUsersWithStats() {
@@ -387,6 +398,7 @@ async function ensureTableExists() {
       discordUsername: varchar('discordUsername', { length: 50 }),
       isAdmin: boolean('isAdmin').default(false),
       isContentCreator: boolean('isContentCreator').default(false),
+      hofCreatorId: varchar('hofCreatorId', { length: 100 }),
     });
   }
   
@@ -580,6 +592,22 @@ async function ensureTableExists() {
         ALTER TABLE "User" ADD COLUMN "isContentCreator" BOOLEAN DEFAULT FALSE;`;
       console.log('isContentCreator column added successfully');
     }
+
+    // Check if hofCreatorId column exists, if not add it
+    const hofCreatorIdColumnExists = await client`
+      SELECT EXISTS (
+        SELECT FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = 'User'
+        AND column_name = 'hofCreatorId'
+      );`;
+    
+    if (!hofCreatorIdColumnExists[0].exists) {
+      console.log('Adding hofCreatorId column to existing User table...');
+      await client`
+        ALTER TABLE "User" ADD COLUMN "hofCreatorId" VARCHAR(100);`;
+      console.log('hofCreatorId column added successfully');
+    }
   }
 
   // Mark as initialized
@@ -598,6 +626,7 @@ async function ensureTableExists() {
     discordUsername: varchar('discordUsername', { length: 50 }),
     isAdmin: boolean('isAdmin').default(false),
     isContentCreator: boolean('isContentCreator').default(false),
+    hofCreatorId: varchar('hofCreatorId', { length: 100 }),
   });
 
   return table;
@@ -1034,6 +1063,7 @@ export async function getUserById(id: number) {
     avatar: users.avatar,
     isAdmin: users.isAdmin,
     isContentCreator: users.isContentCreator,
+    hofCreatorId: users.hofCreatorId,
   }).from(users).where(eq(users.id, id)).limit(1);
   return result[0] || null;
 }
