@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from 'app/auth';
 import { createCityImage, getCityImages } from 'app/db';
-import { uploadToR2, generateImageKeys } from 'app/utils/r2';
+import { processImageForR2 } from 'app/utils/r2ImageProcessing';
 
 export async function POST(
   request: NextRequest,
@@ -72,19 +72,13 @@ export async function POST(
         // Convert File to Buffer
         const imageBuffer = Buffer.from(await file.arrayBuffer());
         
-        // Generate unique keys for R2 storage
-        const imageKeys = generateImageKeys(file.name, user.id);
-        
-        // Upload to R2 (using same image for all sizes for now)
-        const [thumbnailResult, mediumResult, largeResult, originalResult] = await Promise.all([
-          uploadToR2(imageBuffer, imageKeys.thumbnail, file.type),
-          uploadToR2(imageBuffer, imageKeys.medium, file.type),
-          uploadToR2(imageBuffer, imageKeys.large, file.type),
-          uploadToR2(imageBuffer, imageKeys.original, file.type),
-        ]);
-
-        // Extract filename from key for database storage
-        const fileName = imageKeys.thumbnail.split('/').pop() || `${Date.now()}.webp`;
+        // Process image with Sharp for better quality
+        const processedImage = await processImageForR2({
+          buffer: imageBuffer,
+          originalname: file.name,
+          mimetype: file.type,
+          size: file.size,
+        } as Express.Multer.File, user.id);
 
         // Determine if this should be the primary image
         // First image uploaded to a city with no existing images becomes primary
@@ -93,16 +87,16 @@ export async function POST(
         // Save to database using existing function
         const imageData = {
           cityId,
-          fileName,
+          fileName: processedImage.fileName,
           originalName: file.name,
           fileSize: file.size,
           mimeType: file.type,
-          width: 800, // Default for now
-          height: 600, // Default for now
-          thumbnailPath: thumbnailResult.url,
-          mediumPath: mediumResult.url,
-          largePath: largeResult.url,
-          originalPath: originalResult.url,
+          width: processedImage.width,
+          height: processedImage.height,
+          thumbnailPath: processedImage.thumbnailUrl,
+          mediumPath: processedImage.mediumUrl,
+          largePath: processedImage.largeUrl,
+          originalPath: processedImage.originalUrl,
           isPrimary: shouldBePrimary,
         };
 

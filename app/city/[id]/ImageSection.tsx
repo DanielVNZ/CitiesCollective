@@ -36,16 +36,16 @@ export function ImageSection({ cityId, initialImages, isOwner }: ImageSectionPro
     <>
       {/* Image Gallery */}
       {images.length > 0 && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-8">
-          <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-4">Screenshots</h2>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 mb-6">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">Screenshots</h2>
           <ImageGallery images={images} />
         </div>
       )}
 
       {/* Image Management (for owners) */}
       {isOwner && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-8">
-          <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-4">Manage Images</h2>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 mb-6">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">Manage Images</h2>
           <ImageManager cityId={cityId} images={images} onImagesChange={handleImagesChange} />
         </div>
       )}

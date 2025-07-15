@@ -87,7 +87,7 @@ export function OsmMapManager({ cityId, initialOsmMapPath, isOwner }: OsmMapMana
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-8">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
           City Map
@@ -128,80 +128,15 @@ export function OsmMapManager({ cityId, initialOsmMapPath, isOwner }: OsmMapMana
       )}
 
       {osmMapPath ? (
-        <div className="space-y-4">
+        <div>
           {/* OSM Map Viewer */}
           <OsmMapViewer osmMapPath={osmMapPath} cityId={cityId} />
           
-          {/* Download Section */}
-          <div className="relative">
-            <div className="w-full p-6 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
-              <div className="flex items-center justify-center space-x-3">
-                <svg className="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-1.447-.894L15 4m0 13V4m-6 3l6-3" />
-                </svg>
-                <div>
-                  <p className="text-lg font-medium text-gray-900 dark:text-white">OSM Map File</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    {osmMapPath.split('/').pop() || 'osm-map.osm'}
-                  </p>
-                </div>
-              </div>
-              <div className="mt-4 flex justify-center">
-                <a
-                  href={osmMapPath}
-                  download
-                  className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  Download OSM File
-                </a>
-              </div>
-            </div>
-          </div>
           {isOwner && (
-            <p className="text-sm text-gray-500 dark:text-gray-400">
+            <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">
               Upload a new OSM file to replace the current one
             </p>
           )}
-          
-          {/* Special Thanks Section */}
-          <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-            <div className="flex items-center space-x-2 mb-2">
-              <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-              </svg>
-              <p className="text-sm text-blue-800 dark:text-blue-200">
-                Special thanks to{' '}
-                <a 
-                  href="https://github.com/fergusq" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="font-medium hover:underline"
-                >
-                  ferqusq
-                </a>
-                {' '}for the OSM export functionality
-              </p>
-            </div>
-            <div className="flex items-center space-x-2">
-              <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              <p className="text-sm text-blue-800 dark:text-blue-200">
-                <a 
-                  href="https://mods.paradoxplaza.com/mods/87422/Windows" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="font-medium hover:underline"
-                >
-                  OSM Export
-                </a>
-                {' '}- Use this mod to create your OSM
-              </p>
-            </div>
-          </div>
         </div>
       ) : (
         <div className="text-center py-8">

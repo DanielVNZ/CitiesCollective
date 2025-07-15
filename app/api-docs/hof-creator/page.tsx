@@ -54,8 +54,9 @@ export default function HoFCreatorApiDocs() {
                     Overview
                   </h2>
                   <p className="text-gray-600 dark:text-gray-300 mb-4">
-                    The HoF Creator API allows you to programmatically upload images to your cities on Cities Collective using API keys. 
-                    This API is designed for creators who want to automate their image upload process.
+                    The HoF Creator API allows you to programmatically upload images to your cities on Cities Collective using API keys and HoF Creator ID. 
+                    This API is designed for creators who want to automate their image upload process. The API requires both your API key and HoF Creator ID 
+                    to verify ownership of cities and ensure you can only upload images to cities you own.
                   </p>
                   
                   <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
@@ -63,7 +64,8 @@ export default function HoFCreatorApiDocs() {
                       Key Features
                     </h3>
                     <ul className="text-blue-700 dark:text-blue-300 space-y-1">
-                      <li>• API key-based authentication</li>
+                      <li>• API key + HoF Creator ID authentication</li>
+                      <li>• HoF Creator ID-based ownership verification</li>
                       <li>• Upload multiple images to your cities</li>
                       <li>• Retrieve your HoF Creator ID</li>
                       <li>• Get detailed city information</li>
@@ -79,6 +81,30 @@ export default function HoFCreatorApiDocs() {
                   <code className="bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded text-sm font-mono">
                     https://yourdomain.com/api/v1/hof-creator
                   </code>
+                </div>
+
+                <div>
+                  <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">
+                    HoF Creator ID & Ownership Verification
+                  </h3>
+                  <p className="text-gray-600 dark:text-gray-300 mb-4">
+                    The API requires both your API key and HoF Creator ID for authentication. Your HoF Creator ID must be provided in every request 
+                    and will be verified against the ID you set in your user profile. If no custom HoF Creator ID is set in your profile, 
+                    your user ID will be used as the default.
+                  </p>
+                  
+                  <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                    <h4 className="font-semibold text-blue-800 dark:text-blue-200 mb-2">
+                      Important Notes
+                    </h4>
+                    <ul className="text-blue-700 dark:text-blue-300 space-y-1">
+                      <li>• You can only upload images to cities you own</li>
+                      <li>• Your HoF Creator ID must be provided in every API request</li>
+                      <li>• Your HoF Creator ID must match the ID set in your user profile</li>
+                      <li>• Set your HoF Creator ID in your user profile for custom identification</li>
+                      <li>• If no custom HoF Creator ID is set, your user ID will be used</li>
+                    </ul>
+                  </div>
                 </div>
               </div>
             )}
@@ -96,15 +122,22 @@ export default function HoFCreatorApiDocs() {
 
                 <div>
                   <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">
-                    API Key Header
+                    Required Headers
                   </h3>
                   <p className="text-gray-600 dark:text-gray-300 mb-2">
-                    Include your API key in the request headers:
+                    Include both your API key and HoF Creator ID in the request headers:
                   </p>
-                  <div className="bg-gray-100 dark:bg-gray-700 rounded-lg p-4">
-                    <code className="text-sm font-mono">
-                      X-API-Key: cc_your_api_key_here
-                    </code>
+                  <div className="bg-gray-100 dark:bg-gray-700 rounded-lg p-4 space-y-2">
+                    <div>
+                      <code className="text-sm font-mono">
+                        X-API-Key: cc_your_api_key_here
+                      </code>
+                    </div>
+                    <div>
+                      <code className="text-sm font-mono">
+                        X-Hof-Creator-ID: your_hof_creator_id_here
+                      </code>
+                    </div>
                   </div>
                 </div>
 
@@ -113,7 +146,7 @@ export default function HoFCreatorApiDocs() {
                     Alternative Authorization Header
                   </h3>
                   <p className="text-gray-600 dark:text-gray-300 mb-2">
-                    You can also use the Authorization header:
+                    You can also use the Authorization header for the API key:
                   </p>
                   <div className="bg-gray-100 dark:bg-gray-700 rounded-lg p-4">
                     <code className="text-sm font-mono">
@@ -238,8 +271,14 @@ export default function HoFCreatorApiDocs() {
                     <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
                       Content-Type: multipart/form-data
                     </p>
+                    <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
+                      Required Headers: X-API-Key, X-Hof-Creator-ID
+                    </p>
                     <p className="text-sm text-gray-600 dark:text-gray-300">
                       Form field: images (multiple files allowed, max 15 per upload, 10MB per file)
+                    </p>
+                    <p className="text-sm text-gray-600 dark:text-gray-300">
+                      Optional: hofCreatorId in form data (alternative to header)
                     </p>
                   </div>
 
@@ -301,7 +340,8 @@ formData.append('images', imageFile2);
 const uploadResponse = await fetch('/api/v1/hof-creator/city/123/images', {
   method: 'POST',
   headers: {
-    'X-API-Key': 'cc_your_api_key_here'
+    'X-API-Key': 'cc_your_api_key_here',
+    'X-Hof-Creator-ID': 'your_hof_creator_id_here'
   },
   body: formData
 });
@@ -335,7 +375,10 @@ files = [
 
 upload_response = requests.post(
     'https://yourdomain.com/api/v1/hof-creator/city/123/images',
-    headers={'X-API-Key': 'cc_your_api_key_here'},
+    headers={
+        'X-API-Key': 'cc_your_api_key_here',
+        'X-Hof-Creator-ID': 'your_hof_creator_id_here'
+    },
     files=files
 )
 
@@ -357,6 +400,7 @@ curl -X GET "https://yourdomain.com/api/v1/hof-creator" \\
 # Upload images
 curl -X POST "https://yourdomain.com/api/v1/hof-creator/city/123/images" \\
   -H "X-API-Key: cc_your_api_key_here" \\
+  -H "X-Hof-Creator-ID: your_hof_creator_id_here" \\
   -F "images=@image1.jpg" \\
   -F "images=@image2.png"`}
                   </pre>

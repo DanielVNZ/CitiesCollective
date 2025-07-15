@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateApiKey, createApiResponse, createApiErrorResponse } from 'app/utils/apiAuth';
-import { getCityById, getCityImages } from 'app/db';
+import { getCityById, getCityImages, getUserById } from 'app/db';
 
 export async function GET(
   request: NextRequest,
@@ -16,6 +16,25 @@ export async function GET(
     const cityId = parseInt(params.id);
     if (isNaN(cityId)) {
       return createApiErrorResponse('Invalid city ID', 400);
+    }
+
+    // Get HoF Creator ID from request headers
+    const hofCreatorId = request.headers.get('X-Hof-Creator-ID');
+    
+    if (!hofCreatorId) {
+      return createApiErrorResponse('HoF Creator ID is required', 400);
+    }
+
+    // Get user information to verify HoF Creator ID
+    const user = await getUserById(authenticatedUser.userId);
+    if (!user) {
+      return createApiErrorResponse('User not found', 404);
+    }
+
+    // Verify HoF Creator ID matches user's profile
+    const userHofCreatorId = user.hofCreatorId || authenticatedUser.userId.toString();
+    if (hofCreatorId !== userHofCreatorId) {
+      return createApiErrorResponse('Invalid HoF Creator ID', 403);
     }
 
     // Get city information

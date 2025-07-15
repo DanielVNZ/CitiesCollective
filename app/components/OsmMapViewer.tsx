@@ -340,7 +340,7 @@ export function OsmMapViewer({ osmMapPath, cityName, cityId }: OsmMapViewerProps
 
   if (isLoading) {
     return (
-      <div className="w-full h-96 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center">
+      <div className="w-full h-[500px] bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
           <p className="text-gray-600 dark:text-gray-400">
@@ -358,7 +358,7 @@ export function OsmMapViewer({ osmMapPath, cityName, cityId }: OsmMapViewerProps
 
   if (error) {
     return (
-      <div className="w-full h-96 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center">
+      <div className="w-full h-[500px] bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center">
         <div className="text-center">
           <div className="text-4xl mb-4">⚠️</div>
           <p className="text-red-600 dark:text-red-400 font-medium">Failed to load map</p>
@@ -370,7 +370,7 @@ export function OsmMapViewer({ osmMapPath, cityName, cityId }: OsmMapViewerProps
 
   if (!osmData || osmData.nodes.length === 0) {
     return (
-      <div className="w-full h-96 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center">
+      <div className="w-full h-[500px] bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center">
         <div className="text-center">
           <div className="text-4xl mb-4">🗺️</div>
           <p className="text-gray-600 dark:text-gray-400 font-medium">No map data available</p>
@@ -609,7 +609,7 @@ export function OsmMapViewer({ osmMapPath, cityName, cityId }: OsmMapViewerProps
       
       {/* Enhanced Cities: Skylines 2 Map - Canvas Rendered */}
       <div 
-        className={`osm-fullscreen-container ${isFullScreen ? 'fixed inset-0 z-[9998] bg-black w-screen h-screen' : 'w-full h-96 bg-white dark:bg-gray-800 rounded-t-lg overflow-hidden'} relative`}
+        className={`osm-fullscreen-container ${isFullScreen ? 'fixed inset-0 z-[9998] bg-black w-screen h-screen' : 'w-full h-[500px] bg-white dark:bg-gray-800 rounded-t-lg overflow-hidden'} relative`}
         style={{
           ...(isFullScreen && document.fullscreenElement && {
             width: '100vw',

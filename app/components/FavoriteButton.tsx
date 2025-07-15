@@ -77,7 +77,7 @@ export function FavoriteButton({ cityId, initialFavorited = false, size = 'md' }
     <button
       onClick={handleFavorite}
       disabled={loading}
-      className={`flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200 ${
+      className={`flex items-center justify-center px-2.5 py-1.5 rounded-lg transition-all duration-200 ${
         favorited 
           ? 'text-yellow-600 hover:text-yellow-700 bg-yellow-50 hover:bg-yellow-100 shadow-sm' 
           : 'text-gray-700 hover:text-yellow-600 hover:bg-yellow-50 bg-white/80 dark:bg-gray-800/80 dark:text-gray-300 dark:hover:text-yellow-400'

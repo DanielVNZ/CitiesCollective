@@ -1,33 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateApiKey, createApiResponse, createApiErrorResponse } from 'app/utils/apiAuth';
-import { getCityById, getCityImages, createCityImage } from 'app/db';
-import { uploadToR2, generateImageKeys } from 'app/utils/r2';
+import { auth } from 'app/auth';
+import { createCityImage, getCityImages } from 'app/db';
+import { processImageForR2 } from 'app/utils/r2ImageProcessing';
 
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    // Authenticate using API key
-    const authenticatedUser = await authenticateApiKey(request);
-    if (!authenticatedUser) {
-      return createApiErrorResponse('Invalid or missing API key', 401);
+    const session = await auth();
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const cityId = parseInt(params.id);
     if (isNaN(cityId)) {
-      return createApiErrorResponse('Invalid city ID', 400);
+      return NextResponse.json({ error: 'Invalid city ID' }, { status: 400 });
     }
 
-    // Get city information and verify ownership
+    // Get user info and verify ownership using db functions
+    const { getUser, getCityById } = await import('app/db');
+    const users = await getUser(session.user.email);
+    if (users.length === 0) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    const user = users[0];
     const city = await getCityById(cityId);
     if (!city) {
-      return createApiErrorResponse('City not found', 404);
+      return NextResponse.json({ error: 'City not found' }, { status: 404 });
     }
 
-    // Check if the authenticated user owns this city
-    if (city.userId !== authenticatedUser.userId) {
-      return createApiErrorResponse('Unauthorized: You can only upload images to your own cities', 403);
+    if (city.userId !== user.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
     // Check existing image count
@@ -38,18 +43,17 @@ export async function POST(
     const files = formData.getAll('images') as File[];
 
     if (!files || files.length === 0) {
-      return createApiErrorResponse('No images provided', 400);
+      return NextResponse.json({ error: 'No images provided' }, { status: 400 });
     }
 
     if (files.length > 15) {
-      return createApiErrorResponse('Maximum 15 images allowed per upload', 400);
+      return NextResponse.json({ error: 'Maximum 15 images allowed per upload' }, { status: 400 });
     }
 
     if (existingImageCount + files.length > 15) {
-      return createApiErrorResponse(
-        `Cannot upload ${files.length} images. This city already has ${existingImageCount} images. Maximum 15 images allowed per city.`,
-        400
-      );
+      return NextResponse.json({ 
+        error: `Cannot upload ${files.length} images. This city already has ${existingImageCount} images. Maximum 15 images allowed per city.` 
+      }, { status: 400 });
     }
 
     const uploadedImages = [];
@@ -68,19 +72,13 @@ export async function POST(
         // Convert File to Buffer
         const imageBuffer = Buffer.from(await file.arrayBuffer());
         
-        // Generate unique keys for R2 storage
-        const imageKeys = generateImageKeys(file.name, authenticatedUser.userId);
-        
-        // Upload to R2 (using same image for all sizes for now)
-        const [thumbnailResult, mediumResult, largeResult, originalResult] = await Promise.all([
-          uploadToR2(imageBuffer, imageKeys.thumbnail, file.type),
-          uploadToR2(imageBuffer, imageKeys.medium, file.type),
-          uploadToR2(imageBuffer, imageKeys.large, file.type),
-          uploadToR2(imageBuffer, imageKeys.original, file.type),
-        ]);
-
-        // Extract filename from key for database storage
-        const fileName = imageKeys.thumbnail.split('/').pop() || `${Date.now()}.webp`;
+        // Process image with Sharp for better quality
+        const processedImage = await processImageForR2({
+          buffer: imageBuffer,
+          originalname: file.name,
+          mimetype: file.type,
+          size: file.size,
+        } as Express.Multer.File, user.id);
 
         // Determine if this should be the primary image
         // First image uploaded to a city with no existing images becomes primary
@@ -89,16 +87,16 @@ export async function POST(
         // Save to database using existing function
         const imageData = {
           cityId,
-          fileName,
+          fileName: processedImage.fileName,
           originalName: file.name,
           fileSize: file.size,
           mimeType: file.type,
-          width: 800, // Default for now
-          height: 600, // Default for now
-          thumbnailPath: thumbnailResult.url,
-          mediumPath: mediumResult.url,
-          largePath: largeResult.url,
-          originalPath: originalResult.url,
+          width: processedImage.width,
+          height: processedImage.height,
+          thumbnailPath: processedImage.thumbnailUrl,
+          mediumPath: processedImage.mediumUrl,
+          largePath: processedImage.largeUrl,
+          originalPath: processedImage.originalUrl,
           isPrimary: shouldBePrimary,
         };
 
@@ -111,15 +109,14 @@ export async function POST(
       }
     }
 
-    return createApiResponse({
-      success: true,
-      images: uploadedImages,
-      message: `Successfully uploaded ${uploadedImages.length} images to city ${cityId}`
+    return NextResponse.json({ 
+      success: true, 
+      images: uploadedImages 
     });
 
   } catch (error) {
-    console.error('HoF Creator image upload error:', error);
-    return createApiErrorResponse('Internal server error', 500);
+    console.error('Error uploading images:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
