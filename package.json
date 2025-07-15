@@ -33,6 +33,7 @@
     "react-markdown": "^10.1.0",
     "react-slick": "^0.30.3",
     "remark-gfm": "^4.0.1",
+    "sharp": "^0.33.2",
     "slick-carousel": "^1.8.1",
     "uuid": "^11.1.0"
   },
@@ -41,6 +42,7 @@
     "@types/adm-zip": "^0.5.7",
     "@types/nodemailer": "^6.4.17",
     "@types/react-slick": "^0.23.13",
+    "@types/sharp": "^0.32.0",
     "autoprefixer": "^10.4.16",
     "eslint": "8.56.0",
     "eslint-config-next": "^14.0.4",
