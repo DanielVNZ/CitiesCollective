@@ -22,9 +22,9 @@ interface HallOfFameGalleryProps {
 }
 
 export function HallOfFameGallery({ images }: HallOfFameGalleryProps) {
+  const [mainGalleryIndex, setMainGalleryIndex] = useState(0);
   const [selectedImage, setSelectedImage] = useState<HallOfFameImage | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [mainGalleryIndex, setMainGalleryIndex] = useState(0);
 
   const openLightbox = (image: HallOfFameImage, index: number) => {
     setSelectedImage(image);
@@ -36,15 +36,13 @@ export function HallOfFameGallery({ images }: HallOfFameGalleryProps) {
   };
 
   const nextImage = () => {
-    const nextIndex = (currentIndex + 1) % images.length;
-    setCurrentIndex(nextIndex);
-    setSelectedImage(images[nextIndex]);
+    setCurrentIndex((prevIndex) => (prevIndex + 1) % images.length);
+    setSelectedImage(images[(currentIndex + 1) % images.length]);
   };
 
   const prevImage = () => {
-    const prevIndex = (currentIndex - 1 + images.length) % images.length;
-    setCurrentIndex(prevIndex);
-    setSelectedImage(images[prevIndex]);
+    setCurrentIndex((prevIndex) => (prevIndex - 1 + images.length) % images.length);
+    setSelectedImage(images[(currentIndex - 1 + images.length) % images.length]);
   };
 
   const nextMainImage = () => {
@@ -87,6 +85,8 @@ export function HallOfFameGallery({ images }: HallOfFameGalleryProps) {
               height={675}
               className="w-full h-full object-contain transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-2xl"
               quality={100}
+              unoptimized={true}
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 1200px"
             />
             
             {/* Hover overlay */}
@@ -156,6 +156,8 @@ export function HallOfFameGallery({ images }: HallOfFameGalleryProps) {
                 height={400}
                 className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                 quality={85}
+                unoptimized={true}
+                sizes="(max-width: 768px) 33vw, (max-width: 1024px) 25vw, (max-width: 1280px) 16vw, 12vw"
               />
               
               {/* Hover Overlay */}
@@ -228,6 +230,8 @@ export function HallOfFameGallery({ images }: HallOfFameGalleryProps) {
               height={800}
               className="max-w-full max-h-full object-contain"
               onClick={(e) => e.stopPropagation()}
+              unoptimized={true}
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 90vw, 1200px"
             />
 
             {/* Image Info */}
