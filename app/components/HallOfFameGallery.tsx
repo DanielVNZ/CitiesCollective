@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import Image from 'next/image';
 
 interface HallOfFameImage {
   id: number;
@@ -78,15 +77,16 @@ export function HallOfFameGallery({ images }: HallOfFameGalleryProps) {
         <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-lg p-4 mb-6 border border-gray-200 dark:border-gray-700 max-w-4xl mx-auto">
           {/* Main Image */}
           <div className="relative aspect-video group cursor-pointer" onClick={() => openLightbox(images[mainGalleryIndex], mainGalleryIndex)}>
-            <Image
+            <img
               src={images[mainGalleryIndex].imageUrl4K}
-              alt={`${images[mainGalleryIndex].cityName} Hall of Fame screenshot`}
-              width={1200}
-              height={675}
-              className="w-full h-full object-contain transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-2xl"
-              quality={100}
-              unoptimized={true}
+              srcSet={`
+                ${images[mainGalleryIndex].imageUrlThumbnail} 400w,
+                ${images[mainGalleryIndex].imageUrlFHD} 800w,
+                ${images[mainGalleryIndex].imageUrl4K} 1200w
+              `}
               sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 1200px"
+              alt={`${images[mainGalleryIndex].cityName} Hall of Fame screenshot`}
+              className="w-full h-full object-contain transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-2xl"
             />
             
             {/* Hover overlay */}
@@ -149,15 +149,15 @@ export function HallOfFameGallery({ images }: HallOfFameGalleryProps) {
               }`}
               onClick={() => setMainGalleryIndex(index)}
             >
-              <Image
+              <img
                 src={image.imageUrlThumbnail}
-                alt={`${image.cityName} Hall of Fame screenshot`}
-                width={400}
-                height={400}
-                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                quality={85}
-                unoptimized={true}
+                srcSet={`
+                  ${image.imageUrlThumbnail} 400w,
+                  ${image.imageUrlFHD} 800w
+                `}
                 sizes="(max-width: 768px) 33vw, (max-width: 1024px) 25vw, (max-width: 1280px) 16vw, 12vw"
+                alt={`${image.cityName} Hall of Fame screenshot`}
+                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
               />
               
               {/* Hover Overlay */}
@@ -223,15 +223,17 @@ export function HallOfFameGallery({ images }: HallOfFameGalleryProps) {
             )}
 
             {/* Image */}
-            <Image
+            <img
               src={selectedImage.imageUrl4K}
+              srcSet={`
+                ${selectedImage.imageUrlThumbnail} 400w,
+                ${selectedImage.imageUrlFHD} 800w,
+                ${selectedImage.imageUrl4K} 1200w
+              `}
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 90vw, 1200px"
               alt={`${selectedImage.cityName} Hall of Fame screenshot`}
-              width={1200}
-              height={800}
               className="max-w-full max-h-full object-contain"
               onClick={(e) => e.stopPropagation()}
-              unoptimized={true}
-              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 90vw, 1200px"
             />
 
             {/* Image Info */}
