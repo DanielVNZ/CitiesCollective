@@ -199,6 +199,21 @@ const modCompatibilityTable = pgTable('modCompatibility', {
   createdAt: timestamp('createdAt').defaultNow(),
 });
 
+// Hall of Fame cache table
+const hallOfFameCacheTable = pgTable('hallOfFameCache', {
+  id: serial('id').primaryKey(),
+  cityId: integer('cityId').references(() => cityTable.id, { onDelete: 'cascade' }),
+  hofImageId: varchar('hofImageId', { length: 255 }).notNull(), // Hall of Fame image ID
+  cityName: varchar('cityName', { length: 255 }).notNull(),
+  cityPopulation: integer('cityPopulation'),
+  cityMilestone: integer('cityMilestone'),
+  imageUrlThumbnail: varchar('imageUrlThumbnail', { length: 500 }).notNull(),
+  imageUrlFHD: varchar('imageUrlFHD', { length: 500 }).notNull(),
+  imageUrl4K: varchar('imageUrl4K', { length: 500 }).notNull(),
+  createdAt: timestamp('createdAt').defaultNow(),
+  lastUpdated: timestamp('lastUpdated').defaultNow(),
+});
+
 // OSM Map Cache table removed - now using client-side caching with IndexedDB
 
 export async function getUser(email: string) {
@@ -2744,58 +2759,211 @@ export async function updateModCompatibilityNotes(modId: string, notes: string[]
 
 // Function to update all cities that use a specific mod with new compatibility notes
 export async function updateCitiesWithModNotes(modId: string, newNotes: string[]) {
-  await ensureCityTableExists();
-  
-  // Find all cities that use this mod
-  const cities = await db.select({
-    id: cityTable.id,
-    modsEnabled: cityTable.modsEnabled,
-    modsNotes: cityTable.modsNotes,
-  })
-    .from(cityTable)
-    .where(
-      sql`${cityTable.modsEnabled} @> ARRAY[${modId}]::text[]`
-    );
-  
-  // Update each city's mod notes
-  const updatePromises = cities.map(async (city) => {
-    if (!city.modsEnabled || !city.modsEnabled.some(mod => mod.includes(modId))) {
-      return;
-    }
+  try {
+    await ensureModCompatibilityTableExists();
     
-    // Parse existing notes
-    let existingNotes: { [key: string]: string[] } = {};
-    if (city.modsNotes) {
-      try {
-        existingNotes = JSON.parse(city.modsNotes);
-      } catch (error) {
-        console.error('Failed to parse existing mod notes for city', city.id, error);
+    // Update the mod compatibility cache
+    await upsertModCompatibility(modId, 'Unknown Mod', newNotes);
+    
+    // Find all cities that use this mod and update their modsNotes
+    const cities = await db.select().from(cityTable).where(
+      sql`${cityTable.modsEnabled}::text LIKE ${`%${modId}%`}`
+    );
+    
+    for (const city of cities) {
+      if (city.modsNotes) {
+        try {
+          const existingNotes = JSON.parse(city.modsNotes);
+          existingNotes[modId] = newNotes;
+          await db.update(cityTable)
+            .set({ modsNotes: JSON.stringify(existingNotes) })
+            .where(eq(cityTable.id, city.id));
+        } catch (error) {
+          console.error(`Error updating mod notes for city ${city.id}:`, error);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error updating cities with mod notes:', error);
+  }
+}
+
+// Hall of Fame cache functions
+async function ensureHallOfFameCacheTableExists() {
+  if (tableInitCache.has('hallOfFameCache')) {
+    return;
+  }
+
+  try {
+    // First, check if the table exists
+    const tableExists = await client`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'hallOfFameCache'
+      )
+    `;
+
+    if (!tableExists[0].exists) {
+      // Create new table with full schema
+      await client`
+        CREATE TABLE "hallOfFameCache" (
+          "id" serial PRIMARY KEY,
+          "userId" integer REFERENCES "User"("id") ON DELETE CASCADE,
+          "cityId" integer REFERENCES "City"("id") ON DELETE CASCADE,
+          "hofImageId" varchar(255) NOT NULL,
+          "cityName" varchar(255) NOT NULL,
+          "cityPopulation" integer,
+          "cityMilestone" integer,
+          "imageUrlThumbnail" varchar(500) NOT NULL,
+          "imageUrlFHD" varchar(500) NOT NULL,
+          "imageUrl4K" varchar(500) NOT NULL,
+          "createdAt" timestamp DEFAULT now(),
+          "lastUpdated" timestamp DEFAULT now()
+        )
+      `;
+    } else {
+      // Table exists, check if userId column exists
+      const columnExists = await client`
+        SELECT EXISTS (
+          SELECT FROM information_schema.columns 
+          WHERE table_name = 'hallOfFameCache' 
+          AND column_name = 'userId'
+        )
+      `;
+
+      if (!columnExists[0].exists) {
+        // Add the missing userId column
+        await client`
+          ALTER TABLE "hallOfFameCache" 
+          ADD COLUMN "userId" integer REFERENCES "User"("id") ON DELETE CASCADE
+        `;
+        console.log('Added userId column to hallOfFameCache table');
       }
     }
     
-    // Update notes for this mod
-    if (newNotes.length > 0) {
-      existingNotes[modId] = newNotes;
-    } else {
-      delete existingNotes[modId];
-    }
-    
-    // Update city with new notes
-    const updatedNotesJson = Object.keys(existingNotes).length > 0 
-      ? JSON.stringify(existingNotes) 
-      : null;
-    
-    await db.update(cityTable)
-      .set({
-        modsNotes: updatedNotesJson,
-        updatedAt: new Date(),
-      })
-      .where(eq(cityTable.id, city.id));
-  });
-  
-  await Promise.all(updatePromises);
-  
-  return cities.length;
+    tableInitCache.add('hallOfFameCache');
+  } catch (error) {
+    console.error('Error ensuring hallOfFameCache table exists:', error);
+  }
 }
 
-// OSM Map Cache Functions removed - now using client-side caching with IndexedDB
+export async function getHallOfFameImagesForCity(cityId: number) {
+  try {
+    await ensureHallOfFameCacheTableExists();
+    
+    // First get the city name
+    const city = await db.select().from(cityTable).where(eq(cityTable.id, cityId)).limit(1);
+    
+    if (city.length === 0) {
+      return [];
+    }
+    
+    const cityName = city[0].cityName;
+    
+    // Then find Hall of Fame images that match the city name
+    const images = await client`
+      SELECT * FROM "hallOfFameCache" 
+      WHERE LOWER("cityName") = LOWER(${cityName})
+      ORDER BY "createdAt" DESC
+    `;
+    
+    return images;
+  } catch (error) {
+    console.error('Error fetching Hall of Fame images for city:', error);
+    return [];
+  }
+}
+
+export async function upsertHallOfFameImage(cityId: number, imageData: {
+  hofImageId: string;
+  cityName: string;
+  cityPopulation?: number;
+  cityMilestone?: number;
+  imageUrlThumbnail: string;
+  imageUrlFHD: string;
+  imageUrl4K: string;
+}) {
+  try {
+    await ensureHallOfFameCacheTableExists();
+    
+    // Check if image already exists
+    const existing = await db.select().from(hallOfFameCacheTable)
+      .where(and(
+        eq(hallOfFameCacheTable.cityId, cityId),
+        eq(hallOfFameCacheTable.hofImageId, imageData.hofImageId)
+      ))
+      .limit(1);
+    
+    if (existing.length > 0) {
+      // Update existing image
+      await db.update(hallOfFameCacheTable)
+        .set({
+          cityName: imageData.cityName,
+          cityPopulation: imageData.cityPopulation,
+          cityMilestone: imageData.cityMilestone,
+          imageUrlThumbnail: imageData.imageUrlThumbnail,
+          imageUrlFHD: imageData.imageUrlFHD,
+          imageUrl4K: imageData.imageUrl4K,
+          lastUpdated: new Date()
+        })
+        .where(eq(hallOfFameCacheTable.id, existing[0].id));
+    } else {
+      // Insert new image
+      await db.insert(hallOfFameCacheTable).values({
+        cityId,
+        hofImageId: imageData.hofImageId,
+        cityName: imageData.cityName,
+        cityPopulation: imageData.cityPopulation,
+        cityMilestone: imageData.cityMilestone,
+        imageUrlThumbnail: imageData.imageUrlThumbnail,
+        imageUrlFHD: imageData.imageUrlFHD,
+        imageUrl4K: imageData.imageUrl4K
+      });
+    }
+  } catch (error) {
+    console.error('Error upserting Hall of Fame image:', error);
+  }
+}
+
+export async function removeHallOfFameImage(cityId: number, hofImageId: string) {
+  try {
+    await ensureHallOfFameCacheTableExists();
+    
+    await db.delete(hallOfFameCacheTable)
+      .where(and(
+        eq(hallOfFameCacheTable.cityId, cityId),
+        eq(hallOfFameCacheTable.hofImageId, hofImageId)
+      ));
+  } catch (error) {
+    console.error('Error removing Hall of Fame image:', error);
+  }
+}
+
+export async function clearHallOfFameCacheForCity(cityId: number) {
+  try {
+    await ensureHallOfFameCacheTableExists();
+    
+    await db.delete(hallOfFameCacheTable)
+      .where(eq(hallOfFameCacheTable.cityId, cityId));
+  } catch (error) {
+    console.error('Error clearing Hall of Fame cache for city:', error);
+  }
+}
+
+export async function getAllUsersWithHoFCreatorId() {
+  try {
+    await ensureTableExists();
+    
+    const users = await client`
+      SELECT id, email, username, "hofCreatorId"
+      FROM "User"
+      WHERE "hofCreatorId" IS NOT NULL AND "hofCreatorId" != ''
+    `;
+    
+    return users;
+  } catch (error) {
+    console.error('Error fetching users with HoF Creator ID:', error);
+    return [];
+  }
+}

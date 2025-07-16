@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { getUsernameTextColor, getUsernameAvatarColor } from '../utils/userColors';
 import { refreshCommentCount } from './CommentCount';
 
@@ -29,7 +30,28 @@ export function Comments({ cityId }: CommentsProps) {
   const [moderationMessage, setModerationMessage] = useState<string | null>(null);
   const [moderationInfo, setModerationInfo] = useState<any>(null);
   const [sortBy, setSortBy] = useState<'recent' | 'likes'>('likes');
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const router = useRouter();
+
+  const fetchCurrentUser = useCallback(async () => {
+    try {
+      const response = await fetch('/api/user');
+      if (response.ok) {
+        const userData = await response.json();
+        setCurrentUser(userData);
+        
+        // Check if user is admin
+        const adminResponse = await fetch('/api/admin/check');
+        if (adminResponse.ok) {
+          const adminData = await adminResponse.json();
+          setIsAdmin(adminData.isAdmin);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching current user:', error);
+    }
+  }, []);
 
   const fetchComments = useCallback(async () => {
     setLoading(true);
@@ -48,7 +70,8 @@ export function Comments({ cityId }: CommentsProps) {
 
   useEffect(() => {
     fetchComments();
-  }, [fetchComments]);
+    fetchCurrentUser();
+  }, [fetchComments, fetchCurrentUser]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -176,6 +199,11 @@ export function Comments({ cityId }: CommentsProps) {
     return name.charAt(0).toUpperCase();
   };
 
+  const canDeleteComment = (comment: Comment) => {
+    if (!currentUser) return false;
+    return isAdmin || currentUser.id === comment.userId;
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -286,19 +314,21 @@ export function Comments({ cityId }: CommentsProps) {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
                       <span className={`font-medium ${usernameTextColor}`}>
-                        {getUserDisplayName(comment)}
+                        <Link href={`/user/${comment.userId}`} className="hover:underline">{getUserDisplayName(comment)}</Link>
                       </span>
                       <span className="text-sm text-gray-500 dark:text-gray-400">
                         {formatDate(comment.createdAt)}
                       </span>
                     </div>
-                    <button
-                      onClick={() => handleDelete(comment.id)}
-                      className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-sm"
-                      title="Delete comment"
-                    >
-                      Delete
-                    </button>
+                    {canDeleteComment(comment) && (
+                      <button
+                        onClick={() => handleDelete(comment.id)}
+                        className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-sm"
+                        title="Delete comment"
+                      >
+                        Delete
+                      </button>
+                    )}
                   </div>
                   <p className="text-gray-700 dark:text-gray-300 mt-1 whitespace-pre-wrap">
                     {comment.content}

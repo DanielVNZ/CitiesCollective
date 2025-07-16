@@ -18,6 +18,10 @@ const nextConfig = {
           protocol: 'https',
           hostname: 'pub-ba1c78e7f54646c4bd11875db43f3c72.r2.dev',
         },
+        {
+          protocol: 'https',
+          hostname: 'halloffame.azureedge.net',
+        },
       ],
     },
 };

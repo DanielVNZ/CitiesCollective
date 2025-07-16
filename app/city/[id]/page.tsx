@@ -14,7 +14,8 @@ import { ImageSection } from './ImageSection';
 import { getUsernameTextColor, getUsernameAvatarColor } from 'app/utils/userColors';
 import { Header } from 'app/components/Header';
 import { isUserAdmin } from 'app/db';
-import { FloatingActionButton } from './FloatingActionButton';
+import { ClientComponents } from './ClientComponents';
+import CityHallOfFameImages from 'app/components/CityHallOfFameImages';
 
 // Force dynamic rendering to prevent caching
 export const dynamic = 'force-dynamic';
@@ -158,109 +159,132 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
       {/* Header */}
       <Header session={session} isAdmin={isAdmin} />
 
-      <main className="w-full px-4 sm:px-6 lg:px-8 py-8">
-        {/* Main Content Grid - Screenshots on left, Map on right for large screens */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 mb-8">
-          {/* Screenshots Section - Left side on large screens */}
-          <div className="xl:col-span-2">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+        {/* Images Section - Screenshots and Hall of Fame side by side */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+          {/* Screenshots Section - Left side */}
+          <div className={`order-2 xl:order-1 ${!user?.hofCreatorId ? 'xl:col-span-2' : ''}`}>
             <ImageSection cityId={cityId} initialImages={images} isOwner={isOwner} />
           </div>
           
-          {/* Map Section - Right side on large screens */}
+          {/* Hall of Fame Images - Right side */}
+          {user?.hofCreatorId && (
+            <div className="order-1 xl:order-2">
+              <CityHallOfFameImages 
+                cityName={city.cityName || ''} 
+                hofCreatorId={user?.hofCreatorId || null} 
+                cityId={cityId}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Main Content Grid - Map and other content */}
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+          
+          {/* Map and Details Section - Full width */}
           {city.osmMapPath && (
-            <div className="xl:col-span-1">
-              <div className="space-y-4">
+            <div className="xl:col-span-3">
+              <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
                 {/* Map */}
-                <OsmMapManager 
-                  cityId={cityId} 
-                  initialOsmMapPath={city.osmMapPath} 
-                  isOwner={isOwner} 
-                />
-                
-                {/* Map Legend */}
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
-                  <MapLegend />
+                <div className="xl:col-span-2">
+                  <OsmMapManager 
+                    cityId={cityId} 
+                    initialOsmMapPath={city.osmMapPath} 
+                    isOwner={isOwner} 
+                  />
                 </div>
                 
-                {/* Download Section */}
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4">
-                  <div className="w-full p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
-                    <div className="flex items-center justify-center space-x-3">
-                      <svg className="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-1.447-.894L15 4m0 13V4m-6 3l6-3" />
-                      </svg>
-                      <div>
-                        <p className="text-sm font-medium text-gray-900 dark:text-white">OSM Map File</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          {city.osmMapPath?.split('/').pop() || 'osm-map.osm'}
-                        </p>
+                {/* Map Legend and Download Section */}
+                <div className="xl:col-span-1 space-y-6">
+                  {/* Map Legend */}
+                  <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
+                    <MapLegend />
+                  </div>
+                  
+                  {/* OSM Download Section */}
+                  <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-200 dark:border-gray-700">
+                    <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                      <div className="flex items-center justify-center space-x-3 mb-4">
+                        <div className="p-2 bg-blue-100 dark:bg-blue-900/50 rounded-lg">
+                          <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-1.447-.894L15 4m0 13V4m-6 3l6-3" />
+                          </svg>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">OSM Map File</p>
+                          <p className="text-xs text-blue-600 dark:text-blue-300">
+                            {city.osmMapPath?.split('/').pop() || 'osm-map.osm'}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                    <div className="mt-3 flex justify-center">
-                      <a
-                        href={city.osmMapPath}
-                        download
-                        className="inline-flex items-center px-3 py-2 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 transition-colors"
-                      >
-                        <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                        Download OSM File
-                      </a>
+                      <div className="flex justify-center">
+                        <a
+                          href={city.osmMapPath}
+                          download
+                          className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
+                        >
+                          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          Download OSM File
+                        </a>
+                      </div>
                     </div>
                   </div>
                 </div>
-                
               </div>
             </div>
           )}
         </div>
 
-        {/* Special Thanks Section - Full Width */}
+        {/* Special Thanks Section */}
         {city.osmMapPath && (
-          <div className="w-full mb-8">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4">
-              <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                <div className="flex items-center space-x-2 mb-2">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-200 dark:border-gray-700">
+            <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+              <div className="flex items-center space-x-3 mb-3">
+                <div className="p-1.5 bg-blue-100 dark:bg-blue-900/50 rounded-lg">
                   <svg className="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                   </svg>
-                  <p className="text-xs text-blue-800 dark:text-blue-200">
-                    Special thanks to{' '}
-                    <a 
-                      href="https://github.com/fergusq" 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="font-medium hover:underline"
-                    >
-                      ferqusq
-                    </a>
-                    {' '}for the OSM export functionality
-                  </p>
                 </div>
-                <div className="flex items-center space-x-2">
+                <p className="text-sm text-blue-800 dark:text-blue-200">
+                  Special thanks to{' '}
+                  <a 
+                    href="https://github.com/fergusq" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="font-semibold hover:underline"
+                  >
+                    ferqusq
+                  </a>
+                  {' '}for the OSM export functionality
+                </p>
+              </div>
+              <div className="flex items-center space-x-3">
+                <div className="p-1.5 bg-blue-100 dark:bg-blue-900/50 rounded-lg">
                   <svg className="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
-                  <p className="text-xs text-blue-800 dark:text-blue-200">
-                    <a 
-                      href="https://mods.paradoxplaza.com/mods/87422/Windows" 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="font-medium hover:underline"
-                    >
-                      OSM Export
-                    </a>
-                    {' '}- Use this mod to create your OSM
-                  </p>
                 </div>
+                <p className="text-sm text-blue-800 dark:text-blue-200">
+                  <a 
+                    href="https://mods.paradoxplaza.com/mods/87422/Windows" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="font-semibold hover:underline"
+                  >
+                    OSM Export Mod
+                  </a>
+                  {' '}- Use this mod to create your OSM files
+                </p>
               </div>
             </div>
           </div>
         )}
 
         {/* City Header */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-8 mb-8">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8 border border-gray-200 dark:border-gray-700">
           <div className="flex justify-between items-start mb-6">
             <div>
               <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
@@ -339,63 +363,67 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
 
           {/* Key Stats */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div className="text-center p-6 bg-green-50 dark:bg-green-900/20 rounded-lg">
-              <div className="text-2xl md:text-3xl lg:text-4xl font-bold text-green-700 dark:text-green-400 mb-2 break-words">
+            <div className="text-center p-6 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-xl border border-green-200 dark:border-green-800 shadow-lg">
+              <div className="text-3xl md:text-4xl lg:text-5xl font-bold text-green-700 dark:text-green-400 mb-3 break-words">
                 {formatNumber(city.population)}
               </div>
-              <div className="text-lg text-green-600 dark:text-green-300">Population</div>
+              <div className="text-lg font-semibold text-green-600 dark:text-green-300">Population</div>
             </div>
-            <div className="text-center p-6 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
-              <div className="text-2xl md:text-3xl lg:text-4xl font-bold text-yellow-700 dark:text-yellow-400 mb-2 break-words">
+            <div className="text-center p-6 bg-gradient-to-br from-yellow-50 to-amber-50 dark:from-yellow-900/20 dark:to-amber-900/20 rounded-xl border border-yellow-200 dark:border-yellow-800 shadow-lg">
+              <div className="text-3xl md:text-4xl lg:text-5xl font-bold text-yellow-700 dark:text-yellow-400 mb-3 break-words">
                 {city.unlimitedMoney ? '∞' : `$${formatNumber(city.money)}`}
               </div>
-              <div className="text-lg text-yellow-600 dark:text-yellow-300">Money</div>
+              <div className="text-lg font-semibold text-yellow-600 dark:text-yellow-300">Money</div>
             </div>
-            <div className="text-center p-6 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-              <div className="text-2xl md:text-3xl lg:text-4xl font-bold text-purple-700 dark:text-purple-400 mb-2 break-words">
+            <div className="text-center p-6 bg-gradient-to-br from-purple-50 to-violet-50 dark:from-purple-900/20 dark:to-violet-900/20 rounded-xl border border-purple-200 dark:border-purple-800 shadow-lg">
+              <div className="text-3xl md:text-4xl lg:text-5xl font-bold text-purple-700 dark:text-purple-400 mb-3 break-words">
                 {formatNumber(city.xp)}
               </div>
-              <div className="text-lg text-purple-600 dark:text-purple-300">Experience Points</div>
+              <div className="text-lg font-semibold text-purple-600 dark:text-purple-300">Experience Points</div>
             </div>
           </div>
 
-          {/* Community Actions - Now available in floating button */}
-          <div className="flex justify-center items-center mb-8 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+          {/* Community Actions */}
+          <div className="flex justify-center items-center mb-8 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
             <div className="text-center">
-              <p className="text-gray-600 dark:text-gray-400 text-sm">
-                💡 Like and favorite this city using the floating buttons in the bottom right corner
+              <div className="flex items-center justify-center space-x-2 mb-2">
+                <span className="text-2xl">💡</span>
+                <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-100">Community Actions</h3>
+              </div>
+              <p className="text-blue-700 dark:text-blue-300 text-sm">
+                Like and favorite this city using the floating buttons in the bottom right corner
               </p>
             </div>
           </div>
 
           {/* Game Settings */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-            <div className={`p-4 rounded-lg text-center ${city.leftHandTraffic ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400' : 'bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400'}`}>
-              <div className="font-semibold">Left-hand Traffic</div>
-              <div className="text-sm">{city.leftHandTraffic ? 'Enabled' : 'Disabled'}</div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+            <div className={`p-5 rounded-xl text-center border shadow-lg transition-all duration-200 ${city.leftHandTraffic ? 'bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400' : 'bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400'}`}>
+              <div className="font-bold text-lg mb-1">Left-hand Traffic</div>
+              <div className="text-sm font-medium">{city.leftHandTraffic ? 'Enabled' : 'Disabled'}</div>
             </div>
-            <div className={`p-4 rounded-lg text-center ${city.naturalDisasters ? 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400' : 'bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400'}`}>
-              <div className="font-semibold">Natural Disasters</div>
-              <div className="text-sm">{city.naturalDisasters ? 'Enabled' : 'Disabled'}</div>
+            <div className={`p-5 rounded-xl text-center border shadow-lg transition-all duration-200 ${city.naturalDisasters ? 'bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-900/20 dark:to-rose-900/20 border-red-200 dark:border-red-800 text-red-700 dark:text-red-400' : 'bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400'}`}>
+              <div className="font-bold text-lg mb-1">Natural Disasters</div>
+              <div className="text-sm font-medium">{city.naturalDisasters ? 'Enabled' : 'Disabled'}</div>
             </div>
-            <div className={`p-4 rounded-lg text-center ${city.unlimitedMoney ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400' : 'bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400'}`}>
-              <div className="font-semibold">Unlimited Money</div>
-              <div className="text-sm">{city.unlimitedMoney ? 'Enabled' : 'Disabled'}</div>
+            <div className={`p-5 rounded-xl text-center border shadow-lg transition-all duration-200 ${city.unlimitedMoney ? 'bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-green-200 dark:border-green-800 text-green-700 dark:text-green-400' : 'bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400'}`}>
+              <div className="font-bold text-lg mb-1">Unlimited Money</div>
+              <div className="text-sm font-medium">{city.unlimitedMoney ? 'Enabled' : 'Disabled'}</div>
             </div>
-            <div className={`p-4 rounded-lg text-center ${city.unlockMapTiles ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400' : 'bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400'}`}>
-              <div className="font-semibold">Unlock Map Tiles</div>
-              <div className="text-sm">{city.unlockMapTiles ? 'Enabled' : 'Disabled'}</div>
+            <div className={`p-5 rounded-xl text-center border shadow-lg transition-all duration-200 ${city.unlockMapTiles ? 'bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-400' : 'bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400'}`}>
+              <div className="font-bold text-lg mb-1">Unlock Map Tiles</div>
+              <div className="text-sm font-medium">{city.unlockMapTiles ? 'Enabled' : 'Disabled'}</div>
             </div>
           </div>
 
           {/* Simulation Date */}
           {simulationDate && (
-            <div className="mb-8 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-              <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-400 mb-2">Simulation Date</h3>
-              <p className="text-blue-700 dark:text-blue-300">
-                Year {simulationDate.year}, Month {simulationDate.month}, 
+            <div className="mb-8 p-6 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl border border-blue-200 dark:border-blue-800 shadow-lg">
+              <h3 className="text-xl font-bold text-blue-900 dark:text-blue-400 mb-3">Simulation Date</h3>
+              <p className="text-blue-700 dark:text-blue-300 text-lg">
+                Year {simulationDate.year}, Month {simulationDate.month}
                 {simulationDate.hour !== undefined && simulationDate.minute !== undefined && 
-                  ` ${simulationDate.hour.toString().padStart(2, '0')}:${simulationDate.minute.toString().padStart(2, '0')}`
+                  ` • ${simulationDate.hour.toString().padStart(2, '0')}:${simulationDate.minute.toString().padStart(2, '0')}`
                 }
               </p>
             </div>
@@ -416,13 +444,13 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
         }`}>
           {/* Content Prerequisites */}
           {city.contentPrerequisites && city.contentPrerequisites.length > 0 && (
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Required DLC</h3>
-              <div className="flex flex-wrap gap-2">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-200 dark:border-gray-700">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Required DLC</h3>
+              <div className="flex flex-wrap gap-3">
                 {city.contentPrerequisites.map((dlc: string, index: number) => (
                   <span
                     key={index}
-                    className="px-3 py-1 bg-orange-100 dark:bg-orange-900/20 text-orange-800 dark:text-orange-400 text-sm rounded-full"
+                    className="px-4 py-2 bg-gradient-to-r from-orange-100 to-amber-100 dark:from-orange-900/20 dark:to-amber-900/20 text-orange-800 dark:text-orange-400 text-sm font-medium rounded-full border border-orange-200 dark:border-orange-800 shadow-sm"
                   >
                     {dlc}
                   </span>
@@ -432,8 +460,8 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
           )}
 
           {/* Mods */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-200 dark:border-gray-700">
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6">
               {city.modsEnabled && city.modsEnabled.length > 0 ? (
                 <>Mods ({city.modsEnabled.length})</>
               ) : (
@@ -517,41 +545,28 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
         </div>
 
         {/* File Info */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mt-8">
-          <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">File Information</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-            <div>
-              <span className="font-medium text-gray-600 dark:text-gray-400">Filename:</span> <span className="text-gray-900 dark:text-white">{city.fileName}</span>
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-200 dark:border-gray-700">
+          <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6">File Information</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+            <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+              <span className="font-semibold text-gray-600 dark:text-gray-400 block mb-1">Filename</span>
+              <span className="text-gray-900 dark:text-white font-medium">{city.fileName}</span>
             </div>
-            <div>
-              <span className="font-medium text-gray-600 dark:text-gray-400">Uploaded:</span> <span className="text-gray-900 dark:text-white">{formatDate(city.uploadedAt)}</span>
+            <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+              <span className="font-semibold text-gray-600 dark:text-gray-400 block mb-1">Uploaded</span>
+              <span className="text-gray-900 dark:text-white font-medium">{formatDate(city.uploadedAt)}</span>
             </div>
-            <div>
-              <span className="font-medium text-gray-600 dark:text-gray-400">Session GUID:</span> 
-              <code className="ml-2 text-xs bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-gray-900 dark:text-white">{city.sessionGuid}</code>
-            </div>
-            <div>
-              <span className="font-medium text-gray-600 dark:text-gray-400">Auto Save:</span> <span className="text-gray-900 dark:text-white">{city.autoSave ? 'Yes' : 'No'}</span>
-            </div>
-            {city.filePath && (
-              <div>
-                <span className="font-medium text-gray-600 dark:text-gray-400">Save File:</span> <span className="text-gray-900 dark:text-white">Available for download</span>
-              </div>
-            )}
-            {images.length > 0 && (
-              <div>
-                <span className="font-medium text-gray-600 dark:text-gray-400">Screenshots:</span> <span className="text-gray-900 dark:text-white">{images.length}</span>
-              </div>
-            )}
           </div>
         </div>
 
         {/* Comments Section */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mt-8">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-200 dark:border-gray-700">
           <Comments cityId={city.id} />
         </div>
       </main>
-      <FloatingActionButton cityId={cityId} />
+      
+      {/* Client-side components */}
+      <ClientComponents cityId={cityId} />
     </div>
   );
 }

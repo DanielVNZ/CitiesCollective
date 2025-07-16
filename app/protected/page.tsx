@@ -61,6 +61,7 @@ export default async function ProtectedPage() {
             currentHoFCreatorId={user.hofCreatorId} 
           />
         </div>
+
         {/* Cities Management */}
         <div className="mb-8">
           <div className="flex justify-between items-center mb-6">

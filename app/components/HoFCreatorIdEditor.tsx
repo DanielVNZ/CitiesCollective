@@ -81,9 +81,6 @@ export default function HoFCreatorIdEditor({ currentHoFCreatorId }: HoFCreatorId
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
               maxLength={100}
             />
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              This ID will be used when you make API calls to the HoF Creator API. Leave empty to use your user ID.
-            </p>
           </div>
 
           {message && (
@@ -116,17 +113,35 @@ export default function HoFCreatorIdEditor({ currentHoFCreatorId }: HoFCreatorId
       ) : (
         <div className="space-y-2">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Current ID:</span>
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">HoF Creator ID:</span>
             <span className="text-sm text-gray-900 dark:text-white font-mono bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
-              {currentHoFCreatorId || 'Not set'}
+              {currentHoFCreatorId 
+                ? `${currentHoFCreatorId.substring(0, 8)}...${currentHoFCreatorId.substring(currentHoFCreatorId.length - 4)}`
+                : 'Not set'
+              }
             </span>
           </div>
           <p className="text-xs text-gray-500 dark:text-gray-400">
             {currentHoFCreatorId 
-              ? 'This ID will be used in your HoF Creator API calls.'
+              ? ''
               : 'Set a custom HoF Creator ID or leave empty to use your user ID.'
             }
           </p>
+          {currentHoFCreatorId && (
+            <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <div className="flex items-start space-x-2">
+                <div className="flex-shrink-0 mt-0.5">
+                  <svg className="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div className="text-sm text-blue-700 dark:text-blue-300">
+                  <p className="font-medium mb-1">Hall of Fame Integration</p>
+                  <p>Your Hall of Fame screenshots will automatically appear on city pages where the city name matches. No manual upload needed!</p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
