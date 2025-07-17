@@ -9,26 +9,37 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const query = searchParams.get('q');
 
-    if (!query || query.trim().length < 1) {
-      return NextResponse.json({ users: [] });
-    }
-
-    const searchTerm = query.trim().toLowerCase();
-    
-    // Get all users and filter by username
+    // Get all users
     const allUsers = await getAllUsersWithStats();
     
-    const filteredUsers = allUsers
-      .filter(user => 
-        user.username && 
-        user.username.toLowerCase().includes(searchTerm)
-      )
-      .slice(0, 10) // Limit to 10 results
-      .map(user => ({
-        id: user.id,
-        username: user.username,
-        email: user.email
-      }));
+    let filteredUsers;
+    
+    if (!query || query.trim().length === 0) {
+      // Show 5 random users when no query
+      const shuffled = allUsers.sort(() => 0.5 - Math.random());
+      filteredUsers = shuffled
+        .filter(user => user.username)
+        .slice(0, 5)
+        .map(user => ({
+          id: user.id,
+          username: user.username,
+          email: user.email
+        }));
+    } else {
+      // Filter by search term
+      const searchTerm = query.trim().toLowerCase();
+      filteredUsers = allUsers
+        .filter(user => 
+          user.username && 
+          user.username.toLowerCase().includes(searchTerm)
+        )
+        .slice(0, 10) // Limit to 10 results
+        .map(user => ({
+          id: user.id,
+          username: user.username,
+          email: user.email
+        }));
+    }
 
     return NextResponse.json({ users: filteredUsers });
   } catch (error) {

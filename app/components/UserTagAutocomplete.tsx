@@ -22,11 +22,6 @@ export function UserTagAutocomplete({ query, onSelectUser, onClose }: UserTagAut
 
   useEffect(() => {
     const searchUsers = async () => {
-      if (query.length < 1) {
-        setUsers([]);
-        return;
-      }
-
       setLoading(true);
       try {
         const response = await fetch(`/api/search/users?q=${encodeURIComponent(query)}`);
@@ -59,6 +54,12 @@ export function UserTagAutocomplete({ query, onSelectUser, onClose }: UserTagAut
           e.preventDefault();
           setSelectedIndex(prev => (prev - 1 + users.length) % users.length);
           break;
+        case 'Tab':
+          e.preventDefault();
+          if (users[selectedIndex]) {
+            onSelectUser(users[selectedIndex]);
+          }
+          break;
         case 'Enter':
           e.preventDefault();
           if (users[selectedIndex]) {
@@ -76,7 +77,7 @@ export function UserTagAutocomplete({ query, onSelectUser, onClose }: UserTagAut
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [users, selectedIndex, onSelectUser, onClose]);
 
-  if (users.length === 0 && !loading) {
+  if (users.length === 0 && !loading && query.length > 0) {
     return null;
   }
 
