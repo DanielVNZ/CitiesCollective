@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from 'app/auth';
 import { getUser, updateUser } from 'app/db';
+import { sendHallOfFameUserUpdate } from '@/app/utils/hallOfFameWebhook';
 
 // Force dynamic rendering to prevent static generation issues
 export const dynamic = 'force-dynamic';
@@ -63,6 +64,17 @@ export async function PUT(request: NextRequest) {
 
     // Update user
     const updatedUser = await updateUser(userId, { username });
+    
+    // Send webhook to Hall of Fame if user has a Creator ID
+    try {
+      const user = users[0];
+      if (user.hofCreatorId && user.hofCreatorId.trim()) {
+        await sendHallOfFameUserUpdate(userId, user.hofCreatorId);
+      }
+    } catch (webhookError) {
+      // Log error but don't fail the update
+      console.error('Failed to send Hall of Fame webhook:', webhookError);
+    }
     
     return NextResponse.json({ 
       success: true, 

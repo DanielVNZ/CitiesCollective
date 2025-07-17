@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAllUsersWithHoFCreatorId, getCitiesByUser } from '@/app/db';
+import { getAllUsersWithHoFCreatorId, getCitiesByUser, getUserSocialLinks } from '@/app/db';
+
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
@@ -36,13 +39,20 @@ export async function GET(request: NextRequest) {
     // Get all cities for this user
     const cities = await getCitiesByUser(user.id);
 
-    // Return user information with cities
+    // Get user's social links
+    const socialLinks = await getUserSocialLinks(user.id);
+
+    // Return user information with cities and social links
     return NextResponse.json({
       success: true,
       user: {
         id: user.id,
         username: user.username,
         hofCreatorId: user.hofCreatorId,
+        socialLinks: socialLinks.map(link => ({
+          platform: link.platform,
+          url: link.url
+        })),
         cities: cities.map(city => ({
           id: city.id,
           name: city.cityName

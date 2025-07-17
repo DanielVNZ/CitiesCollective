@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from 'app/auth';
 import { getUser, updateUser } from 'app/db';
+import { sendHallOfFameUserUpdate } from '@/app/utils/hallOfFameWebhook';
 
 export async function PUT(request: NextRequest) {
   try {
@@ -31,6 +32,16 @@ export async function PUT(request: NextRequest) {
 
     // Update user's HoF Creator ID
     const updatedUser = await updateUser(user.id, { hofCreatorId: hofCreatorId || null });
+
+    // Send webhook to Hall of Fame if Creator ID is set
+    if (hofCreatorId && hofCreatorId.trim()) {
+      try {
+        await sendHallOfFameUserUpdate(user.id, hofCreatorId.trim());
+      } catch (webhookError) {
+        // Log error but don't fail the update
+        console.error('Failed to send Hall of Fame webhook:', webhookError);
+      }
+    }
 
     return NextResponse.json({
       success: true,

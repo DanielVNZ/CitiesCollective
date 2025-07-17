@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from 'app/auth';
 import { getUserSocialLinks, upsertUserSocialLink, deleteUserSocialLink, getUser } from 'app/db';
+import { sendHallOfFameUserUpdate } from '@/app/utils/hallOfFameWebhook';
 
 // Define supported platforms with their domain validation
 const PLATFORM_DOMAINS = {
@@ -115,6 +116,17 @@ export async function POST(request: NextRequest) {
 
     const socialLink = await upsertUserSocialLink(userId, platform, url.trim());
     
+    // Send webhook to Hall of Fame if user has a Creator ID
+    try {
+      const user = users[0];
+      if (user.hofCreatorId && user.hofCreatorId.trim()) {
+        await sendHallOfFameUserUpdate(userId, user.hofCreatorId);
+      }
+    } catch (webhookError) {
+      // Log error but don't fail the update
+      console.error('Failed to send Hall of Fame webhook:', webhookError);
+    }
+    
     return NextResponse.json({ socialLink, message: 'Social link saved successfully' });
   } catch (error) {
     console.error('Error saving social link:', error);
@@ -150,6 +162,17 @@ export async function DELETE(request: NextRequest) {
     
     if (!deletedLink) {
       return NextResponse.json({ error: 'Social link not found' }, { status: 404 });
+    }
+
+    // Send webhook to Hall of Fame if user has a Creator ID
+    try {
+      const user = users[0];
+      if (user.hofCreatorId && user.hofCreatorId.trim()) {
+        await sendHallOfFameUserUpdate(userId, user.hofCreatorId);
+      }
+    } catch (webhookError) {
+      // Log error but don't fail the update
+      console.error('Failed to send Hall of Fame webhook:', webhookError);
     }
 
     return NextResponse.json({ message: 'Social link deleted successfully' });

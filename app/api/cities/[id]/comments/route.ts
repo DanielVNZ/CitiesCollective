@@ -56,7 +56,7 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid city ID' }, { status: 400 });
     }
 
-    const { content } = await request.json();
+    const { content, taggedUsers = [] } = await request.json();
     if (!content || content.trim().length === 0) {
       return NextResponse.json({ error: 'Comment content is required' }, { status: 400 });
     }
@@ -96,6 +96,31 @@ export async function POST(
     } catch (notificationError) {
       // Log the error but don't fail the comment creation
       console.error('Failed to send comment notification:', notificationError);
+    }
+
+    // Send notifications to tagged users
+    if (taggedUsers.length > 0) {
+      try {
+        const { getUserByUsernameOrEmail, createNotification } = await import('app/db');
+        
+        for (const username of taggedUsers) {
+          const taggedUser = await getUserByUsernameOrEmail(username);
+          if (taggedUser.length > 0 && taggedUser[0].id !== userId) {
+            await createNotification({
+              userId: taggedUser[0].id,
+              type: 'comment_tag',
+              title: 'You were tagged in a comment',
+              message: `@${users[0].username || 'Anonymous'} tagged you in a comment on a city`,
+              relatedUserId: userId,
+              relatedCityId: cityId,
+              relatedCommentId: comment.id
+            });
+          }
+        }
+      } catch (tagNotificationError) {
+        // Log the error but don't fail the comment creation
+        console.error('Failed to send tag notifications:', tagNotificationError);
+      }
     }
     
     // Return moderation info if content was filtered

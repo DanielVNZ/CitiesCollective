@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getUsernameTextColor, getUsernameAvatarColor } from '../utils/userColors';
 import { refreshCommentCount } from './CommentCount';
+import { UserTagAutocomplete } from './UserTagAutocomplete';
 
 interface Comment {
   id: number;
@@ -29,9 +30,13 @@ export function Comments({ cityId }: CommentsProps) {
   const [submitting, setSubmitting] = useState(false);
   const [moderationMessage, setModerationMessage] = useState<string | null>(null);
   const [moderationInfo, setModerationInfo] = useState<any>(null);
-  const [sortBy, setSortBy] = useState<'recent' | 'likes'>('likes');
+  const [sortBy, setSortBy] = useState<'recent' | 'likes'>('recent');
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [showTagAutocomplete, setShowTagAutocomplete] = useState(false);
+  const [tagQuery, setTagQuery] = useState('');
+  const [tagCursorPosition, setTagCursorPosition] = useState(0);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const router = useRouter();
 
   const fetchCurrentUser = useCallback(async () => {
@@ -81,13 +86,19 @@ export function Comments({ cityId }: CommentsProps) {
     setModerationMessage(null);
     setModerationInfo(null);
     
+    // Extract tagged users from comment
+    const taggedUsers = newComment.match(/@(\w+)/g)?.map(tag => tag.slice(1)) || [];
+    
     try {
       const response = await fetch(`/api/cities/${cityId}/comments`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ content: newComment.trim() }),
+        body: JSON.stringify({ 
+          content: newComment.trim(),
+          taggedUsers: taggedUsers
+        }),
       });
 
       if (response.status === 401) {
@@ -204,6 +215,102 @@ export function Comments({ cityId }: CommentsProps) {
     return isAdmin || currentUser.id === comment.userId;
   };
 
+  const handleCommentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    setNewComment(value);
+    
+    const cursorPos = e.target.selectionStart;
+    setTagCursorPosition(cursorPos);
+    
+    // Check if we're typing a tag (@username)
+    const beforeCursor = value.substring(0, cursorPos);
+    const tagMatch = beforeCursor.match(/@(\w*)$/);
+    
+    if (tagMatch) {
+      setTagQuery(tagMatch[1]);
+      setShowTagAutocomplete(true);
+    } else {
+      setShowTagAutocomplete(false);
+    }
+  };
+
+  const handleSelectUser = (user: { id: number; username: string; email: string }) => {
+    const beforeTag = newComment.substring(0, tagCursorPosition - tagQuery.length - 1); // -1 for @
+    const afterTag = newComment.substring(tagCursorPosition);
+    const newValue = beforeTag + `@${user.username} ` + afterTag;
+    
+    setNewComment(newValue);
+    setShowTagAutocomplete(false);
+    setTagQuery('');
+    
+    // Focus back to textarea and set cursor position
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+      const newCursorPos = beforeTag.length + user.username.length + 2; // +2 for @ and space
+      textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+    }
+  };
+
+  const handleCloseTagAutocomplete = () => {
+    setShowTagAutocomplete(false);
+    setTagQuery('');
+  };
+
+  // Cache for user ID lookups
+  const [userIdCache, setUserIdCache] = useState<Record<string, number>>({});
+
+  // Component for tagged username links
+  const TaggedUsername = ({ username }: { username: string }) => {
+    const [userId, setUserId] = useState<number | null>(null);
+    const [isLoading, setIsLoading] = useState(false);
+    const usernameTextColor = getUsernameTextColor(username);
+
+    useEffect(() => {
+      const fetchUserId = async () => {
+        // Check cache first
+        if (userIdCache[username]) {
+          setUserId(userIdCache[username]);
+          return;
+        }
+
+        setIsLoading(true);
+        try {
+          const response = await fetch(`/api/search/user-by-username?username=${encodeURIComponent(username)}`);
+          if (response.ok) {
+            const data = await response.json();
+            setUserId(data.userId);
+            // Cache the result
+            setUserIdCache(prev => ({ ...prev, [username]: data.userId }));
+          }
+        } catch (error) {
+          console.error('Error fetching user ID:', error);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      fetchUserId();
+    }, [username, userIdCache]);
+
+    if (isLoading) {
+      return <span className={`${usernameTextColor} font-medium`}>@{username}</span>;
+    }
+
+    if (userId) {
+      return (
+        <Link 
+          href={`/user/${userId}`}
+          className={`${usernameTextColor} font-medium hover:underline`}
+        >
+          @{username}
+        </Link>
+      );
+    }
+
+    // Fallback if user not found
+    return <span className={`${usernameTextColor} font-medium`}>@{username}</span>;
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -237,22 +344,32 @@ export function Comments({ cityId }: CommentsProps) {
 
       {/* Add Comment Form */}
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
+        <div className="relative">
           <label htmlFor="comment" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             Add a comment
           </label>
           <textarea
+            ref={textareaRef}
             id="comment"
             rows={3}
             value={newComment}
-            onChange={(e) => setNewComment(e.target.value)}
-            placeholder="Share your thoughts about this city..."
+            onChange={handleCommentChange}
+            placeholder="Share your thoughts about this city... Use @ to tag users"
             maxLength={1000}
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
           <div className="text-right text-sm text-gray-500 dark:text-gray-400 mt-1">
             {newComment.length}/1000 characters
           </div>
+          
+          {/* User Tag Autocomplete */}
+          {showTagAutocomplete && (
+            <UserTagAutocomplete
+              query={tagQuery}
+              onSelectUser={handleSelectUser}
+              onClose={handleCloseTagAutocomplete}
+            />
+          )}
         </div>
         
         {/* Moderation Message */}
@@ -331,7 +448,13 @@ export function Comments({ cityId }: CommentsProps) {
                     )}
                   </div>
                   <p className="text-gray-700 dark:text-gray-300 mt-1 whitespace-pre-wrap">
-                    {comment.content}
+                    {comment.content.split(/(@\w+)/).map((part, index) => {
+                      if (part.startsWith('@')) {
+                        const username = part.slice(1); // Remove the @ symbol
+                        return <TaggedUsername key={index} username={username} />;
+                      }
+                      return part;
+                    })}
                   </p>
                   
                   {/* Like Button */}
