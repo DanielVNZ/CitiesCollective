@@ -16,22 +16,21 @@ const formatNumber = (num: number | null) => {
   return num.toString();
 };
 
-// Helper function to format dates consistently
-const formatDate = (date: string | Date) => {
+// Helper function to format dates
+const formatDate = (date: Date | null) => {
   if (!date) return 'Unknown';
   const d = new Date(date);
-  // Use explicit locale to ensure consistency between server and client
-  return d.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric'
-  });
+  const month = d.getMonth() + 1;
+  const day = d.getDate();
+  const year = d.getFullYear();
+  return `${month}/${day}/${year}`;
 };
 
 export function CityCard({ city, ranking }: { city: any; ranking?: number }) {
   const primaryImage = city.images?.find((img: any) => img.isPrimary) || city.images?.[0];
   const imagePath = primaryImage?.mediumPath;
   const isPlaceholder = !imagePath || imagePath.includes('placeholder-image.png');
+  const isHallOfFameImage = primaryImage?.isHallOfFame;
   const username = city.user?.username;
   const usernameTextColor = getUsernameTextColor(username);
   const usernameAvatarColor = getUsernameAvatarColor(username);
@@ -62,7 +61,21 @@ export function CityCard({ city, ranking }: { city: any; ranking?: number }) {
                 priority
               />
             )}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
+            
+            {/* Hall of Fame Icon */}
+            {isHallOfFameImage && (
+              <div className="absolute bottom-4 right-4 z-10">
+                <div className="bg-yellow-400 rounded-full p-1 shadow-lg">
+                  <Image
+                    src="/logo/hof-icon.svg"
+                    alt="Hall of Fame"
+                    width={20}
+                    height={20}
+                    className="w-5 h-5"
+                  />
+                </div>
+              </div>
+            )}
           </div>
         </Link>
         <div className="absolute top-2 right-2 z-10 flex items-center space-x-2">

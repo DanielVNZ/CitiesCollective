@@ -13,6 +13,7 @@ interface HallOfFameImage {
   imageUrlThumbnail: string;
   imageUrlFHD: string;
   imageUrl4K: string;
+  isPrimary: boolean;
   createdAt: string;
   lastUpdated: string;
 }
@@ -21,9 +22,11 @@ interface CityHallOfFameImagesProps {
   cityName: string;
   hofCreatorId: string | null;
   cityId: number;
+  isOwner: boolean;
+  isFeaturedOnHomePage?: boolean;
 }
 
-export default function CityHallOfFameImages({ cityName, hofCreatorId, cityId }: CityHallOfFameImagesProps) {
+export default function CityHallOfFameImages({ cityName, hofCreatorId, cityId, isOwner, isFeaturedOnHomePage = false }: CityHallOfFameImagesProps) {
   const [images, setImages] = useState<HallOfFameImage[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -73,21 +76,24 @@ export default function CityHallOfFameImages({ cityName, hofCreatorId, cityId }:
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-4 mb-6 border border-gray-200 dark:border-gray-700 max-w-4xl mx-auto">
-      <div className="flex items-center space-x-3 mb-3">
-        <div className="flex-shrink-0">
-          <div className="w-8 h-8 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center">
-            <span className="text-white text-sm font-bold">🏆</span>
-          </div>
-        </div>
-        <div>
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white">Hall of Fame Images</h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Screenshots of this city from the Hall of Fame
+      <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-1">Hall of Fame Images</h2>
+      <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+        Screenshots of this city from the Hall of Fame
+      </p>
+      {isOwner && (
+        <div className="mb-3 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+          <p className="text-xs text-yellow-700 dark:text-yellow-300">
+            <span className="font-semibold">Owner Controls:</span> ★ Set as featured image • ✓ Featured image
           </p>
         </div>
-      </div>
+      )}
 
-      <HallOfFameGallery images={images} />
+      <HallOfFameGallery 
+        images={images} 
+        cityId={cityId}
+        isOwner={isOwner}
+        isFeaturedOnHomePage={isFeaturedOnHomePage}
+      />
     </div>
   );
 } 

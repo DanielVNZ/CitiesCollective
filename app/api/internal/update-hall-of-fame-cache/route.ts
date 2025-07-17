@@ -22,6 +22,7 @@ export async function POST(request: NextRequest) {
         "imageUrlThumbnail" varchar(500) NOT NULL,
         "imageUrlFHD" varchar(500) NOT NULL,
         "imageUrl4K" varchar(500) NOT NULL,
+        "isPrimary" BOOLEAN DEFAULT FALSE,
         "createdAt" timestamp DEFAULT now(),
         "lastUpdated" timestamp DEFAULT now()
       )

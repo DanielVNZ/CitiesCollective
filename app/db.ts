@@ -210,6 +210,7 @@ const hallOfFameCacheTable = pgTable('hallOfFameCache', {
   imageUrlThumbnail: varchar('imageUrlThumbnail', { length: 500 }).notNull(),
   imageUrlFHD: varchar('imageUrlFHD', { length: 500 }).notNull(),
   imageUrl4K: varchar('imageUrl4K', { length: 500 }).notNull(),
+  isPrimary: boolean('isPrimary').default(false),
   createdAt: timestamp('createdAt').defaultNow(),
   lastUpdated: timestamp('lastUpdated').defaultNow(),
 });
@@ -789,9 +790,12 @@ async function ensureCityTableExists() {
 
 export async function getRecentCities(limit: number = 12, offset: number = 0) {
   await ensureCityTableExists();
+  await ensureCityImagesTableExists();
+  await ensureHallOfFameCacheTableExists();
   const users = await ensureTableExists();
-  
-  const cities = await db
+
+  // First get cities with primary screenshots
+  const citiesWithScreenshots = await db
     .select({
       id: cityTable.id,
       userId: cityTable.userId,
@@ -806,22 +810,62 @@ export async function getRecentCities(limit: number = 12, offset: number = 0) {
         id: users.id,
         username: users.username,
       },
-      images: sql<Array<{ id: number; fileName: string; isPrimary: boolean; mediumPath: string; largePath: string; thumbnailPath: string }>>`
+      images: sql<Array<{ id: number; fileName: string; isPrimary: boolean; mediumPath: string; largePath: string; thumbnailPath: string; isHallOfFame?: boolean }>>`
         (
-          SELECT COALESCE(json_agg(json_build_object('id', i.id, 'fileName', i."fileName", 'isPrimary', i."isPrimary", 'mediumPath', i."mediumPath", 'largePath', i."largePath", 'thumbnailPath', i."thumbnailPath")), '[]'::json)
+          SELECT COALESCE(json_agg(json_build_object('id', i.id, 'fileName', i."fileName", 'isPrimary', i."isPrimary", 'mediumPath', i."mediumPath", 'largePath', i."largePath", 'thumbnailPath', i."thumbnailPath", 'isHallOfFame', false)), '[]'::json)
           FROM "cityImages" i
-          WHERE i."cityId" = "City".id
+          WHERE i."cityId" = "City".id AND i."isPrimary" = true
         )
       `,
       commentCount: sql<number>`(SELECT COUNT(*) FROM "comments" WHERE "cityId" = "City".id)`.as('commentCount'),
     })
     .from(cityTable)
     .leftJoin(users, eq(cityTable.userId, users.id))
-    .orderBy(desc(cityTable.uploadedAt))
-    .limit(limit)
-    .offset(offset);
+    .innerJoin(cityImagesTable, eq(cityTable.id, cityImagesTable.cityId))
+    .where(eq(cityImagesTable.isPrimary, true))
+    .groupBy(cityTable.id, users.id);
 
-  return cities;
+  // Then get cities with primary Hall of Fame images (that don't have primary screenshots)
+  const citiesWithHallOfFame = await db
+    .select({
+      id: cityTable.id,
+      userId: cityTable.userId,
+      cityName: cityTable.cityName,
+      mapName: cityTable.mapName,
+      population: cityTable.population,
+      money: cityTable.money,
+      xp: cityTable.xp,
+      unlimitedMoney: cityTable.unlimitedMoney,
+      uploadedAt: cityTable.uploadedAt,
+      user: {
+        id: users.id,
+        username: users.username,
+      },
+      images: sql<Array<{ id: number; fileName: string; isPrimary: boolean; mediumPath: string; largePath: string; thumbnailPath: string; isHallOfFame?: boolean }>>`
+        (
+          SELECT COALESCE(json_agg(json_build_object('id', h."hofImageId", 'fileName', h."cityName", 'isPrimary', h."isPrimary", 'mediumPath', h."imageUrlFHD", 'largePath', h."imageUrl4K", 'thumbnailPath', h."imageUrlThumbnail", 'isHallOfFame', true)), '[]'::json)
+          FROM "hallOfFameCache" h
+          WHERE h."cityName" = "City"."cityName" AND h."isPrimary" = true
+        )
+      `,
+      commentCount: sql<number>`(SELECT COUNT(*) FROM "comments" WHERE "cityId" = "City".id)`.as('commentCount'),
+    })
+    .from(cityTable)
+    .leftJoin(users, eq(cityTable.userId, users.id))
+    .innerJoin(hallOfFameCacheTable, eq(hallOfFameCacheTable.cityName, cityTable.cityName))
+    .where(
+      and(
+        eq(hallOfFameCacheTable.isPrimary, true),
+        sql`NOT EXISTS (SELECT 1 FROM "cityImages" WHERE "cityId" = "City".id AND "isPrimary" = true)`
+      )
+    )
+    .groupBy(cityTable.id, users.id);
+
+  // Combine and sort by upload date
+  const allCities = [...citiesWithScreenshots, ...citiesWithHallOfFame];
+  allCities.sort((a, b) => new Date(b.uploadedAt || 0).getTime() - new Date(a.uploadedAt || 0).getTime());
+
+  return allCities.slice(offset, offset + limit);
 }
 
 export async function getTopCitiesByMoney(limit: number = 3) {
@@ -903,9 +947,11 @@ export async function getTopCitiesWithImages(limit: number = 25) {
   await ensureCityTableExists();
   await ensureLikesTableExists();
   await ensureCityImagesTableExists();
+  await ensureHallOfFameCacheTableExists();
   const users = await ensureTableExists();
 
-  const topCities = await db
+  // First get cities with primary screenshots
+  const citiesWithScreenshots = await db
     .select({
       id: cityTable.id,
       userId: cityTable.userId,
@@ -921,11 +967,20 @@ export async function getTopCitiesWithImages(limit: number = 25) {
         id: users.id,
         username: users.username,
       },
-      images: sql<Array<{ id: number; fileName: string; isPrimary: boolean; mediumPath: string; largePath: string; thumbnailPath: string }>>`
+      images: sql<Array<{ id: number; fileName: string; isPrimary: boolean; mediumPath: string; largePath: string; originalPath: string; thumbnailPath: string; isHallOfFame?: boolean }>>`
         (
-          SELECT COALESCE(json_agg(json_build_object('id', i.id, 'fileName', i."fileName", 'isPrimary', i."isPrimary", 'mediumPath', i."mediumPath", 'largePath', i."largePath", 'thumbnailPath', i."thumbnailPath")), '[]'::json)
+          SELECT COALESCE(json_agg(json_build_object(
+            'id', i.id,
+            'fileName', i."fileName",
+            'isPrimary', i."isPrimary",
+            'mediumPath', i."mediumPath",
+            'largePath', i."largePath",
+            'originalPath', i."originalPath",
+            'thumbnailPath', i."thumbnailPath",
+            'isHallOfFame', false
+          )), '[]'::json)
           FROM "cityImages" i
-          WHERE i."cityId" = "City".id
+          WHERE i."cityId" = "City".id AND i."isPrimary" = true
         )
       `,
       commentCount: sql<number>`(SELECT COUNT(*) FROM "comments" WHERE "cityId" = "City".id)`.as('commentCount'),
@@ -934,11 +989,59 @@ export async function getTopCitiesWithImages(limit: number = 25) {
     .leftJoin(users, eq(cityTable.userId, users.id))
     .innerJoin(cityImagesTable, eq(cityTable.id, cityImagesTable.cityId))
     .where(eq(cityImagesTable.isPrimary, true))
-    .groupBy(cityTable.id, users.id)
-    .orderBy(desc(sql`(SELECT COUNT(*) FROM "likes" WHERE "cityId" = "City".id)`))
-    .limit(limit);
+    .groupBy(cityTable.id, users.id);
 
-  return topCities;
+  // Then get cities with primary Hall of Fame images (that don't have primary screenshots)
+  const citiesWithHallOfFame = await db
+    .select({
+      id: cityTable.id,
+      userId: cityTable.userId,
+      cityName: cityTable.cityName,
+      mapName: cityTable.mapName,
+      population: cityTable.population,
+      money: cityTable.money,
+      xp: cityTable.xp,
+      unlimitedMoney: cityTable.unlimitedMoney,
+      uploadedAt: cityTable.uploadedAt,
+      likeCount: sql<number>`(SELECT COUNT(*) FROM "likes" WHERE "cityId" = "City".id)`.as('likeCount'),
+      user: {
+        id: users.id,
+        username: users.username,
+      },
+      images: sql<Array<{ id: number; fileName: string; isPrimary: boolean; mediumPath: string; largePath: string; originalPath: string; thumbnailPath: string; isHallOfFame?: boolean }>>`
+        (
+          SELECT COALESCE(json_agg(json_build_object(
+            'id', h."hofImageId",
+            'fileName', h."cityName",
+            'isPrimary', h."isPrimary",
+            'mediumPath', h."imageUrlFHD",
+            'largePath', h."imageUrl4K",
+            'originalPath', h."imageUrl4K",
+            'thumbnailPath', h."imageUrlThumbnail",
+            'isHallOfFame', true
+          )), '[]'::json)
+          FROM "hallOfFameCache" h
+          WHERE h."cityName" = "City"."cityName" AND h."isPrimary" = true
+        )
+      `,
+      commentCount: sql<number>`(SELECT COUNT(*) FROM "comments" WHERE "cityId" = "City".id)`.as('commentCount'),
+    })
+    .from(cityTable)
+    .leftJoin(users, eq(cityTable.userId, users.id))
+    .innerJoin(hallOfFameCacheTable, eq(hallOfFameCacheTable.cityName, cityTable.cityName))
+    .where(
+      and(
+        eq(hallOfFameCacheTable.isPrimary, true),
+        sql`NOT EXISTS (SELECT 1 FROM "cityImages" WHERE "cityId" = "City".id AND "isPrimary" = true)`
+      )
+    )
+    .groupBy(cityTable.id, users.id);
+
+  // Combine and sort by like count
+  const allCities = [...citiesWithScreenshots, ...citiesWithHallOfFame];
+  allCities.sort((a, b) => (b.likeCount || 0) - (a.likeCount || 0));
+
+  return allCities.slice(0, limit);
 }
 
 export async function getContentCreatorCities(limit: number = 6) {
@@ -1495,9 +1598,10 @@ export async function deleteCityImage(imageId: number, userId: number) {
 
 export async function setPrimaryImage(imageId: number, cityId: number, userId: number) {
   await ensureCityImagesTableExists();
+  await ensureHallOfFameCacheTableExists();
   
   // First, verify the user owns the city
-  const cityOwner = await db.select({ userId: cityTable.userId })
+  const cityOwner = await db.select({ userId: cityTable.userId, cityName: cityTable.cityName })
     .from(cityTable)
     .where(eq(cityTable.id, cityId))
     .limit(1);
@@ -1516,12 +1620,18 @@ export async function setPrimaryImage(imageId: number, cityId: number, userId: n
     throw new Error('Image not found or does not belong to this city');
   }
   
-  // Remove primary status from all images of this city
+  // Remove primary status from ALL images (both screenshots and Hall of Fame) for this city
   await db.update(cityImagesTable)
     .set({ isPrimary: false })
     .where(eq(cityImagesTable.cityId, cityId));
   
-  // Set this image as primary
+  if (cityOwner[0].cityName) {
+    await db.update(hallOfFameCacheTable)
+      .set({ isPrimary: false })
+      .where(eq(hallOfFameCacheTable.cityName, cityOwner[0].cityName));
+  }
+  
+  // Set this screenshot as primary
   await db.update(cityImagesTable)
     .set({ isPrimary: true })
     .where(eq(cityImagesTable.id, imageId));
@@ -2818,6 +2928,7 @@ async function ensureHallOfFameCacheTableExists() {
           "imageUrlThumbnail" varchar(500) NOT NULL,
           "imageUrlFHD" varchar(500) NOT NULL,
           "imageUrl4K" varchar(500) NOT NULL,
+          "isPrimary" BOOLEAN DEFAULT FALSE,
           "createdAt" timestamp DEFAULT now(),
           "lastUpdated" timestamp DEFAULT now()
         )
@@ -2839,6 +2950,24 @@ async function ensureHallOfFameCacheTableExists() {
           ADD COLUMN "userId" integer REFERENCES "User"("id") ON DELETE CASCADE
         `;
         console.log('Added userId column to hallOfFameCache table');
+      }
+
+      // Check if isPrimary column exists, add it if it doesn't
+      const isPrimaryColumnExists = await client`
+        SELECT EXISTS (
+          SELECT FROM information_schema.columns 
+          WHERE table_name = 'hallOfFameCache' 
+          AND column_name = 'isPrimary'
+        )
+      `;
+
+      if (!isPrimaryColumnExists[0].exists) {
+        // Add the missing isPrimary column
+        await client`
+          ALTER TABLE "hallOfFameCache" 
+          ADD COLUMN "isPrimary" BOOLEAN DEFAULT FALSE
+        `;
+        console.log('Added isPrimary column to hallOfFameCache table');
       }
     }
     
@@ -2937,6 +3066,53 @@ export async function removeHallOfFameImage(cityId: number, hofImageId: string) 
       ));
   } catch (error) {
     console.error('Error removing Hall of Fame image:', error);
+  }
+}
+
+export async function setPrimaryHallOfFameImage(hofImageId: string, cityId: number, userId: number) {
+  try {
+    await ensureHallOfFameCacheTableExists();
+    
+    // First, verify the user owns the city
+    const cityOwner = await db.select({ userId: cityTable.userId, cityName: cityTable.cityName })
+      .from(cityTable)
+      .where(eq(cityTable.id, cityId))
+      .limit(1);
+    
+    if (!cityOwner[0] || cityOwner[0].userId !== userId) {
+      throw new Error('Unauthorized');
+    }
+    
+    const cityName = cityOwner[0].cityName;
+    
+    // Verify the image belongs to this city by matching city name
+    const imageOwner = await db.select({ cityName: hallOfFameCacheTable.cityName })
+      .from(hallOfFameCacheTable)
+      .where(eq(hallOfFameCacheTable.hofImageId, hofImageId))
+      .limit(1);
+    
+    if (!imageOwner[0] || imageOwner[0].cityName !== cityName) {
+      throw new Error('Image not found or does not belong to this city');
+    }
+    
+    // Remove primary status from ALL images (both screenshots and Hall of Fame) for this city
+    await db.update(hallOfFameCacheTable)
+      .set({ isPrimary: false })
+      .where(eq(hallOfFameCacheTable.cityName, cityName));
+    
+    await db.update(cityImagesTable)
+      .set({ isPrimary: false })
+      .where(eq(cityImagesTable.cityId, cityId));
+    
+    // Set this Hall of Fame image as primary
+    await db.update(hallOfFameCacheTable)
+      .set({ isPrimary: true })
+      .where(eq(hallOfFameCacheTable.hofImageId, hofImageId));
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Error setting primary Hall of Fame image:', error);
+    throw error;
   }
 }
 

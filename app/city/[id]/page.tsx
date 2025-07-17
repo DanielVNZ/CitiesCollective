@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { getCityById, getUserById, getCityImages, getUser, getModCompatibility } from 'app/db';
+import { getCityById, getUserById, getCityImages, getUser, getModCompatibility, getTopCitiesWithImages, getHallOfFameImagesForCity } from 'app/db';
 import { ImageGallery } from './ImageGallery';
 import { ImageManager } from 'app/components/ImageManager';
 import { LikeButton } from 'app/components/LikeButton';
@@ -32,9 +32,10 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
     notFound();
   }
 
-  const [city, images] = await Promise.all([
+  const [city, images, hallOfFameImages] = await Promise.all([
     getCityById(cityId),
-    getCityImages(cityId)
+    getCityImages(cityId),
+    getHallOfFameImagesForCity(cityId)
   ]);
 
   if (!city) {
@@ -153,6 +154,10 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
   const usernameAvatarColor = getUsernameAvatarColor(username);
 
   const isAdmin = session?.user?.email ? await isUserAdmin(session.user.email) : false;
+  
+  // Check if this city is featured on the home page (in top 25)
+  const topCities = await getTopCitiesWithImages(25);
+  const isFeaturedOnHomePage = topCities.some(topCity => topCity.id === cityId);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -160,20 +165,24 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
       <Header session={session} isAdmin={isAdmin} />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        {/* Images Section - Screenshots and Hall of Fame side by side */}
+        {/* Images Section - Dynamic layout based on available images */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-          {/* Screenshots Section - Left side */}
-          <div className={`order-2 xl:order-1 ${!user?.hofCreatorId ? 'xl:col-span-2' : ''}`}>
-            <ImageSection cityId={cityId} initialImages={images} isOwner={isOwner} />
-          </div>
+          {/* Screenshots Section */}
+          {images.length > 0 && (
+            <div className={`order-2 xl:order-1 ${hallOfFameImages.length === 0 ? 'xl:col-span-2' : ''}`}>
+              <ImageSection cityId={cityId} initialImages={images} isOwner={isOwner} />
+            </div>
+          )}
           
-          {/* Hall of Fame Images - Right side */}
-          {user?.hofCreatorId && (
-            <div className="order-1 xl:order-2">
+          {/* Hall of Fame Images */}
+          {user?.hofCreatorId && hallOfFameImages.length > 0 && (
+            <div className={`order-1 xl:order-2 ${images.length === 0 ? 'xl:col-span-2' : ''}`}>
               <CityHallOfFameImages 
                 cityName={city.cityName || ''} 
                 hofCreatorId={user?.hofCreatorId || null} 
                 cityId={cityId}
+                isOwner={isOwner}
+                isFeaturedOnHomePage={isFeaturedOnHomePage}
               />
             </div>
           )}
@@ -183,7 +192,7 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
           
           {/* Map and Details Section - Full width */}
-          {city.osmMapPath && (
+          {(city.osmMapPath || isOwner) && (
             <div className="xl:col-span-3">
               <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
                 {/* Map */}
@@ -196,43 +205,45 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
                 </div>
                 
                 {/* Map Legend and Download Section */}
-                <div className="xl:col-span-1 space-y-6">
-                  {/* Map Legend */}
-                  <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
-                    <MapLegend />
-                  </div>
-                  
-                  {/* OSM Download Section */}
-                  <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-200 dark:border-gray-700">
-                    <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                      <div className="flex items-center justify-center space-x-3 mb-4">
-                        <div className="p-2 bg-blue-100 dark:bg-blue-900/50 rounded-lg">
-                          <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-1.447-.894L15 4m0 13V4m-6 3l6-3" />
-                          </svg>
+                {city.osmMapPath && (
+                  <div className="xl:col-span-1 space-y-6">
+                    {/* Map Legend */}
+                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
+                      <MapLegend />
+                    </div>
+                    
+                    {/* OSM Download Section */}
+                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-200 dark:border-gray-700">
+                      <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                        <div className="flex items-center justify-center space-x-3 mb-4">
+                          <div className="p-2 bg-blue-100 dark:bg-blue-900/50 rounded-lg">
+                            <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-1.447-.894L15 4m0 13V4m-6 3l6-3" />
+                            </svg>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">OSM Map File</p>
+                            <p className="text-xs text-blue-600 dark:text-blue-300">
+                              {city.osmMapPath?.split('/').pop() || 'osm-map.osm'}
+                            </p>
+                          </div>
                         </div>
-                        <div className="text-center">
-                          <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">OSM Map File</p>
-                          <p className="text-xs text-blue-600 dark:text-blue-300">
-                            {city.osmMapPath?.split('/').pop() || 'osm-map.osm'}
-                          </p>
+                        <div className="flex justify-center">
+                          <a
+                            href={city.osmMapPath}
+                            download
+                            className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
+                          >
+                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            Download OSM File
+                          </a>
                         </div>
-                      </div>
-                      <div className="flex justify-center">
-                        <a
-                          href={city.osmMapPath}
-                          download
-                          className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
-                        >
-                          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                          Download OSM File
-                        </a>
                       </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
           )}

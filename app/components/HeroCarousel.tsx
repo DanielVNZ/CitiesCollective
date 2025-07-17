@@ -11,7 +11,7 @@ type HeroCarouselProps = {
   topCities: {
     id: number;
     cityName: string | null;
-    images: { id: number; fileName: string; isPrimary: boolean; mediumPath: string; largePath: string; thumbnailPath: string; }[];
+    images: { id: number; fileName: string; isPrimary: boolean; mediumPath: string; largePath: string; originalPath: string; thumbnailPath: string; isHallOfFame?: boolean; }[];
     user: { username: string | null; } | null;
   }[];
 };
@@ -32,7 +32,7 @@ export function HeroCarousel({ topCities }: HeroCarouselProps) {
       >
         {topCities.map((city, index) => {
           const primaryImage = city.images?.find((img: { isPrimary: boolean }) => img.isPrimary) || city.images?.[0];
-          const imagePath = primaryImage?.mediumPath;
+          const imagePath = primaryImage?.originalPath || primaryImage?.largePath || primaryImage?.mediumPath;
           const isPlaceholder = !imagePath || imagePath.includes('placeholder-image.png');
           
           return (
@@ -43,14 +43,37 @@ export function HeroCarousel({ topCities }: HeroCarouselProps) {
                   <span>This city is so mysterious, they didn&apos;t even upload a picture!</span>
                 </div>
               ) : (
-                <Image
+                <img
                   src={imagePath}
                   alt={city.cityName || 'City image'}
-                  width={1200}
-                  height={600}
+                  width={1920}
+                  height={1080}
                   className="w-full h-full object-cover brightness-50"
-                  priority
+                  loading="eager"
+                  srcSet={[
+                    primaryImage?.thumbnailPath && `${primaryImage.thumbnailPath} 400w`,
+                    primaryImage?.mediumPath && `${primaryImage.mediumPath} 800w`,
+                    primaryImage?.largePath && `${primaryImage.largePath} 1200w`,
+                    primaryImage?.originalPath && `${primaryImage.originalPath} 3840w`
+                  ].filter(Boolean).join(', ')}
+                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 1920px"
+                  style={{ width: '100%', height: '100%' }}
                 />
+              )}
+              
+              {/* Hall of Fame Icon */}
+              {primaryImage?.isHallOfFame && (
+                <div className="absolute bottom-4 right-4 z-10">
+                  <div className="bg-yellow-400 rounded-full p-1 shadow-lg">
+                    <img
+                      src="/logo/hof-icon.svg"
+                      alt="Hall of Fame"
+                      width={20}
+                      height={20}
+                      className="w-5 h-5"
+                    />
+                  </div>
+                </div>
               )}
               {/* Ranking Badge */}
               <div className="absolute top-4 left-4 bg-gradient-to-r from-purple-600 to-blue-500 text-white rounded-full w-12 h-12 flex items-center justify-center font-bold text-lg shadow-lg border-2 border-white">
