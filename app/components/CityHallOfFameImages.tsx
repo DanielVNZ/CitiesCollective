@@ -75,11 +75,7 @@ export default function CityHallOfFameImages({ cityName, hofCreatorId, cityId, i
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-4 mb-6 border border-gray-200 dark:border-gray-700 max-w-4xl mx-auto">
-      <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-1">Hall of Fame Images</h2>
-      <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-        Screenshots of this city from the Hall of Fame
-      </p>
+    <div>
       {isOwner && (
         <div className="mb-3 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
           <p className="text-xs text-yellow-700 dark:text-yellow-300">

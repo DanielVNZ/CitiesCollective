@@ -14,6 +14,9 @@ importers:
       '@aws-sdk/s3-request-presigner':
         specifier: ^3.842.0
         version: 3.842.0
+      '@fancyapps/ui':
+        specifier: ^6.0.14
+        version: 6.0.14
       '@heroicons/react':
         specifier: ^2.2.0
         version: 2.2.0(react@18.2.0)
@@ -1113,6 +1116,9 @@ packages:
   '@expo/xcpretty@4.3.2':
     resolution: {integrity: sha512-ReZxZ8pdnoI3tP/dNnJdnmAk7uLT4FjsKDGW7YeDdvdOMz2XCQSmSCM9IWlrXuWtMF9zeSB6WJtEhCQ41gQOfw==}
     hasBin: true
+
+  '@fancyapps/ui@6.0.14':
+    resolution: {integrity: sha512-Kska7tgdTo3iNePqNkRvESzepjJ4CqkivGHlsMtM7MHsb/ALHyw4Wfbiyi3WN6cXd7C+MZyTFjgZYNEl2kWWMQ==}
 
   '@gar/promisify@1.1.3':
     resolution: {integrity: sha512-k2Ty1JcVojjJFwrg/ThKi2ujJ7XNLYaFGNB/bWT9wGR+oSMJHMa5w+CUq6p/pVrKeNNgA7pCqEcjSnHVoqJQFw==}
@@ -6932,6 +6938,8 @@ snapshots:
       chalk: 4.1.2
       find-up: 5.0.0
       js-yaml: 4.1.0
+
+  '@fancyapps/ui@6.0.14': {}
 
   '@gar/promisify@1.1.3': {}
 

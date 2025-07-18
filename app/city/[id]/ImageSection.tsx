@@ -37,11 +37,7 @@ export function ImageSection({ cityId, initialImages, isOwner }: ImageSectionPro
     <>
       {/* Image Gallery */}
       {images.length > 0 && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-4 mb-6 border border-gray-200 dark:border-gray-700">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-1">Screenshots</h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-            User-uploaded screenshots of this city
-          </p>
+        <div>
           {isOwner && (
             <div className="mb-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
               <p className="text-xs text-blue-700 dark:text-blue-300">

@@ -77,15 +77,25 @@ export function LikeButton({ cityId, initialLiked = false, initialCount = 0, siz
     lg: 'w-6 h-6'
   };
 
+  const buttonSizes = {
+    sm: 'px-2.5 py-1.5 min-h-[36px]',
+    md: 'px-3 py-2 min-h-[44px]',
+    lg: 'px-4 py-3 min-h-[52px]'
+  };
+
   return (
     <button
       onClick={handleLike}
       disabled={loading}
-      className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg transition-all duration-200 ${
+      className={`flex items-center space-x-1.5 rounded-lg transition-all duration-200 ${
         liked 
           ? 'text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 shadow-sm' 
           : 'text-gray-700 hover:text-red-600 hover:bg-red-50 bg-white/80 dark:bg-gray-800/80 dark:text-gray-300 dark:hover:text-red-400'
-      } ${loading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:shadow-md'} ${sizeClasses[size]}`}
+      } ${loading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:shadow-md'} ${sizeClasses[size]} ${buttonSizes[size]} ${
+        // Enhanced mobile touch targets
+        'touch-manipulation select-none active:scale-95 sm:active:scale-100'
+      }`}
+      title={liked ? 'Unlike this city' : 'Like this city'}
     >
       <svg 
         className={`${iconSizes[size]} ${liked ? 'fill-current' : 'fill-none'}`}

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
+import { Fancybox } from '@fancyapps/ui';
 
 interface CityImage {
   id: number;
@@ -26,56 +27,23 @@ interface ImageGalleryProps {
 }
 
 export function ImageGallery({ images, cityId, isOwner, onImagesChange }: ImageGalleryProps) {
-  const [selectedImage, setSelectedImage] = useState<CityImage | null>(null);
-  const [currentIndex, setCurrentIndex] = useState(0);
   const [mainGalleryIndex, setMainGalleryIndex] = useState(0);
   const [thumbnailStartIndex, setThumbnailStartIndex] = useState(0);
-  const [zoom, setZoom] = useState(1);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const imageRef = useRef<HTMLImageElement>(null);
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+  const mainImageRef = useRef<HTMLDivElement>(null);
 
   // Filter out images with missing required data
   const validImages = images.filter(image => 
     image.mediumPath && image.largePath && image.originalName && image.thumbnailPath
   );
 
-  // Show 8 thumbnails at a time
-  const thumbnailsPerPage = 8;
+  // Show 12 thumbnails at a time (more with smaller thumbnails)
+  const thumbnailsPerPage = 12;
   const displayedThumbnails = validImages.slice(thumbnailStartIndex, thumbnailStartIndex + thumbnailsPerPage);
   const hasMoreImages = validImages.length > thumbnailsPerPage;
   const canScrollLeft = thumbnailStartIndex > 0;
   const canScrollRight = thumbnailStartIndex + thumbnailsPerPage < validImages.length;
-
-  const openLightbox = (image: CityImage, index: number) => {
-    setSelectedImage(image);
-    setCurrentIndex(index);
-    setZoom(1);
-    setPan({ x: 0, y: 0 });
-  };
-
-  const closeLightbox = () => {
-    setSelectedImage(null);
-    setZoom(1);
-    setPan({ x: 0, y: 0 });
-  };
-
-  const nextImage = () => {
-    const nextIndex = (currentIndex + 1) % validImages.length;
-    setCurrentIndex(nextIndex);
-    setSelectedImage(validImages[nextIndex]);
-    setZoom(1);
-    setPan({ x: 0, y: 0 });
-  };
-
-  const prevImage = () => {
-    const prevIndex = (currentIndex - 1 + validImages.length) % validImages.length;
-    setCurrentIndex(prevIndex);
-    setSelectedImage(validImages[prevIndex]);
-    setZoom(1);
-    setPan({ x: 0, y: 0 });
-  };
 
   const nextMainImage = () => {
     setMainGalleryIndex((prevIndex) => (prevIndex + 1) % displayedThumbnails.length);
@@ -99,49 +67,32 @@ export function ImageGallery({ images, cityId, isOwner, onImagesChange }: ImageG
     }
   };
 
-  // Zoom functions
-  const handleWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    const newZoom = Math.max(0.5, Math.min(5, zoom * delta));
-    setZoom(newZoom);
+  // Touch gesture handlers
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStart(e.targetTouches[0].clientX);
   };
 
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (zoom > 1) {
-      e.preventDefault();
-      setIsDragging(true);
-      setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+  const handleTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > 50;
+    const isRightSwipe = distance < -50;
+
+    if (isLeftSwipe && displayedThumbnails.length > 1) {
+      nextMainImage();
     }
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (isDragging && zoom > 1) {
-      e.preventDefault();
-      setPan({
-        x: e.clientX - dragStart.x,
-        y: e.clientY - dragStart.y,
-      });
+    if (isRightSwipe && displayedThumbnails.length > 1) {
+      prevMainImage();
     }
-  };
 
-  const handleMouseUp = (e: React.MouseEvent) => {
-    if (isDragging) {
-      e.preventDefault();
-      setIsDragging(false);
-    }
-  };
-
-  const handleMouseLeave = () => {
-    if (isDragging) {
-      setIsDragging(false);
-    }
-  };
-
-  const resetZoom = () => {
-    setZoom(1);
-    setPan({ x: 0, y: 0 });
+    // Reset values
+    setTouchStart(null);
+    setTouchEnd(null);
   };
 
   const handleSetPrimary = async (imageId: number) => {
@@ -197,35 +148,14 @@ export function ImageGallery({ images, cityId, isOwner, onImagesChange }: ImageG
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      closeLightbox();
-    } else if (e.key === 'ArrowRight') {
-      nextImage();
-    } else if (e.key === 'ArrowLeft') {
-      prevImage();
-    } else if (e.key === '0') {
-      resetZoom();
-    }
-  };
-
-  // Reset zoom when image changes and prevent body scroll
+  // Initialize Fancybox
   useEffect(() => {
-    if (selectedImage) {
-      setZoom(1);
-      setPan({ x: 0, y: 0 });
-      // Prevent body scroll when modal is open
-      document.body.style.overflow = 'hidden';
-    } else {
-      // Restore body scroll when modal is closed
-      document.body.style.overflow = 'unset';
-    }
+    Fancybox.bind('[data-fancybox="screenshots"]');
 
-    // Cleanup function to restore body scroll
     return () => {
-      document.body.style.overflow = 'unset';
+      Fancybox.destroy();
     };
-  }, [selectedImage]);
+  }, [validImages]);
 
   if (validImages.length === 0) {
     return (
@@ -240,16 +170,32 @@ export function ImageGallery({ images, cityId, isOwner, onImagesChange }: ImageG
       {/* Main Gallery View */}
       <div className="mb-6">
         <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-lg p-4 mb-6 border border-gray-200 dark:border-gray-700 max-w-4xl mx-auto">
-          {/* Main Image */}
-          <div className="relative aspect-video group cursor-pointer" onClick={() => openLightbox(displayedThumbnails[mainGalleryIndex], thumbnailStartIndex + mainGalleryIndex)}>
-            <Image
-              src={displayedThumbnails[mainGalleryIndex].originalPath!}
-              alt={displayedThumbnails[mainGalleryIndex].originalName!}
-              width={1200}
-              height={675}
-              className="w-full h-full object-contain transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-2xl"
-              quality={100}
-            />
+          {/* Main Image with Touch Gestures */}
+          <div 
+            ref={mainImageRef}
+            className="relative aspect-video group cursor-pointer select-none"
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+          >
+            <a
+              href={displayedThumbnails[mainGalleryIndex].originalPath!}
+              data-fancybox="screenshots"
+              data-caption={displayedThumbnails[mainGalleryIndex].originalName!}
+              data-width={displayedThumbnails[mainGalleryIndex].width}
+              data-height={displayedThumbnails[mainGalleryIndex].height}
+              data-original-name={displayedThumbnails[mainGalleryIndex].originalName!}
+              data-is-primary={displayedThumbnails[mainGalleryIndex].isPrimary}
+            >
+              <Image
+                src={displayedThumbnails[mainGalleryIndex].originalPath!}
+                alt={displayedThumbnails[mainGalleryIndex].originalName!}
+                width={1200}
+                height={675}
+                className="w-full h-full object-contain transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-2xl"
+                quality={100}
+              />
+            </a>
             
             {/* Hover overlay */}
             <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-300 rounded-lg flex items-center justify-center pointer-events-none">
@@ -264,6 +210,13 @@ export function ImageGallery({ images, cityId, isOwner, onImagesChange }: ImageG
             {displayedThumbnails[mainGalleryIndex].isPrimary && (
               <div className="absolute top-4 left-4 bg-blue-500 text-white px-3 py-1 rounded-full text-sm font-medium">
                 Primary
+              </div>
+            )}
+
+            {/* Swipe Indicator (only show on mobile) */}
+            {displayedThumbnails.length > 1 && (
+              <div className="absolute bottom-4 right-4 bg-black bg-opacity-50 text-white px-2 py-1 rounded-full text-xs md:hidden">
+                ← Swipe →
               </div>
             )}
           </div>
@@ -297,8 +250,6 @@ export function ImageGallery({ images, cityId, isOwner, onImagesChange }: ImageG
               </div>
             </>
           )}
-
-
         </div>
       </div>
 
@@ -329,8 +280,26 @@ export function ImageGallery({ images, cityId, isOwner, onImagesChange }: ImageG
             </button>
           )}
 
+          {/* Hidden Fancybox Gallery - All Images */}
+          <div className="hidden">
+            {validImages.map((image) => (
+              <a
+                key={`fancybox-${image.id}`}
+                href={image.originalPath!}
+                data-fancybox="screenshots"
+                data-caption={image.originalName!}
+                data-width={image.width}
+                data-height={image.height}
+                data-original-name={image.originalName!}
+                data-is-primary={image.isPrimary}
+              >
+                <img src={image.thumbnailPath!} alt={image.originalName!} />
+              </a>
+            ))}
+          </div>
+
           {/* Thumbnail Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-3 px-8">
+          <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-12 gap-2 px-8">
             {displayedThumbnails.map((image, index) => (
               <div
                 key={image.id}
@@ -341,21 +310,25 @@ export function ImageGallery({ images, cityId, isOwner, onImagesChange }: ImageG
                 }`}
                 onClick={() => setMainGalleryIndex(index)}
               >
-                <Image
-                  src={image.mediumPath!}
-                  alt={image.originalName!}
-                  width={400}
-                  height={400}
-                  className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                  quality={85}
-                />
-                
-                {/* Primary Badge */}
-                {image.isPrimary && (
-                  <div className="absolute top-1 left-1 bg-blue-500 text-white px-1 py-0.5 rounded-full text-xs font-medium">
-                    Primary
-                  </div>
-                )}
+                <a
+                  href={image.originalPath!}
+                  data-fancybox="screenshots"
+                  data-caption={image.originalName!}
+                  data-width={image.width}
+                  data-height={image.height}
+                  data-original-name={image.originalName!}
+                  data-is-primary={image.isPrimary}
+                  className="block w-full h-full"
+                >
+                  <Image
+                    src={image.mediumPath!}
+                    alt={image.originalName!}
+                    width={400}
+                    height={400}
+                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    quality={85}
+                  />
+                </a>
                 
                 {/* Primary Badge */}
                 {image.isPrimary && (
@@ -365,7 +338,7 @@ export function ImageGallery({ images, cityId, isOwner, onImagesChange }: ImageG
                 )}
 
                 {/* Hover Overlay */}
-                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-opacity duration-300 flex items-center justify-center">
+                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-opacity duration-300 flex items-center justify-center pointer-events-none">
                   <div className="text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
@@ -412,149 +385,6 @@ export function ImageGallery({ images, cityId, isOwner, onImagesChange }: ImageG
           </div>
         </div>
       </div>
-
-      {/* Lightbox Modal with Zoom */}
-      {selectedImage && selectedImage.largePath && selectedImage.originalName && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-90 z-[10000] flex items-center justify-center p-4"
-          onClick={closeLightbox}
-          onKeyDown={handleKeyDown}
-          onWheel={handleWheel}
-          tabIndex={0}
-        >
-          <div className="relative max-w-[95vw] max-h-[95vh] overflow-hidden">
-            {/* Close Button */}
-            <button
-              onClick={closeLightbox}
-              className="absolute top-4 right-4 text-white hover:text-gray-300 z-10"
-            >
-              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-
-            {/* Previous Button */}
-            {validImages.length > 1 && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  prevImage();
-                }}
-                className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white hover:text-gray-300 z-10"
-              >
-                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </button>
-            )}
-
-            {/* Next Button */}
-            {validImages.length > 1 && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  nextImage();
-                }}
-                className="absolute right-4 top-1/2 transform -translate-y-1/2 text-white hover:text-gray-300 z-10"
-              >
-                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
-            )}
-
-            {/* Zoom Controls */}
-            <div className="absolute top-4 left-4 z-10 flex space-x-2">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setZoom(Math.max(0.5, zoom - 0.25));
-                }}
-                className="bg-black bg-opacity-50 hover:bg-opacity-70 text-white p-2 rounded-full transition-all duration-200"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-                </svg>
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setZoom(Math.min(5, zoom + 0.25));
-                }}
-                className="bg-black bg-opacity-50 hover:bg-opacity-70 text-white p-2 rounded-full transition-all duration-200"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  resetZoom();
-                }}
-                className="bg-black bg-opacity-50 hover:bg-opacity-70 text-white px-3 py-2 rounded-full text-sm transition-all duration-200"
-              >
-                Reset
-              </button>
-            </div>
-
-            {/* Zoom Level Indicator */}
-            <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-10 bg-black bg-opacity-50 text-white px-3 py-2 rounded-full text-sm">
-              {Math.round(zoom * 100)}%
-            </div>
-
-            {/* Image - Full size without cropping but properly constrained */}
-            <img
-              ref={imageRef}
-              src={selectedImage.originalPath!}
-              srcSet={`
-                ${selectedImage.thumbnailPath} 400w,
-                ${selectedImage.mediumPath} 800w,
-                ${selectedImage.largePath} 1200w,
-                ${selectedImage.originalPath} 2000w
-              `}
-              sizes="(max-width: 768px) 95vw, (max-width: 1200px) 90vw, 95vw"
-              alt={selectedImage.originalName}
-              className="max-w-full max-h-full object-contain transition-transform duration-200 select-none"
-              style={{
-                transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
-                cursor: zoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default',
-                userSelect: 'none',
-                WebkitUserSelect: 'none',
-                MozUserSelect: 'none',
-                msUserSelect: 'none',
-              }}
-              onMouseDown={handleMouseDown}
-              onMouseMove={handleMouseMove}
-              onMouseUp={handleMouseUp}
-              onMouseLeave={handleMouseLeave}
-              onClick={(e) => e.stopPropagation()}
-            />
-
-            {/* Image Info */}
-            <div className="absolute bottom-4 left-4 right-4 text-white bg-black bg-opacity-50 rounded-lg p-4">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h3 className="font-semibold">{selectedImage.originalName}</h3>
-                  <p className="text-sm text-gray-300">
-                    {selectedImage.width || 'Unknown'} × {selectedImage.height || 'Unknown'} pixels
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm text-gray-300">
-                    {currentIndex + 1} of {validImages.length}
-                  </p>
-                  {selectedImage.isPrimary && (
-                    <span className="inline-block bg-blue-500 text-white px-2 py-1 rounded-full text-xs font-medium mt-1">
-                      Primary
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 } 

@@ -9,10 +9,15 @@ import { getDownloadUrl } from 'app/utils/r2';
 // use the Drizzle adapter for Auth.js / NextAuth
 // https://authjs.dev/reference/adapter/drizzle
 let client = postgres(process.env.POSTGRES_URL!, {
-  ssl: false,
-  max: 1,
+  ssl: false, // Keep SSL disabled for local development
+  max: process.env.NODE_ENV === 'production' ? 10 : 10, // Reduced for local
   idle_timeout: 20,
-  connect_timeout: 10
+  connect_timeout: 10,
+  // Add connection pooling optimizations
+  prepare: true, // Enable prepared statements
+  max_lifetime: 60 * 30, // 30 minutes
+  // Better error handling
+  onnotice: () => {}, // Suppress notice messages
 });
 let db = drizzle(client);
 
@@ -794,8 +799,8 @@ export async function getRecentCities(limit: number = 12, offset: number = 0) {
   await ensureHallOfFameCacheTableExists();
   const users = await ensureTableExists();
 
-  // First get cities with primary screenshots
-  const citiesWithScreenshots = await db
+  // Get ALL cities with their images (if any) and sort by upload date
+  const allCities = await db
     .select({
       id: cityTable.id,
       userId: cityTable.userId,
@@ -821,11 +826,11 @@ export async function getRecentCities(limit: number = 12, offset: number = 0) {
     })
     .from(cityTable)
     .leftJoin(users, eq(cityTable.userId, users.id))
-    .innerJoin(cityImagesTable, eq(cityTable.id, cityImagesTable.cityId))
-    .where(eq(cityImagesTable.isPrimary, true))
-    .groupBy(cityTable.id, users.id);
+    .orderBy(desc(cityTable.uploadedAt))
+    .limit(limit)
+    .offset(offset);
 
-  // Then get cities with primary Hall of Fame images (that don't have primary screenshots)
+  // For cities without primary screenshots, check if they have Hall of Fame images
   const citiesWithHallOfFame = await db
     .select({
       id: cityTable.id,
@@ -861,11 +866,19 @@ export async function getRecentCities(limit: number = 12, offset: number = 0) {
     )
     .groupBy(cityTable.id, users.id);
 
-  // Combine and sort by upload date
-  const allCities = [...citiesWithScreenshots, ...citiesWithHallOfFame];
-  allCities.sort((a, b) => new Date(b.uploadedAt || 0).getTime() - new Date(a.uploadedAt || 0).getTime());
+  // Create a map of cities with Hall of Fame images for quick lookup
+  const hofCitiesMap = new Map(citiesWithHallOfFame.map(city => [city.id, city]));
 
-  return allCities.slice(offset, offset + limit);
+  // Update cities that have Hall of Fame images
+  const updatedCities = allCities.map(city => {
+    const hofCity = hofCitiesMap.get(city.id);
+    if (hofCity && city.images.length === 0) {
+      return { ...city, images: hofCity.images };
+    }
+    return city;
+  });
+
+  return updatedCities;
 }
 
 export async function getTopCitiesByMoney(limit: number = 3) {

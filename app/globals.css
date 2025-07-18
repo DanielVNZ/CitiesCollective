@@ -2,6 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Fancybox CSS */
+@import '@fancyapps/ui/dist/fancybox/fancybox.css';
+
 /* Support system color scheme preferences */
 :root {
   color-scheme: light dark;

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { Fancybox } from '@fancyapps/ui';
 
 interface HallOfFameImage {
   id: number;
@@ -26,48 +27,17 @@ interface HallOfFameGalleryProps {
 
 export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePage = false }: HallOfFameGalleryProps) {
   const [mainGalleryIndex, setMainGalleryIndex] = useState(0);
-  const [selectedImage, setSelectedImage] = useState<HallOfFameImage | null>(null);
-  const [currentIndex, setCurrentIndex] = useState(0);
   const [thumbnailStartIndex, setThumbnailStartIndex] = useState(0);
-  const [zoom, setZoom] = useState(1);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const imageRef = useRef<HTMLImageElement>(null);
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+  const mainImageRef = useRef<HTMLDivElement>(null);
 
-  // Show 8 thumbnails at a time
-  const thumbnailsPerPage = 8;
+  // Show 12 thumbnails at a time (more with smaller thumbnails)
+  const thumbnailsPerPage = 12;
   const displayedThumbnails = images.slice(thumbnailStartIndex, thumbnailStartIndex + thumbnailsPerPage);
   const hasMoreImages = images.length > thumbnailsPerPage;
   const canScrollLeft = thumbnailStartIndex > 0;
   const canScrollRight = thumbnailStartIndex + thumbnailsPerPage < images.length;
-
-  const openLightbox = (image: HallOfFameImage, index: number) => {
-    setSelectedImage(image);
-    setCurrentIndex(index);
-    setZoom(1);
-    setPan({ x: 0, y: 0 });
-  };
-
-  const closeLightbox = () => {
-    setSelectedImage(null);
-    setZoom(1);
-    setPan({ x: 0, y: 0 });
-  };
-
-  const nextImage = () => {
-    setCurrentIndex((prevIndex) => (prevIndex + 1) % images.length);
-    setSelectedImage(images[(currentIndex + 1) % images.length]);
-    setZoom(1);
-    setPan({ x: 0, y: 0 });
-  };
-
-  const prevImage = () => {
-    setCurrentIndex((prevIndex) => (prevIndex - 1 + images.length) % images.length);
-    setSelectedImage(images[(currentIndex - 1 + images.length) % images.length]);
-    setZoom(1);
-    setPan({ x: 0, y: 0 });
-  };
 
   const nextMainImage = () => {
     setMainGalleryIndex((prevIndex) => (prevIndex + 1) % displayedThumbnails.length);
@@ -91,49 +61,32 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
     }
   };
 
-  // Zoom functions
-  const handleWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    const newZoom = Math.max(0.5, Math.min(5, zoom * delta));
-    setZoom(newZoom);
+  // Touch gesture handlers
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStart(e.targetTouches[0].clientX);
   };
 
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (zoom > 1) {
-      e.preventDefault();
-      setIsDragging(true);
-      setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+  const handleTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > 50;
+    const isRightSwipe = distance < -50;
+
+    if (isLeftSwipe && displayedThumbnails.length > 1) {
+      nextMainImage();
     }
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (isDragging && zoom > 1) {
-      e.preventDefault();
-      setPan({
-        x: e.clientX - dragStart.x,
-        y: e.clientY - dragStart.y,
-      });
+    if (isRightSwipe && displayedThumbnails.length > 1) {
+      prevMainImage();
     }
-  };
 
-  const handleMouseUp = (e: React.MouseEvent) => {
-    if (isDragging) {
-      e.preventDefault();
-      setIsDragging(false);
-    }
-  };
-
-  const handleMouseLeave = () => {
-    if (isDragging) {
-      setIsDragging(false);
-    }
-  };
-
-  const resetZoom = () => {
-    setZoom(1);
-    setPan({ x: 0, y: 0 });
+    // Reset values
+    setTouchStart(null);
+    setTouchEnd(null);
   };
 
   const handleSetPrimary = async (hofImageId: string) => {
@@ -161,35 +114,14 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      closeLightbox();
-    } else if (e.key === 'ArrowRight') {
-      nextImage();
-    } else if (e.key === 'ArrowLeft') {
-      prevImage();
-    } else if (e.key === '0') {
-      resetZoom();
-    }
-  };
-
-  // Reset zoom when image changes and prevent body scroll
+  // Initialize Fancybox
   useEffect(() => {
-    if (selectedImage) {
-      setZoom(1);
-      setPan({ x: 0, y: 0 });
-      // Prevent body scroll when modal is open
-      document.body.style.overflow = 'hidden';
-    } else {
-      // Restore body scroll when modal is closed
-      document.body.style.overflow = 'unset';
-    }
+    Fancybox.bind('[data-fancybox="hall-of-fame"]');
 
-    // Cleanup function to restore body scroll
     return () => {
-      document.body.style.overflow = 'unset';
+      Fancybox.destroy();
     };
-  }, [selectedImage]);
+  }, [images]);
 
   if (images.length === 0) {
     return (
@@ -204,19 +136,25 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
       {/* Main Gallery View */}
       <div className="mb-6">
         <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-lg p-4 mb-6 border border-gray-200 dark:border-gray-700 max-w-4xl mx-auto">
-          {/* Main Image */}
-          <div className="relative aspect-video group cursor-pointer" onClick={() => openLightbox(displayedThumbnails[mainGalleryIndex], thumbnailStartIndex + mainGalleryIndex)}>
-            <img
-              src={displayedThumbnails[mainGalleryIndex].imageUrl4K}
-              srcSet={`
-                ${displayedThumbnails[mainGalleryIndex].imageUrlThumbnail} 400w,
-                ${displayedThumbnails[mainGalleryIndex].imageUrlFHD} 800w,
-                ${displayedThumbnails[mainGalleryIndex].imageUrl4K} 1200w
-              `}
-              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 1200px"
-              alt={`${displayedThumbnails[mainGalleryIndex].cityName} Hall of Fame screenshot`}
-              className="w-full h-full object-contain transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-2xl"
-            />
+          {/* Main Image with Touch Gestures */}
+          <div 
+            ref={mainImageRef}
+            className="relative aspect-video group cursor-pointer select-none"
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+          >
+            <a
+              href={displayedThumbnails[mainGalleryIndex].imageUrl4K}
+              data-fancybox="hall-of-fame"
+              data-caption={`${displayedThumbnails[mainGalleryIndex].cityName} - Hall of Fame Image`}
+            >
+              <img
+                src={displayedThumbnails[mainGalleryIndex].imageUrlFHD}
+                alt={`${displayedThumbnails[mainGalleryIndex].cityName} - Hall of Fame Image`}
+                className="w-full h-full object-contain transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-2xl"
+              />
+            </a>
             
             {/* Hover overlay */}
             <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-300 rounded-lg flex items-center justify-center pointer-events-none">
@@ -226,15 +164,29 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
                 </svg>
               </div>
             </div>
+            
+            {/* Primary Badge */}
+            {displayedThumbnails[mainGalleryIndex].isPrimary && (
+              <div className="absolute top-4 left-4 bg-yellow-500 text-white px-3 py-1 rounded-full text-sm font-medium">
+                Primary
+              </div>
+            )}
 
-            {/* HOF Icon for featured images */}
-            {isFeaturedOnHomePage && (
-              <div className="absolute bottom-4 right-4">
-                <img 
-                  src="/logo/hof-icon.svg" 
-                  alt="Hall of Fame" 
-                  className="w-8 h-8 filter drop-shadow-lg"
+            {/* Hall of Fame Icon */}
+            <div className="absolute top-4 right-4">
+              <div className="bg-yellow-400 rounded-full p-1 shadow-lg">
+                <img
+                  src="/logo/hof-icon.svg"
+                  alt="Hall of Fame"
+                  className="w-5 h-5"
                 />
+              </div>
+            </div>
+
+            {/* Swipe Indicator (only show on mobile) */}
+            {displayedThumbnails.length > 1 && (
+              <div className="absolute bottom-4 right-4 bg-black bg-opacity-50 text-white px-2 py-1 rounded-full text-xs md:hidden">
+                ← Swipe →
               </div>
             )}
           </div>
@@ -268,8 +220,6 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
               </div>
             </>
           )}
-
-
         </div>
       </div>
 
@@ -300,38 +250,65 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
             </button>
           )}
 
+          {/* Hidden Fancybox Gallery - All Images */}
+          <div className="hidden">
+            {images.map((image) => (
+              <a
+                key={`fancybox-hof-${image.id}`}
+                href={image.imageUrl4K}
+                data-fancybox="hall-of-fame"
+                data-caption={`${image.cityName} - Hall of Fame Image`}
+              >
+                <img src={image.imageUrlThumbnail} alt={`${image.cityName} - Hall of Fame Image`} />
+              </a>
+            ))}
+          </div>
+
           {/* Thumbnail Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-3 px-8">
+          <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-12 gap-2 px-8">
             {displayedThumbnails.map((image, index) => (
               <div
                 key={image.id}
                 className={`relative aspect-square cursor-pointer group overflow-hidden rounded-lg border-2 transition-all duration-200 ${
                   index === mainGalleryIndex 
-                    ? 'border-blue-500 ring-2 ring-blue-200' 
+                    ? 'border-yellow-500 ring-2 ring-yellow-200' 
                     : 'border-transparent hover:border-gray-300'
                 }`}
                 onClick={() => setMainGalleryIndex(index)}
               >
-                <img
-                  src={image.imageUrlThumbnail}
-                  srcSet={`
-                    ${image.imageUrlThumbnail} 400w,
-                    ${image.imageUrlFHD} 800w
-                  `}
-                  sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, 25vw"
-                  alt={`${image.cityName} Hall of Fame screenshot`}
-                  className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                />
+                <a
+                  href={image.imageUrl4K}
+                  data-fancybox="hall-of-fame"
+                  data-caption={`${image.cityName} - Hall of Fame Image`}
+                  className="block w-full h-full"
+                >
+                  <img
+                    src={image.imageUrlThumbnail}
+                    alt={`${image.cityName} - Hall of Fame Image`}
+                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                  />
+                </a>
                 
                 {/* Primary Badge */}
                 {image.isPrimary && (
-                  <div className="absolute top-1 left-1 bg-blue-500 text-white px-1 py-0.5 rounded-full text-xs font-medium">
+                  <div className="absolute top-1 left-1 bg-yellow-500 text-white px-1 py-0.5 rounded-full text-xs font-medium">
                     Primary
                   </div>
                 )}
 
+                {/* Hall of Fame Icon */}
+                <div className="absolute top-1 right-1">
+                  <div className="bg-yellow-400 rounded-full p-0.5 shadow-lg">
+                    <img
+                      src="/logo/hof-icon.svg"
+                      alt="Hall of Fame"
+                      className="w-3 h-3"
+                    />
+                  </div>
+                </div>
+
                 {/* Hover Overlay */}
-                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-opacity duration-300 flex items-center justify-center">
+                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-opacity duration-300 flex items-center justify-center pointer-events-none">
                   <div className="text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
@@ -341,7 +318,7 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
 
                 {/* Owner Controls */}
                 {isOwner && (
-                  <div className="absolute top-1 right-1 flex space-x-1">
+                  <div className="absolute bottom-1 right-1 flex space-x-1">
                     {/* Set Primary Button */}
                     <button
                       onClick={(e) => {
@@ -350,10 +327,10 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
                       }}
                       className={`w-6 h-6 rounded-full text-xs font-medium transition-all duration-200 flex items-center justify-center ${
                         image.isPrimary 
-                          ? 'bg-blue-500 text-white' 
+                          ? 'bg-yellow-500 text-white' 
                           : 'bg-black bg-opacity-50 text-white hover:bg-opacity-70'
                       }`}
-                      title={image.isPrimary ? 'This is your featured image (will be shown on your city page and home page)' : 'Set as featured image (will be shown on your city page and home page)'}
+                      title={image.isPrimary ? 'This is your featured Hall of Fame image' : 'Set as featured Hall of Fame image'}
                     >
                       <span className={image.isPrimary ? '' : 'transform translate-y-[-1px]'}>
                         {image.isPrimary ? '✓' : '★'}
@@ -366,145 +343,6 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
           </div>
         </div>
       </div>
-
-      {/* Lightbox Modal with Zoom */}
-      {selectedImage && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-90 z-[10000] flex items-center justify-center p-4"
-          onClick={closeLightbox}
-          onKeyDown={handleKeyDown}
-          onWheel={handleWheel}
-          tabIndex={0}
-        >
-          <div 
-            className="relative max-w-[95vw] max-h-[95vh] overflow-hidden"
-          >
-            {/* Close Button */}
-            <button
-              onClick={closeLightbox}
-              className="absolute top-4 right-4 text-white hover:text-gray-300 z-10"
-            >
-              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-
-            {/* Previous Button */}
-            {images.length > 1 && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  prevImage();
-                }}
-                className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white hover:text-gray-300 z-10"
-              >
-                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </button>
-            )}
-
-            {/* Next Button */}
-            {images.length > 1 && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  nextImage();
-                }}
-                className="absolute right-4 top-1/2 transform -translate-y-1/2 text-white hover:text-gray-300 z-10"
-              >
-                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
-            )}
-
-            {/* Zoom Controls */}
-            <div className="absolute top-4 left-4 z-10 flex space-x-2">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setZoom(Math.max(0.5, zoom - 0.25));
-                }}
-                className="bg-black bg-opacity-50 hover:bg-opacity-70 text-white p-2 rounded-full transition-all duration-200"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-                </svg>
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setZoom(Math.min(5, zoom + 0.25));
-                }}
-                className="bg-black bg-opacity-50 hover:bg-opacity-70 text-white p-2 rounded-full transition-all duration-200"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  resetZoom();
-                }}
-                className="bg-black bg-opacity-50 hover:bg-opacity-70 text-white px-3 py-2 rounded-full text-sm transition-all duration-200"
-              >
-                Reset
-              </button>
-            </div>
-
-            {/* Zoom Level Indicator */}
-            <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-10 bg-black bg-opacity-50 text-white px-3 py-2 rounded-full text-sm">
-              {Math.round(zoom * 100)}%
-            </div>
-
-            {/* Image - Full size without cropping but properly constrained */}
-            <img
-              ref={imageRef}
-              src={selectedImage.imageUrl4K}
-              srcSet={`
-                ${selectedImage.imageUrlThumbnail} 400w,
-                ${selectedImage.imageUrlFHD} 800w,
-                ${selectedImage.imageUrl4K} 1200w
-              `}
-              sizes="(max-width: 768px) 95vw, (max-width: 1200px) 90vw, 95vw"
-              alt={`${selectedImage.cityName} Hall of Fame screenshot`}
-              className="max-w-full max-h-full object-contain transition-transform duration-200 select-none"
-              style={{
-                transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
-                cursor: zoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default',
-                userSelect: 'none',
-                WebkitUserSelect: 'none',
-                MozUserSelect: 'none',
-                msUserSelect: 'none',
-              }}
-              onMouseDown={handleMouseDown}
-              onMouseMove={handleMouseMove}
-              onMouseUp={handleMouseUp}
-              onMouseLeave={handleMouseLeave}
-              onClick={(e) => e.stopPropagation()}
-            />
-
-            {/* Image Info */}
-            <div className="absolute bottom-4 left-4 right-4 text-white bg-black bg-opacity-50 rounded-lg p-4">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h3 className="font-semibold">{selectedImage.cityName}</h3>
-                  <p className="text-sm text-gray-300">
-                    Hall of Fame Screenshot • {new Date(selectedImage.createdAt).toLocaleDateString()}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm text-gray-300">
-                    {currentIndex + 1} of {images.length}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 } 
