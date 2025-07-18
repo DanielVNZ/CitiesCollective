@@ -2,6 +2,8 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Fancybox } from '@fancyapps/ui';
+import { ImageLikeButton } from './ImageLikeButton';
+import { ImageComments } from './ImageComments';
 
 interface HallOfFameImage {
   id: number;
@@ -30,6 +32,8 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
   const [thumbnailStartIndex, setThumbnailStartIndex] = useState(0);
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
+  const [showComments, setShowComments] = useState(false);
+  const [isClosingComments, setIsClosingComments] = useState(false);
   const mainImageRef = useRef<HTMLDivElement>(null);
 
   // Show 12 thumbnails at a time (more with smaller thumbnails)
@@ -40,11 +44,38 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
   const canScrollRight = thumbnailStartIndex + thumbnailsPerPage < images.length;
 
   const nextMainImage = () => {
-    setMainGalleryIndex((prevIndex) => (prevIndex + 1) % displayedThumbnails.length);
+    const currentGlobalIndex = thumbnailStartIndex + mainGalleryIndex;
+    if (currentGlobalIndex < images.length - 1) {
+      // Move to next image in the same page
+      if (mainGalleryIndex < displayedThumbnails.length - 1) {
+        setMainGalleryIndex(mainGalleryIndex + 1);
+      } else {
+        // Move to next page
+        scrollThumbnailsRight();
+      }
+    } else {
+      // Wrap around to first image
+      setThumbnailStartIndex(0);
+      setMainGalleryIndex(0);
+    }
   };
 
   const prevMainImage = () => {
-    setMainGalleryIndex((prevIndex) => (prevIndex - 1 + displayedThumbnails.length) % displayedThumbnails.length);
+    const currentGlobalIndex = thumbnailStartIndex + mainGalleryIndex;
+    if (currentGlobalIndex > 0) {
+      // Move to previous image in the same page
+      if (mainGalleryIndex > 0) {
+        setMainGalleryIndex(mainGalleryIndex - 1);
+      } else {
+        // Move to previous page
+        scrollThumbnailsLeft();
+      }
+    } else {
+      // Wrap around to last image
+      const lastPageStart = Math.max(0, images.length - thumbnailsPerPage);
+      setThumbnailStartIndex(lastPageStart);
+      setMainGalleryIndex(images.length - lastPageStart - 1);
+    }
   };
 
   const scrollThumbnailsLeft = () => {
@@ -111,6 +142,20 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
     } catch (error) {
       console.error('Error setting primary Hall of Fame image:', error);
       alert('Failed to set primary image. Please try again.');
+    }
+  };
+
+  const handleToggleComments = () => {
+    if (showComments) {
+      // Start closing animation
+      setIsClosingComments(true);
+      // Wait for animation to complete before hiding
+      setTimeout(() => {
+        setShowComments(false);
+        setIsClosingComments(false);
+      }, 200); // Match the animation duration
+    } else {
+      setShowComments(true);
     }
   };
 
@@ -183,44 +228,85 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
               </div>
             </div>
 
+            {/* Like and Comment Controls */}
+            <div className="absolute bottom-2 right-4 flex space-x-2">
+              <ImageLikeButton
+                imageId={displayedThumbnails[mainGalleryIndex].hofImageId}
+                imageType="hall_of_fame"
+                cityId={cityId}
+                size="md"
+              />
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleToggleComments();
+                }}
+                className="flex items-center space-x-1.5 px-3 py-2 min-h-[44px] rounded-lg transition-all duration-200 text-gray-700 hover:text-blue-600 hover:bg-blue-50 bg-white/80 dark:bg-gray-800/80 dark:text-gray-300 dark:hover:text-blue-400 cursor-pointer hover:shadow-md touch-manipulation select-none active:scale-95 sm:active:scale-100"
+                title="View comments"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+                <span className="font-semibold text-sm">Comments</span>
+              </button>
+            </div>
+
             {/* Swipe Indicator (only show on mobile) */}
             {displayedThumbnails.length > 1 && (
               <div className="absolute bottom-4 right-4 bg-black bg-opacity-50 text-white px-2 py-1 rounded-full text-xs md:hidden">
                 ← Swipe →
               </div>
             )}
+
+            {/* Navigation Controls */}
+            {displayedThumbnails.length > 1 && (
+              <>
+                {/* Previous Button */}
+                <button
+                  onClick={prevMainImage}
+                  className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 hover:bg-opacity-70 text-white p-2 rounded-full transition-all duration-200 z-10"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+
+                {/* Next Button */}
+                <button
+                  onClick={nextMainImage}
+                  className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 hover:bg-opacity-70 text-white p-2 rounded-full transition-all duration-200 z-10"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+
+                {/* Image Counter */}
+                <div className="absolute bottom-4 left-4 bg-black bg-opacity-50 text-white px-3 py-1 rounded-full text-sm z-10">
+                  {thumbnailStartIndex + mainGalleryIndex + 1} of {images.length}
+                </div>
+              </>
+            )}
           </div>
-
-          {/* Navigation Controls */}
-          {displayedThumbnails.length > 1 && (
-            <>
-              {/* Previous Button */}
-              <button
-                onClick={prevMainImage}
-                className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 hover:bg-opacity-70 text-white p-2 rounded-full transition-all duration-200"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </button>
-
-              {/* Next Button */}
-              <button
-                onClick={nextMainImage}
-                className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 hover:bg-opacity-70 text-white p-2 rounded-full transition-all duration-200"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
-
-              {/* Image Counter */}
-              <div className="absolute bottom-4 left-4 bg-black bg-opacity-50 text-white px-3 py-1 rounded-full text-sm">
-                {thumbnailStartIndex + mainGalleryIndex + 1} of {images.length}
-              </div>
-            </>
-          )}
         </div>
+
+        {/* Comments Section - Outside the main container */}
+        {showComments && (
+          <div 
+            className={`mt-4 bg-white dark:bg-gray-800 rounded-xl shadow-lg p-4 border border-gray-200 dark:border-gray-700 max-w-4xl mx-auto transform transition-all duration-200 ease-out ${
+              isClosingComments 
+                ? 'opacity-0 -translate-y-4 max-h-0 overflow-hidden' 
+                : 'opacity-100 translate-y-0 max-h-[2000px]'
+            }`}
+          >
+            <ImageComments
+              imageId={displayedThumbnails[mainGalleryIndex].hofImageId}
+              imageType="hall_of_fame"
+              cityId={cityId}
+            />
+          </div>
+        )}
       </div>
 
       {/* Thumbnail Grid with Scroll Arrows */}

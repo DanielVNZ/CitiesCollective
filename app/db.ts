@@ -3240,3 +3240,355 @@ export async function getAllUsersWithHoFCreatorId() {
     return [];
   }
 }
+
+// Image likes table for both screenshots and Hall of Fame images
+const imageLikesTable = pgTable('imageLikes', {
+  id: serial('id').primaryKey(),
+  userId: integer('userId').notNull(),
+  imageId: varchar('imageId', { length: 255 }).notNull(), // Can be cityImage.id or hofImageId
+  imageType: varchar('imageType', { length: 20 }).notNull(), // 'screenshot' or 'hall_of_fame'
+  cityId: integer('cityId').references(() => cityTable.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('createdAt').defaultNow(),
+});
+
+// Image comments table for both screenshots and Hall of Fame images
+const imageCommentsTable = pgTable('imageComments', {
+  id: serial('id').primaryKey(),
+  userId: integer('userId').notNull(),
+  imageId: varchar('imageId', { length: 255 }).notNull(), // Can be cityImage.id or hofImageId
+  imageType: varchar('imageType', { length: 20 }).notNull(), // 'screenshot' or 'hall_of_fame'
+  cityId: integer('cityId').references(() => cityTable.id, { onDelete: 'cascade' }),
+  content: text('content').notNull(),
+  createdAt: timestamp('createdAt').defaultNow(),
+  updatedAt: timestamp('updatedAt').defaultNow(),
+});
+
+// Image comment likes table
+const imageCommentLikesTable = pgTable('imageCommentLikes', {
+  id: serial('id').primaryKey(),
+  userId: integer('userId').notNull(),
+  commentId: integer('commentId').references(() => imageCommentsTable.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('createdAt').defaultNow(),
+});
+
+async function ensureImageLikesTableExists() {
+  if (tableInitCache.has('imageLikes')) {
+    return imageLikesTable;
+  }
+
+  try {
+    await client`
+      CREATE TABLE IF NOT EXISTS "imageLikes" (
+        "id" SERIAL PRIMARY KEY,
+        "userId" INTEGER NOT NULL,
+        "imageId" VARCHAR(255) NOT NULL,
+        "imageType" VARCHAR(20) NOT NULL,
+        "cityId" INTEGER REFERENCES "City"("id") ON DELETE CASCADE,
+        "createdAt" TIMESTAMP DEFAULT NOW(),
+        UNIQUE("userId", "imageId", "imageType")
+      )
+    `;
+  
+    tableInitCache.add('imageLikes');
+  } catch (error) {
+    console.error('Error ensuring image likes table exists:', error);
+  }
+
+  return imageLikesTable;
+}
+
+async function ensureImageCommentsTableExists() {
+  if (tableInitCache.has('imageComments')) {
+    return imageCommentsTable;
+  }
+
+  try {
+    await client`
+      CREATE TABLE IF NOT EXISTS "imageComments" (
+        "id" SERIAL PRIMARY KEY,
+        "userId" INTEGER NOT NULL,
+        "imageId" VARCHAR(255) NOT NULL,
+        "imageType" VARCHAR(20) NOT NULL,
+        "cityId" INTEGER REFERENCES "City"("id") ON DELETE CASCADE,
+        "content" TEXT NOT NULL,
+        "createdAt" TIMESTAMP DEFAULT NOW(),
+        "updatedAt" TIMESTAMP DEFAULT NOW()
+      )
+    `;
+  
+    tableInitCache.add('imageComments');
+  } catch (error) {
+    console.error('Error ensuring image comments table exists:', error);
+  }
+
+  return imageCommentsTable;
+}
+
+async function ensureImageCommentLikesTableExists() {
+  if (tableInitCache.has('imageCommentLikes')) {
+    return imageCommentLikesTable;
+  }
+
+  try {
+    await client`
+      CREATE TABLE IF NOT EXISTS "imageCommentLikes" (
+        "id" SERIAL PRIMARY KEY,
+        "userId" INTEGER NOT NULL,
+        "commentId" INTEGER REFERENCES "imageComments"("id") ON DELETE CASCADE,
+        "createdAt" TIMESTAMP DEFAULT NOW(),
+        UNIQUE("userId", "commentId")
+      )
+    `;
+  
+    tableInitCache.add('imageCommentLikes');
+  } catch (error) {
+    console.error('Error ensuring image comment likes table exists:', error);
+  }
+
+  return imageCommentLikesTable;
+}
+
+// Image Likes Functions
+export async function toggleImageLike(userId: number, imageId: string, imageType: 'screenshot' | 'hall_of_fame', cityId: number) {
+  await ensureImageLikesTableExists();
+  
+  const existingLike = await db
+    .select()
+    .from(imageLikesTable)
+    .where(
+      and(
+        eq(imageLikesTable.userId, userId),
+        eq(imageLikesTable.imageId, imageId),
+        eq(imageLikesTable.imageType, imageType)
+      )
+    )
+    .limit(1);
+
+  if (existingLike.length > 0) {
+    // Unlike
+    await db
+      .delete(imageLikesTable)
+      .where(
+        and(
+          eq(imageLikesTable.userId, userId),
+          eq(imageLikesTable.imageId, imageId),
+          eq(imageLikesTable.imageType, imageType)
+        )
+      );
+    return { liked: false };
+  } else {
+    // Like
+    await db.insert(imageLikesTable).values({
+      userId,
+      imageId,
+      imageType,
+      cityId,
+    });
+    return { liked: true };
+  }
+}
+
+export async function getImageLikes(imageId: string, imageType: 'screenshot' | 'hall_of_fame') {
+  await ensureImageLikesTableExists();
+  
+  const result = await db
+    .select({ count: sql<number>`cast(count(*) as integer)` })
+    .from(imageLikesTable)
+    .where(
+      and(
+        eq(imageLikesTable.imageId, imageId),
+        eq(imageLikesTable.imageType, imageType)
+      )
+    );
+  
+  return result[0]?.count || 0;
+}
+
+export async function isImageLikedByUser(userId: number, imageId: string, imageType: 'screenshot' | 'hall_of_fame') {
+  await ensureImageLikesTableExists();
+  
+  const result = await db
+    .select()
+    .from(imageLikesTable)
+    .where(
+      and(
+        eq(imageLikesTable.userId, userId),
+        eq(imageLikesTable.imageId, imageId),
+        eq(imageLikesTable.imageType, imageType)
+      )
+    )
+    .limit(1);
+  
+  return result.length > 0;
+}
+
+// Image Comments Functions
+export async function addImageComment(userId: number, imageId: string, imageType: 'screenshot' | 'hall_of_fame', cityId: number, content: string) {
+  await ensureImageCommentsTableExists();
+  
+  const result = await db.insert(imageCommentsTable).values({
+    userId,
+    imageId,
+    imageType,
+    cityId,
+    content,
+  }).returning();
+  
+  return result[0];
+}
+
+export async function getImageComments(imageId: string, imageType: 'screenshot' | 'hall_of_fame', requestUserId?: number, sortBy: 'recent' | 'likes' = 'recent') {
+  await ensureImageCommentsTableExists();
+  await ensureImageCommentLikesTableExists();
+  const users = await ensureTableExists();
+  
+  let orderByClause;
+  if (sortBy === 'likes') {
+    orderByClause = desc(sql`(SELECT COUNT(*) FROM "imageCommentLikes" WHERE "commentId" = "imageComments"."id")`);
+  } else {
+    orderByClause = desc(imageCommentsTable.createdAt);
+  }
+
+  const comments = await db
+    .select({
+      id: imageCommentsTable.id,
+      userId: imageCommentsTable.userId,
+      imageId: imageCommentsTable.imageId,
+      imageType: imageCommentsTable.imageType,
+      cityId: imageCommentsTable.cityId,
+      content: imageCommentsTable.content,
+      createdAt: imageCommentsTable.createdAt,
+      updatedAt: imageCommentsTable.updatedAt,
+      user: {
+        id: users.id,
+        username: users.username,
+        avatar: users.avatar,
+      },
+      likeCount: sql<number>`cast((SELECT COUNT(*) FROM "imageCommentLikes" WHERE "commentId" = "imageComments"."id") as integer)`.as('likeCount'),
+      isLikedByUser: requestUserId ? sql<boolean>`EXISTS(SELECT 1 FROM "imageCommentLikes" WHERE "commentId" = "imageComments"."id" AND "userId" = ${requestUserId})`.as('isLikedByUser') : sql<boolean>`false`.as('isLikedByUser'),
+    })
+    .from(imageCommentsTable)
+    .leftJoin(users, eq(imageCommentsTable.userId, users.id))
+    .where(
+      and(
+        eq(imageCommentsTable.imageId, imageId),
+        eq(imageCommentsTable.imageType, imageType)
+      )
+    )
+    .orderBy(orderByClause);
+
+  return comments;
+}
+
+export async function deleteImageComment(commentId: number, userId: number) {
+  await ensureImageCommentsTableExists();
+  
+  const result = await db
+    .delete(imageCommentsTable)
+    .where(
+      and(
+        eq(imageCommentsTable.id, commentId),
+        eq(imageCommentsTable.userId, userId)
+      )
+    )
+    .returning();
+  
+  return result[0] || null;
+}
+
+export async function deleteImageCommentAsAdmin(commentId: number) {
+  await ensureImageCommentsTableExists();
+  
+  const result = await db
+    .delete(imageCommentsTable)
+    .where(eq(imageCommentsTable.id, commentId))
+    .returning();
+  
+  return result[0] || null;
+}
+
+// Image Comment Likes Functions
+export async function toggleImageCommentLike(userId: number, commentId: number) {
+  await ensureImageCommentLikesTableExists();
+  
+  const existingLike = await db
+    .select()
+    .from(imageCommentLikesTable)
+    .where(
+      and(
+        eq(imageCommentLikesTable.userId, userId),
+        eq(imageCommentLikesTable.commentId, commentId)
+      )
+    )
+    .limit(1);
+
+  if (existingLike.length > 0) {
+    // Unlike
+    await db
+      .delete(imageCommentLikesTable)
+      .where(
+        and(
+          eq(imageCommentLikesTable.userId, userId),
+          eq(imageCommentLikesTable.commentId, commentId)
+        )
+      );
+    return { liked: false };
+  } else {
+    // Like
+    await db.insert(imageCommentLikesTable).values({
+      userId,
+      commentId,
+    });
+    return { liked: true };
+  }
+}
+
+export async function getImageCommentLikes(commentId: number) {
+  await ensureImageCommentLikesTableExists();
+  
+  const result = await db
+    .select({ count: sql<number>`cast(count(*) as integer)` })
+    .from(imageCommentLikesTable)
+    .where(eq(imageCommentLikesTable.commentId, commentId));
+  
+  return result[0]?.count || 0;
+}
+
+export async function isImageCommentLikedByUser(userId: number, commentId: number) {
+  await ensureImageCommentLikesTableExists();
+  
+  const result = await db
+    .select()
+    .from(imageCommentLikesTable)
+    .where(
+      and(
+        eq(imageCommentLikesTable.userId, userId),
+        eq(imageCommentLikesTable.commentId, commentId)
+      )
+    )
+    .limit(1);
+  
+  return result.length > 0;
+}
+
+// Utility function to get image stats
+export async function getImageStats(imageId: string, imageType: 'screenshot' | 'hall_of_fame', userId?: number) {
+  const [likeCount, commentCount, isLiked] = await Promise.all([
+    getImageLikes(imageId, imageType),
+    db.select({ count: sql<number>`cast(count(*) as integer)` })
+      .from(imageCommentsTable)
+      .where(
+        and(
+          eq(imageCommentsTable.imageId, imageId),
+          eq(imageCommentsTable.imageType, imageType)
+        )
+      ).then(result => result[0]?.count || 0),
+    userId ? isImageLikedByUser(userId, imageId, imageType) : Promise.resolve(false)
+  ]);
+
+  return {
+    likeCount,
+    commentCount,
+    isLiked
+  };
+}

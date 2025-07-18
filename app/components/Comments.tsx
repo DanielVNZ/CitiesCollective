@@ -256,6 +256,18 @@ export function Comments({ cityId }: CommentsProps) {
     setTagQuery('');
   };
 
+  const handleReply = (username: string) => {
+    setNewComment(`@${username} `);
+    // Focus the textarea and position cursor after the username
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+        const cursorPosition = `@${username} `.length;
+        textareaRef.current.setSelectionRange(cursorPosition, cursorPosition);
+      }
+    }, 100);
+  };
+
   // Cache for user ID lookups
   const [userIdCache, setUserIdCache] = useState<Record<string, number>>({});
 
@@ -457,7 +469,7 @@ export function Comments({ cityId }: CommentsProps) {
                     })}
                   </p>
                   
-                  {/* Like Button */}
+                  {/* Like and Reply Buttons */}
                   <div className="flex items-center space-x-4 mt-3">
                     <button
                       onClick={() => handleLike(comment.id)}
@@ -480,6 +492,14 @@ export function Comments({ cityId }: CommentsProps) {
                         />
                       </svg>
                       <span>{comment.likesCount}</span>
+                    </button>
+                    
+                    <button
+                      onClick={() => handleReply(username)}
+                      className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 transition-colors"
+                      title="Reply to this comment"
+                    >
+                      Reply
                     </button>
                   </div>
                 </div>
