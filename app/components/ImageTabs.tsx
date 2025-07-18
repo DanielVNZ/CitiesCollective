@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { ImageSection } from 'app/city/[id]/ImageSection';
 import CityHallOfFameImages from 'app/components/CityHallOfFameImages';
 
@@ -27,9 +28,31 @@ export function ImageTabs({
     // Show Hall of Fame first if available, otherwise Screenshots
     return hallOfFameImages.length > 0 ? 'hof' : 'screenshots';
   });
+  const searchParams = useSearchParams();
+  const hasHandledDeepLink = useRef(false);
 
   const hasScreenshots = images.length > 0;
   const hasHallOfFame = hallOfFameImages.length > 0;
+
+  // Handle deep link navigation from URL parameters
+  useEffect(() => {
+    if (hasHandledDeepLink.current) return;
+
+    const imageId = searchParams.get('image');
+    const imageType = searchParams.get('type');
+    const commentId = searchParams.get('comment');
+
+    if (imageId && imageType) {
+      // Switch to the correct tab based on image type
+      if (imageType === 'hall_of_fame' && hasHallOfFame) {
+        setActiveTab('hof');
+      } else if (imageType === 'screenshot' && hasScreenshots) {
+        setActiveTab('screenshots');
+      }
+      
+      hasHandledDeepLink.current = true;
+    }
+  }, [searchParams, hasHallOfFame, hasScreenshots]);
 
   // If only one type of images exists, don't show tabs
   if (hasScreenshots && !hasHallOfFame) {
@@ -37,7 +60,14 @@ export function ImageTabs({
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
         <div className="p-6">
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Screenshots</h2>
-          <ImageSection cityId={cityId} initialImages={images} isOwner={isOwner} />
+          <ImageSection 
+            cityId={cityId} 
+            initialImages={images} 
+            isOwner={isOwner}
+            deepLinkImageId={searchParams.get('image')}
+            deepLinkImageType={searchParams.get('type')}
+            deepLinkCommentId={searchParams.get('comment')}
+          />
         </div>
       </div>
     );
@@ -54,6 +84,9 @@ export function ImageTabs({
             cityId={cityId}
             isOwner={isOwner}
             isFeaturedOnHomePage={isFeaturedOnHomePage}
+            deepLinkImageId={searchParams.get('image')}
+            deepLinkImageType={searchParams.get('type')}
+            deepLinkCommentId={searchParams.get('comment')}
           />
         </div>
       </div>
@@ -100,10 +133,20 @@ export function ImageTabs({
                 cityId={cityId}
                 isOwner={isOwner}
                 isFeaturedOnHomePage={isFeaturedOnHomePage}
+                deepLinkImageId={searchParams.get('image')}
+                deepLinkImageType={searchParams.get('type')}
+                deepLinkCommentId={searchParams.get('comment')}
               />
             )}
             {activeTab === 'screenshots' && (
-              <ImageSection cityId={cityId} initialImages={images} isOwner={isOwner} />
+              <ImageSection 
+                cityId={cityId} 
+                initialImages={images} 
+                isOwner={isOwner}
+                deepLinkImageId={searchParams.get('image')}
+                deepLinkImageType={searchParams.get('type')}
+                deepLinkCommentId={searchParams.get('comment')}
+              />
             )}
           </div>
         </div>

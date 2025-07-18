@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 
 // Dynamically import the floating action button to avoid SSR issues
 const DynamicFloatingActionButton = dynamic(
-  () => import('./FloatingActionButton').then(mod => ({ default: mod.FloatingActionButton })),
+  () => import('./FloatingActionButton'),
   { 
     ssr: false,
     loading: () => null

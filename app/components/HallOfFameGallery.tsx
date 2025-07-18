@@ -25,9 +25,12 @@ interface HallOfFameGalleryProps {
   cityId: number;
   isOwner: boolean;
   isFeaturedOnHomePage?: boolean;
+  deepLinkImageId?: string | null;
+  deepLinkImageType?: string | null;
+  deepLinkCommentId?: string | null;
 }
 
-export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePage = false }: HallOfFameGalleryProps) {
+export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePage = false, deepLinkImageId, deepLinkImageType, deepLinkCommentId }: HallOfFameGalleryProps) {
   const [mainGalleryIndex, setMainGalleryIndex] = useState(0);
   const [thumbnailStartIndex, setThumbnailStartIndex] = useState(0);
   const [touchStart, setTouchStart] = useState<number | null>(null);
@@ -35,6 +38,7 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
   const [showComments, setShowComments] = useState(false);
   const [isClosingComments, setIsClosingComments] = useState(false);
   const mainImageRef = useRef<HTMLDivElement>(null);
+  const hasHandledDeepLink = useRef(false);
 
   // Show 12 thumbnails at a time (more with smaller thumbnails)
   const thumbnailsPerPage = 12;
@@ -158,6 +162,38 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
       setShowComments(true);
     }
   };
+
+  // Handle deep link navigation from props
+  useEffect(() => {
+    if (hasHandledDeepLink.current) return;
+
+    if (deepLinkImageId && deepLinkImageType && deepLinkImageType === 'hall_of_fame') {
+      // Find the image by hofImageId
+      const targetImageIndex = images.findIndex(img => img.hofImageId === deepLinkImageId);
+      
+      if (targetImageIndex !== -1) {
+        // Calculate which page this image is on
+        const targetPage = Math.floor(targetImageIndex / thumbnailsPerPage);
+        const targetIndexInPage = targetImageIndex % thumbnailsPerPage;
+        
+        // Navigate to the correct page and image
+        setThumbnailStartIndex(targetPage * thumbnailsPerPage);
+        setMainGalleryIndex(targetIndexInPage);
+      }
+      
+      // Small delay to ensure component is mounted
+      setTimeout(() => {
+        setShowComments(true);
+        
+        // If there's also a comment ID, we'll handle it in the ImageComments component
+        if (deepLinkCommentId) {
+          // The ImageComments component will handle scrolling to the specific comment
+        }
+      }, 100);
+      
+      hasHandledDeepLink.current = true;
+    }
+  }, [deepLinkImageId, deepLinkImageType, deepLinkCommentId, images]);
 
   // Initialize Fancybox
   useEffect(() => {

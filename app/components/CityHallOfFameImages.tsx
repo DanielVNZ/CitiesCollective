@@ -24,9 +24,12 @@ interface CityHallOfFameImagesProps {
   cityId: number;
   isOwner: boolean;
   isFeaturedOnHomePage?: boolean;
+  deepLinkImageId?: string | null;
+  deepLinkImageType?: string | null;
+  deepLinkCommentId?: string | null;
 }
 
-export default function CityHallOfFameImages({ cityName, hofCreatorId, cityId, isOwner, isFeaturedOnHomePage = false }: CityHallOfFameImagesProps) {
+export default function CityHallOfFameImages({ cityName, hofCreatorId, cityId, isOwner, isFeaturedOnHomePage = false, deepLinkImageId, deepLinkImageType, deepLinkCommentId }: CityHallOfFameImagesProps) {
   const [images, setImages] = useState<HallOfFameImage[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -89,6 +92,9 @@ export default function CityHallOfFameImages({ cityName, hofCreatorId, cityId, i
         cityId={cityId}
         isOwner={isOwner}
         isFeaturedOnHomePage={isFeaturedOnHomePage}
+        deepLinkImageId={deepLinkImageId}
+        deepLinkImageType={deepLinkImageType}
+        deepLinkCommentId={deepLinkCommentId}
       />
     </div>
   );

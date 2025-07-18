@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { getUsernameTextColor, getUsernameAvatarColor } from '../utils/userColors';
 import { UserTagAutocomplete } from './UserTagAutocomplete';
@@ -40,8 +40,10 @@ export function ImageComments({ imageId, imageType, cityId, initialComments = []
   const [isVisible, setIsVisible] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const commentInputRef = useRef<HTMLTextAreaElement>(null);
   const commentsRef = useRef<HTMLDivElement>(null);
+  const hasHandledDeepLink = useRef(false);
 
   const commentsPerPage = 6;
   const totalPages = Math.ceil(comments.length / commentsPerPage);
@@ -66,6 +68,41 @@ export function ImageComments({ imageId, imageType, cityId, initialComments = []
 
     return () => clearTimeout(timer);
   }, []);
+
+  // Handle deep link to specific comment
+  useEffect(() => {
+    if (hasHandledDeepLink.current) return;
+
+    const commentId = searchParams.get('comment');
+    if (commentId) {
+      const targetCommentId = parseInt(commentId);
+      
+      // Find the comment and navigate to the correct page
+      const commentIndex = comments.findIndex(comment => comment.id === targetCommentId);
+      if (commentIndex !== -1) {
+        const targetPage = Math.floor(commentIndex / commentsPerPage);
+        setCurrentPage(targetPage);
+        
+        // Scroll to the comment after a short delay
+        setTimeout(() => {
+          const commentElement = document.getElementById(`comment-${targetCommentId}`);
+          if (commentElement) {
+            commentElement.scrollIntoView({ 
+              behavior: 'smooth', 
+              block: 'center' 
+            });
+            // Add a highlight effect
+            commentElement.classList.add('ring-2', 'ring-blue-500', 'ring-opacity-50');
+            setTimeout(() => {
+              commentElement.classList.remove('ring-2', 'ring-blue-500', 'ring-opacity-50');
+            }, 3000);
+          }
+        }, 500);
+        
+        hasHandledDeepLink.current = true;
+      }
+    }
+  }, [comments, searchParams]);
 
   const fetchComments = async () => {
     try {

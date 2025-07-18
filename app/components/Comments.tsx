@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { getUsernameTextColor, getUsernameAvatarColor } from '../utils/userColors';
 import { refreshCommentCount } from './CommentCount';
@@ -38,6 +38,8 @@ export function Comments({ cityId }: CommentsProps) {
   const [tagCursorPosition, setTagCursorPosition] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const hasHandledDeepLink = useRef(false);
 
   const fetchCurrentUser = useCallback(async () => {
     try {
@@ -77,6 +79,36 @@ export function Comments({ cityId }: CommentsProps) {
     fetchComments();
     fetchCurrentUser();
   }, [fetchComments, fetchCurrentUser]);
+
+  // Handle deep link to specific comment
+  useEffect(() => {
+    if (hasHandledDeepLink.current) return;
+
+    const commentId = searchParams.get('comment');
+    if (commentId) {
+      const targetCommentId = parseInt(commentId);
+      
+      // Wait for comments to load, then scroll to the specific comment
+      if (comments.length > 0) {
+        setTimeout(() => {
+          const commentElement = document.getElementById(`comment-${targetCommentId}`);
+          if (commentElement) {
+            commentElement.scrollIntoView({ 
+              behavior: 'smooth', 
+              block: 'center' 
+            });
+            // Add a highlight effect
+            commentElement.classList.add('ring-2', 'ring-blue-500', 'ring-opacity-50');
+            setTimeout(() => {
+              commentElement.classList.remove('ring-2', 'ring-blue-500', 'ring-opacity-50');
+            }, 3000);
+          }
+        }, 500);
+        
+        hasHandledDeepLink.current = true;
+      }
+    }
+  }, [comments, searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

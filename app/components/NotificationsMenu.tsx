@@ -13,6 +13,7 @@ interface Notification {
   relatedUserId?: number;
   relatedCityId?: number;
   relatedCommentId?: number;
+  metadata?: string;
   relatedUser?: {
     id: number;
     username: string;
@@ -278,11 +279,11 @@ export function NotificationsMenu() {
                               </Link>
                             ) : notification.type === 'image_comment_tag' ? (
                               <Link
-                                href={`/city/${notification.relatedCity.id}`}
+                                href={`/city/${notification.relatedCity.id}?image=${notification.metadata ? JSON.parse(notification.metadata).imageId : ''}&type=${notification.metadata ? JSON.parse(notification.metadata).imageType : ''}&comment=${notification.relatedCommentId}`}
                                 className="block text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
                                 onClick={() => setIsOpen(false)}
                               >
-                                View image gallery on {notification.relatedCity.cityName}
+                                View comment on {notification.relatedCity.cityName}
                               </Link>
                             ) : (
                               <Link

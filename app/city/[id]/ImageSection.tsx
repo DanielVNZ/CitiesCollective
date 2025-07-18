@@ -24,9 +24,12 @@ interface ImageSectionProps {
   cityId: number;
   initialImages: CityImage[];
   isOwner: boolean;
+  deepLinkImageId?: string | null;
+  deepLinkImageType?: string | null;
+  deepLinkCommentId?: string | null;
 }
 
-export function ImageSection({ cityId, initialImages, isOwner }: ImageSectionProps) {
+export function ImageSection({ cityId, initialImages, isOwner, deepLinkImageId, deepLinkImageType, deepLinkCommentId }: ImageSectionProps) {
   const [images, setImages] = useState<CityImage[]>(initialImages);
 
   const handleImagesChange = (newImages: CityImage[]) => {
@@ -50,6 +53,9 @@ export function ImageSection({ cityId, initialImages, isOwner }: ImageSectionPro
             cityId={cityId}
             isOwner={isOwner}
             onImagesChange={handleImagesChange}
+            deepLinkImageId={deepLinkImageId}
+            deepLinkImageType={deepLinkImageType}
+            deepLinkCommentId={deepLinkCommentId}
           />
         </div>
       )}

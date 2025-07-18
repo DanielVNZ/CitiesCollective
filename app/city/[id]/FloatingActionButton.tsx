@@ -8,7 +8,7 @@ interface FloatingActionButtonProps {
   cityId: number;
 }
 
-export function FloatingActionButton({ cityId }: FloatingActionButtonProps) {
+export default function FloatingActionButton({ cityId }: FloatingActionButtonProps) {
   const [isVisible, setIsVisible] = useState(true);
   const [isMounted, setIsMounted] = useState(false);
 

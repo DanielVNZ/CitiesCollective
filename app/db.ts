@@ -180,6 +180,7 @@ const notificationsTable = pgTable('notifications', {
   relatedUserId: integer('relatedUserId'), // User who triggered the notification
   relatedCityId: integer('relatedCityId'), // City related to the notification
   relatedCommentId: integer('relatedCommentId'), // Comment related to the notification
+  metadata: text('metadata'), // Additional metadata as JSON string
   isRead: boolean('isRead').default(false),
   createdAt: timestamp('createdAt').defaultNow(),
 });
@@ -2530,9 +2531,23 @@ async function ensureNotificationsTableExists() {
         "relatedUserId" integer,
         "relatedCityId" integer,
         "relatedCommentId" integer,
+        "metadata" text,
         "isRead" boolean DEFAULT false,
         "createdAt" timestamp DEFAULT now()
       );`;
+  } else {
+    // Check if metadata column exists, add it if it doesn't
+    const columnExists = await client`
+      SELECT EXISTS (
+        SELECT FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = 'notifications' 
+        AND column_name = 'metadata'
+      );`;
+    
+    if (!columnExists[0].exists) {
+      await client`ALTER TABLE "notifications" ADD COLUMN "metadata" text;`;
+    }
   }
 
   tableInitCache.add('notifications');
@@ -2652,6 +2667,7 @@ export async function createNotification(data: {
   relatedUserId?: number;
   relatedCityId?: number;
   relatedCommentId?: number;
+  metadata?: string;
 }) {
   const notifications = await ensureNotificationsTableExists();
   
@@ -2673,6 +2689,7 @@ export async function getUserNotifications(userId: number, limit: number = 20, o
     relatedUserId: notifications.relatedUserId,
     relatedCityId: notifications.relatedCityId,
     relatedCommentId: notifications.relatedCommentId,
+    metadata: notifications.metadata,
     relatedUser: {
       id: users.id,
       username: users.username,

@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { Fancybox } from '@fancyapps/ui';
 import { ImageLikeButton } from 'app/components/ImageLikeButton';
 import { ImageComments } from 'app/components/ImageComments';
+import { useSearchParams } from 'next/navigation';
 
 interface CityImage {
   id: number;
@@ -26,9 +27,12 @@ interface ImageGalleryProps {
   cityId: number;
   isOwner: boolean;
   onImagesChange?: (newImages: CityImage[]) => void;
+  deepLinkImageId?: string | null;
+  deepLinkImageType?: string | null;
+  deepLinkCommentId?: string | null;
 }
 
-export function ImageGallery({ images, cityId, isOwner, onImagesChange }: ImageGalleryProps) {
+export function ImageGallery({ images, cityId, isOwner, onImagesChange, deepLinkImageId, deepLinkImageType, deepLinkCommentId }: ImageGalleryProps) {
   const [mainGalleryIndex, setMainGalleryIndex] = useState(0);
   const [thumbnailStartIndex, setThumbnailStartIndex] = useState(0);
   const [touchStart, setTouchStart] = useState<number | null>(null);
@@ -36,6 +40,8 @@ export function ImageGallery({ images, cityId, isOwner, onImagesChange }: ImageG
   const [showComments, setShowComments] = useState(false);
   const [isClosingComments, setIsClosingComments] = useState(false);
   const mainImageRef = useRef<HTMLDivElement>(null);
+  const searchParams = useSearchParams();
+  const hasHandledDeepLink = useRef(false);
 
   // Filter out images with missing required data
   const validImages = images.filter(image => 
@@ -192,6 +198,48 @@ export function ImageGallery({ images, cityId, isOwner, onImagesChange }: ImageG
       setShowComments(true);
     }
   };
+
+  // Method to navigate to a specific image (for deep linking)
+  const navigateToImage = (imageId: string, imageType: string) => {
+    if (imageType === 'screenshot') {
+      // Find the image by ID (convert string to number for city images)
+      const targetImageIndex = validImages.findIndex(img => img.id.toString() === imageId);
+      
+      if (targetImageIndex !== -1) {
+        // Calculate which page this image is on
+        const targetPage = Math.floor(targetImageIndex / thumbnailsPerPage);
+        const targetIndexInPage = targetImageIndex % thumbnailsPerPage;
+        
+        // Navigate to the correct page and image
+        setThumbnailStartIndex(targetPage * thumbnailsPerPage);
+        setMainGalleryIndex(targetIndexInPage);
+      }
+    }
+    
+    // Always expand comments for image comment notifications
+    if (imageType === 'screenshot' || imageType === 'hall_of_fame') {
+      setShowComments(true);
+    }
+  };
+
+  // Handle deep link navigation from props
+  useEffect(() => {
+    if (hasHandledDeepLink.current) return;
+
+    if (deepLinkImageId && deepLinkImageType) {
+      // Small delay to ensure component is mounted
+      setTimeout(() => {
+        navigateToImage(deepLinkImageId, deepLinkImageType);
+        
+        // If there's also a comment ID, we'll handle it in the ImageComments component
+        if (deepLinkCommentId) {
+          // The ImageComments component will handle scrolling to the specific comment
+        }
+      }, 100);
+      
+      hasHandledDeepLink.current = true;
+    }
+  }, [deepLinkImageId, deepLinkImageType, deepLinkCommentId]);
 
   // Initialize Fancybox
   useEffect(() => {

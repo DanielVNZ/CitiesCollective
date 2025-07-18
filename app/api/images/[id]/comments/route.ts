@@ -94,7 +94,11 @@ export async function POST(
               message: `@${user.username || 'Anonymous'} tagged you in a comment on an image`,
               relatedUserId: user.id,
               relatedCityId: parseInt(cityId),
-              relatedCommentId: comment.id
+              relatedCommentId: comment.id,
+              metadata: JSON.stringify({
+                imageId: imageId,
+                imageType: imageType
+              })
             });
           }
         }
