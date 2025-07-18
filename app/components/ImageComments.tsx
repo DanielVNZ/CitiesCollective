@@ -399,6 +399,7 @@ export function ImageComments({ imageId, imageType, cityId, initialComments = []
             return (
               <div 
                 key={comment.id} 
+                id={`comment-${comment.id}`}
                 className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 transform transition-all duration-200 hover:scale-[1.01] hover:shadow-md"
                 style={{
                   animationDelay: `${index * 50}ms`,

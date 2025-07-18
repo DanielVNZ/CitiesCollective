@@ -10,6 +10,9 @@ interface Notification {
   message: string;
   isRead: boolean;
   createdAt: string;
+  relatedUserId?: number;
+  relatedCityId?: number;
+  relatedCommentId?: number;
   relatedUser?: {
     id: number;
     username: string;
@@ -263,13 +266,34 @@ export function NotificationsMenu() {
                         </div>
                         {/* Related content links */}
                         {notification.relatedCity && (
-                          <Link
-                            href={`/city/${notification.relatedCity.id}`}
-                            className="block mt-2 text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-                            onClick={() => setIsOpen(false)}
-                          >
-                            View city: {notification.relatedCity.cityName}
-                          </Link>
+                          <div className="mt-2">
+                            {/* For comment notifications, link to the specific comment */}
+                            {(notification.type === 'comment_tag' || notification.type === 'new_comment') && notification.relatedCommentId ? (
+                              <Link
+                                href={`/city/${notification.relatedCity.id}#comment-${notification.relatedCommentId}`}
+                                className="block text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                                onClick={() => setIsOpen(false)}
+                              >
+                                View comment on {notification.relatedCity.cityName}
+                              </Link>
+                            ) : notification.type === 'image_comment_tag' ? (
+                              <Link
+                                href={`/city/${notification.relatedCity.id}`}
+                                className="block text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                                onClick={() => setIsOpen(false)}
+                              >
+                                View image gallery on {notification.relatedCity.cityName}
+                              </Link>
+                            ) : (
+                              <Link
+                                href={`/city/${notification.relatedCity.id}`}
+                                className="block text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                                onClick={() => setIsOpen(false)}
+                              >
+                                View city: {notification.relatedCity.cityName}
+                              </Link>
+                            )}
+                          </div>
                         )}
                         {notification.relatedUser && (
                           <Link

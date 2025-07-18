@@ -1185,10 +1185,12 @@ export async function getContentCreatorCities(limit: number = 6) {
 export async function getCitiesByUser(userId: number) {
   await ensureCityTableExists();
   await ensureCityImagesTableExists();
+  await ensureHallOfFameCacheTableExists();
   await ensureCommentsTableExists();
   const users = await ensureTableExists();
   
-  const cities = await db.select({
+  // Get cities with primary screenshots
+  const citiesWithScreenshots = await db.select({
     id: cityTable.id,
     userId: cityTable.userId,
     cityName: cityTable.cityName,
@@ -1208,11 +1210,11 @@ export async function getCitiesByUser(userId: number) {
       id: users.id,
       username: users.username,
     },
-    images: sql<Array<{ id: number; fileName: string; isPrimary: boolean; mediumPath: string; largePath: string; thumbnailPath: string }>>`
+    images: sql<Array<{ id: number; fileName: string; isPrimary: boolean; mediumPath: string; largePath: string; thumbnailPath: string; isHallOfFame?: boolean }>>`
       (
-        SELECT COALESCE(json_agg(json_build_object('id', i.id, 'fileName', i."fileName", 'isPrimary', i."isPrimary", 'mediumPath', i."mediumPath", 'largePath', i."largePath", 'thumbnailPath', i."thumbnailPath")), '[]'::json)
+        SELECT COALESCE(json_agg(json_build_object('id', i.id, 'fileName', i."fileName", 'isPrimary', i."isPrimary", 'mediumPath', i."mediumPath", 'largePath', i."largePath", 'thumbnailPath', i."thumbnailPath", 'isHallOfFame', false)), '[]'::json)
         FROM "cityImages" i
-        WHERE i."cityId" = "City".id
+        WHERE i."cityId" = "City".id AND i."isPrimary" = true
       )
     `,
     commentCount: sql<number>`(SELECT COUNT(*) FROM "comments" WHERE "cityId" = "City".id)`.as('commentCount'),
@@ -1221,8 +1223,69 @@ export async function getCitiesByUser(userId: number) {
     .leftJoin(users, eq(cityTable.userId, users.id))
     .where(eq(cityTable.userId, userId))
     .orderBy(desc(cityTable.uploadedAt));
-  
-  return cities;
+
+  // Get cities with Hall of Fame images (that don't have primary screenshots)
+  const citiesWithHallOfFame = await db.select({
+    id: cityTable.id,
+    userId: cityTable.userId,
+    cityName: cityTable.cityName,
+    mapName: cityTable.mapName,
+    population: cityTable.population,
+    money: cityTable.money,
+    xp: cityTable.xp,
+    unlimitedMoney: cityTable.unlimitedMoney,
+    theme: cityTable.theme,
+    gameMode: cityTable.gameMode,
+    fileName: cityTable.fileName,
+    filePath: cityTable.filePath,
+    downloadable: cityTable.downloadable,
+    uploadedAt: cityTable.uploadedAt,
+    modsEnabled: cityTable.modsEnabled,
+    user: {
+      id: users.id,
+      username: users.username,
+    },
+    images: sql<Array<{ id: number; fileName: string; isPrimary: boolean; mediumPath: string; largePath: string; thumbnailPath: string; isHallOfFame?: boolean }>>`
+      (
+        SELECT COALESCE(json_agg(json_build_object('id', h."hofImageId", 'fileName', h."cityName", 'isPrimary', h."isPrimary", 'mediumPath', h."imageUrlFHD", 'largePath', h."imageUrl4K", 'thumbnailPath', h."imageUrlThumbnail", 'isHallOfFame', true) ORDER BY h."isPrimary" DESC, h."createdAt" ASC), '[]'::json)
+        FROM "hallOfFameCache" h
+        WHERE h."cityName" = "City"."cityName"
+      )
+    `,
+    commentCount: sql<number>`(SELECT COUNT(*) FROM "comments" WHERE "cityId" = "City".id)`.as('commentCount'),
+  })
+    .from(cityTable)
+    .leftJoin(users, eq(cityTable.userId, users.id))
+    .innerJoin(hallOfFameCacheTable, eq(hallOfFameCacheTable.cityName, cityTable.cityName))
+    .where(
+      and(
+        eq(cityTable.userId, userId),
+        sql`NOT EXISTS (SELECT 1 FROM "cityImages" WHERE "cityId" = "City".id AND "isPrimary" = true)`
+      )
+    )
+    .groupBy(cityTable.id, users.id)
+    .orderBy(desc(cityTable.uploadedAt));
+
+  // Create a map of cities with Hall of Fame images for quick lookup
+  const hofCitiesMap = new Map(citiesWithHallOfFame.map(city => [city.id, city]));
+
+  // Update cities that have Hall of Fame images
+  const updatedCities = citiesWithScreenshots.map(city => {
+    const hofCity = hofCitiesMap.get(city.id);
+    if (hofCity && city.images.length === 0) {
+      return { ...city, images: hofCity.images };
+    }
+    return city;
+  });
+
+  // Add cities that only have Hall of Fame images
+  const citiesOnlyWithHof = citiesWithHallOfFame.filter(city => !hofCitiesMap.has(city.id) || citiesWithScreenshots.every(c => c.id !== city.id));
+
+  return [...updatedCities, ...citiesOnlyWithHof].sort((a, b) => {
+    const dateA = a.uploadedAt ? new Date(a.uploadedAt).getTime() : 0;
+    const dateB = b.uploadedAt ? new Date(b.uploadedAt).getTime() : 0;
+    return dateB - dateA;
+  });
 }
 
 export async function getCityCountByUser(userId: number) {
@@ -2607,6 +2670,9 @@ export async function getUserNotifications(userId: number, limit: number = 20, o
     message: notifications.message,
     isRead: notifications.isRead,
     createdAt: notifications.createdAt,
+    relatedUserId: notifications.relatedUserId,
+    relatedCityId: notifications.relatedCityId,
+    relatedCommentId: notifications.relatedCommentId,
     relatedUser: {
       id: users.id,
       username: users.username,
