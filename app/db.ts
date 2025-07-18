@@ -848,9 +848,9 @@ export async function getRecentCities(limit: number = 12, offset: number = 0) {
       },
       images: sql<Array<{ id: number; fileName: string; isPrimary: boolean; mediumPath: string; largePath: string; thumbnailPath: string; isHallOfFame?: boolean }>>`
         (
-          SELECT COALESCE(json_agg(json_build_object('id', h."hofImageId", 'fileName', h."cityName", 'isPrimary', h."isPrimary", 'mediumPath', h."imageUrlFHD", 'largePath', h."imageUrl4K", 'thumbnailPath', h."imageUrlThumbnail", 'isHallOfFame', true)), '[]'::json)
+          SELECT COALESCE(json_agg(json_build_object('id', h."hofImageId", 'fileName', h."cityName", 'isPrimary', h."isPrimary", 'mediumPath', h."imageUrlFHD", 'largePath', h."imageUrl4K", 'thumbnailPath', h."imageUrlThumbnail", 'isHallOfFame', true) ORDER BY h."isPrimary" DESC, h."createdAt" ASC), '[]'::json)
           FROM "hallOfFameCache" h
-          WHERE h."cityName" = "City"."cityName" AND h."isPrimary" = true
+          WHERE h."cityName" = "City"."cityName"
         )
       `,
       commentCount: sql<number>`(SELECT COUNT(*) FROM "comments" WHERE "cityId" = "City".id)`.as('commentCount'),
@@ -859,10 +859,7 @@ export async function getRecentCities(limit: number = 12, offset: number = 0) {
     .leftJoin(users, eq(cityTable.userId, users.id))
     .innerJoin(hallOfFameCacheTable, eq(hallOfFameCacheTable.cityName, cityTable.cityName))
     .where(
-      and(
-        eq(hallOfFameCacheTable.isPrimary, true),
-        sql`NOT EXISTS (SELECT 1 FROM "cityImages" WHERE "cityId" = "City".id AND "isPrimary" = true)`
-      )
+      sql`NOT EXISTS (SELECT 1 FROM "cityImages" WHERE "cityId" = "City".id AND "isPrimary" = true)`
     )
     .groupBy(cityTable.id, users.id);
 
@@ -883,9 +880,12 @@ export async function getRecentCities(limit: number = 12, offset: number = 0) {
 
 export async function getTopCitiesByMoney(limit: number = 3) {
   await ensureCityTableExists();
+  await ensureCityImagesTableExists();
+  await ensureHallOfFameCacheTableExists();
   const users = await ensureTableExists();
   
-  const cities = await db
+  // Get cities with primary screenshots
+  const citiesWithScreenshots = await db
     .select({
       id: cityTable.id,
       userId: cityTable.userId,
@@ -899,29 +899,73 @@ export async function getTopCitiesByMoney(limit: number = 3) {
         id: users.id,
         username: users.username,
       },
-      images: sql<Array<{ id: number; fileName: string; isPrimary: boolean; mediumPath: string; largePath: string; thumbnailPath: string }>>`
+      images: sql<Array<{ id: number; fileName: string; isPrimary: boolean; mediumPath: string; largePath: string; thumbnailPath: string; isHallOfFame?: boolean }>>`
         (
-          SELECT COALESCE(json_agg(json_build_object('id', i.id, 'fileName', i."fileName", 'isPrimary', i."isPrimary", 'mediumPath', i."mediumPath", 'largePath', i."largePath", 'thumbnailPath', i."thumbnailPath")), '[]'::json)
+          SELECT COALESCE(json_agg(json_build_object('id', i.id, 'fileName', i."fileName", 'isPrimary', i."isPrimary", 'mediumPath', i."mediumPath", 'largePath', i."largePath", 'thumbnailPath', i."thumbnailPath", 'isHallOfFame', false)), '[]'::json)
           FROM "cityImages" i
-          WHERE i."cityId" = "City".id
+          WHERE i."cityId" = "City".id AND i."isPrimary" = true
         )
       `,
       commentCount: sql<number>`(SELECT COUNT(*) FROM "comments" WHERE "cityId" = "City".id)`.as('commentCount'),
     })
     .from(cityTable)
     .leftJoin(users, eq(cityTable.userId, users.id))
+    .innerJoin(cityImagesTable, eq(cityTable.id, cityImagesTable.cityId))
+    .where(eq(cityImagesTable.isPrimary, true))
+    .groupBy(cityTable.id, users.id)
     .orderBy(desc(cityTable.money))
     .limit(limit);
 
-  return cities;
+  // Get cities with Hall of Fame images (that don't have primary screenshots)
+  const citiesWithHallOfFame = await db
+    .select({
+      id: cityTable.id,
+      userId: cityTable.userId,
+      cityName: cityTable.cityName,
+      mapName: cityTable.mapName,
+      population: cityTable.population,
+      money: cityTable.money,
+      xp: cityTable.xp,
+      uploadedAt: cityTable.uploadedAt,
+      user: {
+        id: users.id,
+        username: users.username,
+      },
+      images: sql<Array<{ id: number; fileName: string; isPrimary: boolean; mediumPath: string; largePath: string; thumbnailPath: string; isHallOfFame?: boolean }>>`
+        (
+          SELECT COALESCE(json_agg(json_build_object('id', h."hofImageId", 'fileName', h."cityName", 'isPrimary', h."isPrimary", 'mediumPath', h."imageUrlFHD", 'largePath', h."imageUrl4K", 'thumbnailPath', h."imageUrlThumbnail", 'isHallOfFame', true) ORDER BY h."isPrimary" DESC, h."createdAt" ASC), '[]'::json)
+          FROM "hallOfFameCache" h
+          WHERE h."cityName" = "City"."cityName"
+        )
+      `,
+      commentCount: sql<number>`(SELECT COUNT(*) FROM "comments" WHERE "cityId" = "City".id)`.as('commentCount'),
+    })
+    .from(cityTable)
+    .leftJoin(users, eq(cityTable.userId, users.id))
+    .innerJoin(hallOfFameCacheTable, eq(hallOfFameCacheTable.cityName, cityTable.cityName))
+    .where(
+      sql`NOT EXISTS (SELECT 1 FROM "cityImages" WHERE "cityId" = "City".id AND "isPrimary" = true)`
+    )
+    .groupBy(cityTable.id, users.id)
+    .orderBy(desc(cityTable.money))
+    .limit(limit);
+
+  // Combine and sort by money
+  const allCities = [...citiesWithScreenshots, ...citiesWithHallOfFame];
+  allCities.sort((a, b) => (b.money || 0) - (a.money || 0));
+
+  return allCities.slice(0, limit);
 }
 
 export async function getTopCitiesByLikes(limit: number = 3) {
   await ensureCityTableExists();
   await ensureLikesTableExists();
+  await ensureCityImagesTableExists();
+  await ensureHallOfFameCacheTableExists();
   const users = await ensureTableExists();
 
-  const topCities = await db
+  // Get cities with primary screenshots
+  const citiesWithScreenshots = await db
     .select({
       id: cityTable.id,
       userId: cityTable.userId,
@@ -937,11 +981,11 @@ export async function getTopCitiesByLikes(limit: number = 3) {
         id: users.id,
         username: users.username,
       },
-      images: sql<Array<{ id: number; fileName: string; isPrimary: boolean; mediumPath: string; largePath: string; thumbnailPath: string }>>`
+      images: sql<Array<{ id: number; fileName: string; isPrimary: boolean; mediumPath: string; largePath: string; thumbnailPath: string; isHallOfFame?: boolean }>>`
         (
-          SELECT COALESCE(json_agg(json_build_object('id', i.id, 'fileName', i."fileName", 'isPrimary', i."isPrimary", 'mediumPath', i."mediumPath", 'largePath', i."largePath", 'thumbnailPath', i."thumbnailPath")), '[]'::json)
+          SELECT COALESCE(json_agg(json_build_object('id', i.id, 'fileName', i."fileName", 'isPrimary', i."isPrimary", 'mediumPath', i."mediumPath", 'largePath', i."largePath", 'thumbnailPath', i."thumbnailPath", 'isHallOfFame', false)), '[]'::json)
           FROM "cityImages" i
-          WHERE i."cityId" = "City".id
+          WHERE i."cityId" = "City".id AND i."isPrimary" = true
         )
       `,
       commentCount: sql<number>`(SELECT COUNT(*) FROM "comments" WHERE "cityId" = "City".id)`.as('commentCount'),
@@ -949,11 +993,54 @@ export async function getTopCitiesByLikes(limit: number = 3) {
     .from(cityTable)
     .leftJoin(likesTable, eq(cityTable.id, likesTable.cityId))
     .leftJoin(users, eq(cityTable.userId, users.id))
+    .innerJoin(cityImagesTable, eq(cityTable.id, cityImagesTable.cityId))
+    .where(eq(cityImagesTable.isPrimary, true))
     .groupBy(cityTable.id, users.id)
     .orderBy(desc(sql`count(${likesTable.id})`))
     .limit(limit);
 
-  return topCities;
+  // Get cities with Hall of Fame images (that don't have primary screenshots)
+  const citiesWithHallOfFame = await db
+    .select({
+      id: cityTable.id,
+      userId: cityTable.userId,
+      cityName: cityTable.cityName,
+      mapName: cityTable.mapName,
+      population: cityTable.population,
+      money: cityTable.money,
+      xp: cityTable.xp,
+      unlimitedMoney: cityTable.unlimitedMoney,
+      uploadedAt: cityTable.uploadedAt,
+      likeCount: sql<number>`count(${likesTable.id})`,
+      user: {
+        id: users.id,
+        username: users.username,
+      },
+      images: sql<Array<{ id: number; fileName: string; isPrimary: boolean; mediumPath: string; largePath: string; thumbnailPath: string; isHallOfFame?: boolean }>>`
+        (
+          SELECT COALESCE(json_agg(json_build_object('id', h."hofImageId", 'fileName', h."cityName", 'isPrimary', h."isPrimary", 'mediumPath', h."imageUrlFHD", 'largePath', h."imageUrl4K", 'thumbnailPath', h."imageUrlThumbnail", 'isHallOfFame', true) ORDER BY h."isPrimary" DESC, h."createdAt" ASC), '[]'::json)
+          FROM "hallOfFameCache" h
+          WHERE h."cityName" = "City"."cityName"
+        )
+      `,
+      commentCount: sql<number>`(SELECT COUNT(*) FROM "comments" WHERE "cityId" = "City".id)`.as('commentCount'),
+    })
+    .from(cityTable)
+    .leftJoin(likesTable, eq(cityTable.id, likesTable.cityId))
+    .leftJoin(users, eq(cityTable.userId, users.id))
+    .innerJoin(hallOfFameCacheTable, eq(hallOfFameCacheTable.cityName, cityTable.cityName))
+    .where(
+      sql`NOT EXISTS (SELECT 1 FROM "cityImages" WHERE "cityId" = "City".id AND "isPrimary" = true)`
+    )
+    .groupBy(cityTable.id, users.id)
+    .orderBy(desc(sql`count(${likesTable.id})`))
+    .limit(limit);
+
+  // Combine and sort by like count
+  const allCities = [...citiesWithScreenshots, ...citiesWithHallOfFame];
+  allCities.sort((a, b) => (b.likeCount || 0) - (a.likeCount || 0));
+
+  return allCities.slice(0, limit);
 }
 
 export async function getTopCitiesWithImages(limit: number = 25) {
@@ -1004,7 +1091,7 @@ export async function getTopCitiesWithImages(limit: number = 25) {
     .where(eq(cityImagesTable.isPrimary, true))
     .groupBy(cityTable.id, users.id);
 
-  // Then get cities with primary Hall of Fame images (that don't have primary screenshots)
+  // Then get cities with Hall of Fame images (that don't have primary screenshots)
   const citiesWithHallOfFame = await db
     .select({
       id: cityTable.id,
@@ -1032,9 +1119,9 @@ export async function getTopCitiesWithImages(limit: number = 25) {
             'originalPath', h."imageUrl4K",
             'thumbnailPath', h."imageUrlThumbnail",
             'isHallOfFame', true
-          )), '[]'::json)
+          ) ORDER BY h."isPrimary" DESC, h."createdAt" ASC), '[]'::json)
           FROM "hallOfFameCache" h
-          WHERE h."cityName" = "City"."cityName" AND h."isPrimary" = true
+          WHERE h."cityName" = "City"."cityName"
         )
       `,
       commentCount: sql<number>`(SELECT COUNT(*) FROM "comments" WHERE "cityId" = "City".id)`.as('commentCount'),
@@ -1043,10 +1130,7 @@ export async function getTopCitiesWithImages(limit: number = 25) {
     .leftJoin(users, eq(cityTable.userId, users.id))
     .innerJoin(hallOfFameCacheTable, eq(hallOfFameCacheTable.cityName, cityTable.cityName))
     .where(
-      and(
-        eq(hallOfFameCacheTable.isPrimary, true),
-        sql`NOT EXISTS (SELECT 1 FROM "cityImages" WHERE "cityId" = "City".id AND "isPrimary" = true)`
-      )
+      sql`NOT EXISTS (SELECT 1 FROM "cityImages" WHERE "cityId" = "City".id AND "isPrimary" = true)`
     )
     .groupBy(cityTable.id, users.id);
 
