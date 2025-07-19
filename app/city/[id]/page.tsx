@@ -388,7 +388,7 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
                     ? 'text-purple-900 dark:text-purple-100' 
                     : 'text-gray-900 dark:text-white'
                 }`}>
-                  {isContentCreator ? '🌟 Creator City Stats' : 'City Stats'}
+                  🌟 City Stats
                 </h3>
                 <div className="space-y-4">
                   <div className={`text-center p-4 rounded-xl border ${
@@ -461,7 +461,7 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
                     ? 'text-purple-900 dark:text-purple-100' 
                     : 'text-gray-900 dark:text-white'
                 }`}>
-                  {isContentCreator ? '🎮 Creator Game Settings' : 'Game Settings'}
+                  🎮 Game Settings
                 </h3>
                 <div className="space-y-3">
                   <div className={`flex items-center justify-between p-3 rounded-lg ${city.leftHandTraffic ? 'bg-blue-50 dark:bg-blue-900/20' : 'bg-gray-50 dark:bg-gray-700'}`}>
@@ -505,7 +505,7 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
                       ? 'text-purple-900 dark:text-purple-100' 
                       : 'text-gray-900 dark:text-white'
                   }`}>
-                    {isContentCreator ? '⚙️ Creator City Settings' : 'City Settings'}
+                    ⚙️ City Settings
                   </h3>
                   <div className="space-y-6">
                     {/* Download Toggle */}
@@ -546,7 +546,7 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
                       ? 'text-purple-900 dark:text-purple-100' 
                       : 'text-gray-900 dark:text-white'
                   }`}>
-                    {isContentCreator ? '📅 Creator Simulation Date' : 'Simulation Date'}
+                    📅 Simulation Date
                   </h3>
                   <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
                     <div className="text-lg font-bold text-blue-700 dark:text-blue-400">
@@ -575,7 +575,7 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
                       ? 'text-purple-900 dark:text-purple-100' 
                       : 'text-gray-900 dark:text-white'
                   }`}>
-                    {isContentCreator ? '🎯 Creator Required DLC' : 'Required DLC'}
+                    🎯 Required DLC
                   </h3>
                   <div className="space-y-2">
                     {city.contentPrerequisites.map((dlc: string, index: number) => (
@@ -604,9 +604,9 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
                     : 'text-gray-900 dark:text-white'
                 }`}>
                   {city.modsEnabled && city.modsEnabled.length > 0 ? (
-                    <>{isContentCreator ? '🔧 Creator Mods' : 'Mods'} ({city.modsEnabled.length})</>
+                    <>🔧 Mods ({city.modsEnabled.length})</>
                   ) : (
-                    <>{isContentCreator ? '🔧 Creator Mods - Vanilla' : 'Mods - Vanilla'}</>
+                    <>🔧 Mods - Vanilla</>
                   )}
                 </h3>
                 {city.modsEnabled && city.modsEnabled.length > 0 ? (
@@ -667,7 +667,7 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
                     ? 'text-purple-900 dark:text-purple-100' 
                     : 'text-gray-900 dark:text-white'
                 }`}>
-                  {isContentCreator ? '📁 Creator File Info' : 'File Info'}
+                  📁 File Info
                 </h3>
                 <div className="space-y-3">
                   <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">

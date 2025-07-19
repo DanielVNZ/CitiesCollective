@@ -1568,9 +1568,9 @@ export async function searchCities(
         isContentCreator: userTable.isContentCreator,
       },
       // Subquery for images to prevent row duplication
-      images: sql<Array<{ id: number; fileName: string; isPrimary: boolean; mediumPath: string; largePath: string; thumbnailPath: string }>>`
+      images: sql<Array<{ id: number; fileName: string; isPrimary: boolean; mediumPath: string; largePath: string; thumbnailPath: string; isHallOfFame: boolean }>>`
         (
-          SELECT COALESCE(json_agg(json_build_object('id', i.id, 'fileName', i."fileName", 'isPrimary', i."isPrimary", 'mediumPath', i."mediumPath", 'largePath', i."largePath", 'thumbnailPath', i."thumbnailPath")), '[]'::json)
+          SELECT COALESCE(json_agg(json_build_object('id', i.id, 'fileName', i."fileName", 'isPrimary', i."isPrimary", 'mediumPath', i."mediumPath", 'largePath', i."largePath", 'thumbnailPath', i."thumbnailPath", 'isHallOfFame', i."isHallOfFame")), '[]'::json)
           FROM "cityImages" i
           WHERE i."cityId" = "City".id
         )
