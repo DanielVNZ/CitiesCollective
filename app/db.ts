@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/postgres-js';
-import { pgTable, serial, varchar, integer, boolean, json, text, timestamp } from 'drizzle-orm/pg-core';
+import { pgTable, serial, varchar, integer, boolean, json, text, timestamp, index } from 'drizzle-orm/pg-core';
 import { eq, desc, and, ilike, gte, lte, or, asc, sql } from 'drizzle-orm';
 import postgres from 'postgres';
 import { genSaltSync, hashSync } from 'bcrypt-ts';
@@ -815,6 +815,7 @@ export async function getRecentCities(limit: number = 12, offset: number = 0) {
       user: {
         id: users.id,
         username: users.username,
+        isContentCreator: users.isContentCreator,
       },
       images: sql<Array<{ id: number; fileName: string; isPrimary: boolean; mediumPath: string; largePath: string; thumbnailPath: string; isHallOfFame?: boolean }>>`
         (
@@ -846,6 +847,7 @@ export async function getRecentCities(limit: number = 12, offset: number = 0) {
       user: {
         id: users.id,
         username: users.username,
+        isContentCreator: users.isContentCreator,
       },
       images: sql<Array<{ id: number; fileName: string; isPrimary: boolean; mediumPath: string; largePath: string; thumbnailPath: string; isHallOfFame?: boolean }>>`
         (
@@ -1082,6 +1084,7 @@ export async function getTopCitiesWithImages(limit: number = 25) {
       user: {
         id: users.id,
         username: users.username,
+        isContentCreator: users.isContentCreator,
       },
       images: sql<Array<{ id: number; fileName: string; isPrimary: boolean; mediumPath: string; largePath: string; originalPath: string; thumbnailPath: string; isHallOfFame?: boolean }>>`
         (
@@ -1123,6 +1126,7 @@ export async function getTopCitiesWithImages(limit: number = 25) {
       user: {
         id: users.id,
         username: users.username,
+        isContentCreator: users.isContentCreator,
       },
       images: sql<Array<{ id: number; fileName: string; isPrimary: boolean; mediumPath: string; largePath: string; originalPath: string; thumbnailPath: string; isHallOfFame?: boolean }>>`
         (
@@ -1182,6 +1186,7 @@ export async function getContentCreatorCities(limit: number = 6) {
       user: {
         id: users.id,
         username: users.username,
+        isContentCreator: users.isContentCreator,
       },
       images: sql<Array<{ id: number; fileName: string; isPrimary: boolean; mediumPath: string; largePath: string; thumbnailPath: string; isHallOfFame?: boolean }>>`
         (
@@ -1213,6 +1218,7 @@ export async function getContentCreatorCities(limit: number = 6) {
       user: {
         id: users.id,
         username: users.username,
+        isContentCreator: users.isContentCreator,
       },
       images: sql<Array<{ id: number; fileName: string; isPrimary: boolean; mediumPath: string; largePath: string; thumbnailPath: string; isHallOfFame?: boolean }>>`
         (
@@ -1293,6 +1299,7 @@ export async function getCitiesByUser(userId: number) {
     user: {
       id: users.id,
       username: users.username,
+      isContentCreator: users.isContentCreator,
     },
     images: sql<Array<{ id: number; fileName: string; isPrimary: boolean; mediumPath: string; largePath: string; thumbnailPath: string; isHallOfFame?: boolean }>>`
       (
@@ -1328,6 +1335,7 @@ export async function getCitiesByUser(userId: number) {
     user: {
       id: users.id,
       username: users.username,
+      isContentCreator: users.isContentCreator,
     },
     images: sql<Array<{ id: number; fileName: string; isPrimary: boolean; mediumPath: string; largePath: string; thumbnailPath: string; isHallOfFame?: boolean }>>`
       (
@@ -1557,6 +1565,7 @@ export async function searchCities(
       user: {
         id: userTable.id,
         username: userTable.username,
+        isContentCreator: userTable.isContentCreator,
       },
       // Subquery for images to prevent row duplication
       images: sql<Array<{ id: number; fileName: string; isPrimary: boolean; mediumPath: string; largePath: string; thumbnailPath: string }>>`
@@ -2362,6 +2371,7 @@ export async function getUserFavorites(userId: number, limit: number = 12, offse
       user: {
         id: users.id,
         username: users.username,
+        isContentCreator: users.isContentCreator,
       },
       images: sql<Array<{ id: number; fileName: string; isPrimary: boolean; mediumPath: string; largePath: string; thumbnailPath: string }>>`
         (
@@ -3816,4 +3826,78 @@ export async function getImageStats(imageId: string, imageType: 'screenshot' | '
     commentCount,
     isLiked
   };
+}
+
+// City Views Functions
+async function ensureCityViewsTableExists() {
+  const cityViewsTable = pgTable('cityViews', {
+    id: serial('id').primaryKey(),
+    cityId: integer('cityId').notNull().references(() => cityTable.id, { onDelete: 'cascade' }),
+    sessionId: text('sessionId').notNull(),
+    viewedAt: timestamp('viewedAt').defaultNow().notNull(),
+  });
+
+  // Create unique index on cityId + sessionId to ensure one view per session per city
+  const uniqueIndex = index('city_views_unique_idx').on(cityViewsTable.cityId, cityViewsTable.sessionId);
+
+  try {
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS "cityViews" (
+      "id" serial PRIMARY KEY,
+      "cityId" integer NOT NULL REFERENCES "City"("id") ON DELETE CASCADE,
+      "sessionId" text NOT NULL,
+      "viewedAt" timestamp DEFAULT now() NOT NULL
+    )`);
+    
+    // Create unique index if it doesn't exist
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "city_views_unique_idx" ON "cityViews" ("cityId", "sessionId")`);
+  } catch (error) {
+    console.error('Error ensuring cityViews table exists:', error);
+  }
+
+  return cityViewsTable;
+}
+
+export async function recordCityView(cityId: number, sessionId: string) {
+  const cityViewsTable = await ensureCityViewsTableExists();
+  
+  try {
+    // Use ON CONFLICT DO NOTHING to handle duplicate session views gracefully
+    await db.execute(sql`
+      INSERT INTO "cityViews" ("cityId", "sessionId", "viewedAt") 
+      VALUES (${cityId}, ${sessionId}, now()) 
+      ON CONFLICT ("cityId", "sessionId") DO NOTHING
+    `);
+    return true;
+  } catch (error) {
+    console.error('Error recording city view:', error);
+    return false;
+  }
+}
+
+export async function getCityViewCount(cityId: number) {
+  const cityViewsTable = await ensureCityViewsTableExists();
+  
+  const result = await db
+    .select({ count: sql<number>`cast(count(*) as integer)` })
+    .from(cityViewsTable)
+    .where(eq(cityViewsTable.cityId, cityId));
+  
+  return result[0]?.count || 0;
+}
+
+export async function hasViewedCity(cityId: number, sessionId: string) {
+  const cityViewsTable = await ensureCityViewsTableExists();
+  
+  const result = await db
+    .select()
+    .from(cityViewsTable)
+    .where(
+      and(
+        eq(cityViewsTable.cityId, cityId),
+        eq(cityViewsTable.sessionId, sessionId)
+      )
+    )
+    .limit(1);
+  
+  return result.length > 0;
 }

@@ -52,6 +52,18 @@ export function ImageComments({ imageId, imageType, cityId, initialComments = []
   const displayedComments = comments.slice(startIndex, endIndex);
 
   useEffect(() => {
+    const fetchComments = async () => {
+      try {
+        const response = await fetch(`/api/images/${imageId}/comments?type=${imageType}&sortBy=${sortBy}`);
+        if (response.ok) {
+          const data = await response.json();
+          setComments(data.comments);
+        }
+      } catch (error) {
+        console.error('Error fetching image comments:', error);
+      }
+    };
+
     fetchComments();
   }, [imageId, imageType, sortBy]);
 
@@ -104,17 +116,7 @@ export function ImageComments({ imageId, imageType, cityId, initialComments = []
     }
   }, [comments, searchParams]);
 
-  const fetchComments = async () => {
-    try {
-      const response = await fetch(`/api/images/${imageId}/comments?type=${imageType}&sortBy=${sortBy}`);
-      if (response.ok) {
-        const data = await response.json();
-        setComments(data.comments);
-      }
-    } catch (error) {
-      console.error('Error fetching image comments:', error);
-    }
-  };
+
 
   const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -319,7 +321,7 @@ export function ImageComments({ imageId, imageType, cityId, initialComments = []
       };
 
       fetchUserId();
-    }, [username, userIdCache]);
+    }, [username]);
 
     if (isLoading) {
       return <span className={`${usernameTextColor} font-medium`}>@{username}</span>;

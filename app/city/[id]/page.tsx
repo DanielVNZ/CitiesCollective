@@ -20,6 +20,7 @@ import CityHallOfFameImages from 'app/components/CityHallOfFameImages';
 import { DownloadToggle } from './DownloadToggle';
 import { SaveGameSection } from './SaveGameSection';
 import { CityNameEditor } from './CityNameEditor';
+import { ViewCounter } from 'app/components/ViewCounter';
 
 // Force dynamic rendering to prevent caching
 export const dynamic = 'force-dynamic';
@@ -159,15 +160,26 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
   // Check if this city is featured on the home page (in top 25)
   const topCities = await getTopCitiesWithImages(25);
   const isFeaturedOnHomePage = topCities.some(topCity => topCity.id === cityId);
+  
+  // Check if the city creator is a content creator
+  const isContentCreator = user?.isContentCreator;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+    <div className={`min-h-screen ${
+      isContentCreator 
+        ? 'bg-gradient-to-br from-purple-50/50 via-pink-50/50 to-indigo-50/50 dark:from-purple-900/20 dark:via-pink-900/20 dark:to-indigo-900/20' 
+        : 'bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900'
+    }`}>
       {/* Header */}
       <Header session={session} isAdmin={isAdmin} />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         {/* Hero Section - City Header */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div className={`rounded-2xl shadow-xl border overflow-hidden ${
+          isContentCreator 
+            ? 'bg-gradient-to-br from-purple-50/80 via-pink-50/80 to-indigo-50/80 dark:from-purple-900/20 dark:via-pink-900/20 dark:to-indigo-900/20 border-purple-200 dark:border-purple-700 shadow-2xl' 
+            : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+        }`}>
           <div className="p-6 lg:p-8">
             <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
               {/* City Info */}
@@ -183,48 +195,86 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
 
                 {/* Creator Information */}
                 {user && (
-                  <div className="flex items-center space-x-3 p-4 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-600 rounded-xl">
-                    <div className={`w-12 h-12 bg-gradient-to-br ${usernameAvatarColor} rounded-full flex items-center justify-center text-white font-bold text-lg`}>
-                      {(user.username || user.email || 'U').charAt(0).toUpperCase()}
+                  <div className={`flex items-center space-x-3 p-4 rounded-xl ${
+                    isContentCreator 
+                      ? 'bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border border-purple-200 dark:border-purple-700' 
+                      : 'bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-600'
+                  }`}>
+                    <div className="relative">
+                      <div className={`w-12 h-12 bg-gradient-to-br ${usernameAvatarColor} rounded-full flex items-center justify-center text-white font-bold text-lg ${
+                        isContentCreator ? 'ring-2 ring-purple-300 dark:ring-purple-600 shadow-lg' : ''
+                      }`}>
+                        {(user.username || user.email || 'U').charAt(0).toUpperCase()}
+                      </div>
+                      {isContentCreator && (
+                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full border border-white dark:border-gray-800 flex items-center justify-center">
+                          <svg className="w-2 h-2 text-white" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                      )}
                     </div>
                     <div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">Created by</p>
+                      <p className={`text-sm ${
+                        isContentCreator 
+                          ? 'text-purple-600 dark:text-purple-400' 
+                          : 'text-gray-600 dark:text-gray-400'
+                      }`}>
+                        {isContentCreator ? '🎬 Premium Content Creator' : 'Created by'}
+                      </p>
                       <Link 
                         href={`/user/${user.id}`}
-                        className={`text-lg font-semibold ${usernameTextColor} hover:underline`}
+                        className={`text-lg font-semibold ${usernameTextColor} hover:underline ${
+                          isContentCreator ? 'font-bold' : ''
+                        }`}
                       >
                         {user.username || user.email || 'Unknown User'}
+                        {isContentCreator && <span className="ml-1 text-purple-600 dark:text-purple-400">🎬</span>}
                       </Link>
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* Download Button */}
-              <div className="lg:flex-shrink-0">
+              {/* Right Side - Download Button and View Counter */}
+              <div className="lg:flex-shrink-0 flex flex-col items-center lg:items-end gap-4">
+                {/* View Counter */}
+                <ViewCounter cityId={cityId} isContentCreator={isContentCreator || false} trackView={true} />
+                
+                {/* Download Button */}
                 {city.filePath && (city.downloadable || isOwner) && session ? (
                   <a
                     href={`/api/cities/${city.id}/download`}
                     download
-                    className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white text-lg font-semibold rounded-xl hover:from-green-700 hover:to-emerald-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                    className={`inline-flex items-center px-6 py-3 text-white text-lg font-semibold rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 ${
+                      isContentCreator 
+                        ? 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 shadow-xl' 
+                        : 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700'
+                    }`}
                   >
                     <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
-                    Download Save
+                    {isContentCreator ? '🌟 Download Creator Save' : 'Download Save'}
                     {isOwner && !city.downloadable && (
-                      <span className="ml-2 text-sm bg-green-500 px-2 py-1 rounded-full">Owner</span>
+                      <span className={`ml-2 text-sm px-2 py-1 rounded-full ${
+                        isContentCreator ? 'bg-purple-500' : 'bg-green-500'
+                      }`}>Owner</span>
                     )}
                   </a>
                 ) : city.filePath && city.downloadable && !session ? (
                   <Link
                     href={`/login?redirect=${encodeURIComponent(`/city/${city.id}`)}`}
-                    className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-lg font-semibold rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                    className={`inline-flex items-center px-6 py-3 text-white text-lg font-semibold rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 ${
+                      isContentCreator 
+                        ? 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 shadow-xl' 
+                        : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700'
+                    }`}
                   >
                     <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
                     </svg>
-                    Login to Download
+                    {isContentCreator ? '🌟 Login to Download Creator Save' : 'Login to Download'}
                   </Link>
                 ) : null}
               </div>
@@ -245,12 +295,23 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
               cityName={city.cityName || ''}
               isOwner={isOwner}
               isFeaturedOnHomePage={isFeaturedOnHomePage}
+              isContentCreator={isContentCreator || false}
             />
 
             {/* City Description */}
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div className={`rounded-2xl shadow-xl border overflow-hidden ${
+              isContentCreator 
+                ? 'bg-gradient-to-br from-purple-50/80 via-pink-50/80 to-indigo-50/80 dark:from-purple-900/20 dark:via-pink-900/20 dark:to-indigo-900/20 border-purple-200 dark:border-purple-700 shadow-2xl' 
+                : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+            }`}>
               <div className="p-6">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">About This City</h2>
+                <h2 className={`text-2xl font-bold mb-6 ${
+                  isContentCreator 
+                    ? 'text-purple-900 dark:text-purple-100' 
+                    : 'text-gray-900 dark:text-white'
+                }`}>
+                  {isContentCreator ? '🌟 About This Creator City' : 'About This City'}
+                </h2>
                 <CityDescription 
                   cityId={cityId} 
                   initialDescription={city.description} 
@@ -261,9 +322,19 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
 
             {/* Map Section */}
             {(isOwner || city.osmMapPath) && (
-              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+              <div className={`rounded-2xl shadow-xl border overflow-hidden ${
+                isContentCreator 
+                  ? 'bg-gradient-to-br from-purple-50/80 via-pink-50/80 to-indigo-50/80 dark:from-purple-900/20 dark:via-pink-900/20 dark:to-indigo-900/20 border-purple-200 dark:border-purple-700 shadow-2xl' 
+                  : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+              }`}>
                 <div className="p-6">
-                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">City Map</h2>
+                  <h2 className={`text-2xl font-bold mb-6 ${
+                    isContentCreator 
+                      ? 'text-purple-900 dark:text-purple-100' 
+                      : 'text-gray-900 dark:text-white'
+                  }`}>
+                    {isContentCreator ? '🗺️ Creator City Map' : 'City Map'}
+                  </h2>
                   {isOwner ? (
                     <OsmMapManager 
                       cityId={cityId} 
@@ -285,9 +356,19 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
             )}
 
             {/* Comments Section */}
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div className={`rounded-2xl shadow-xl border overflow-hidden ${
+              isContentCreator 
+                ? 'bg-gradient-to-br from-purple-50/80 via-pink-50/80 to-indigo-50/80 dark:from-purple-900/20 dark:via-pink-900/20 dark:to-indigo-900/20 border-purple-200 dark:border-purple-700 shadow-2xl' 
+                : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+            }`}>
               <div className="p-6">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Community Discussion</h2>
+                <h2 className={`text-2xl font-bold mb-6 ${
+                  isContentCreator 
+                    ? 'text-purple-900 dark:text-purple-100' 
+                    : 'text-gray-900 dark:text-white'
+                }`}>
+                  {isContentCreator ? '💬 Creator Community Discussion' : 'Community Discussion'}
+                </h2>
                 <Comments cityId={city.id} />
               </div>
             </div>
@@ -296,36 +377,92 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
           {/* Sidebar - Stats and Details */}
           <div className="xl:col-span-1 space-y-6">
             {/* Key Stats */}
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div className={`rounded-2xl shadow-xl border overflow-hidden ${
+              isContentCreator 
+                ? 'bg-gradient-to-br from-purple-50/80 via-pink-50/80 to-indigo-50/80 dark:from-purple-900/20 dark:via-pink-900/20 dark:to-indigo-900/20 border-purple-200 dark:border-purple-700 shadow-2xl' 
+                : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+            }`}>
               <div className="p-6">
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6">City Stats</h3>
+                <h3 className={`text-xl font-bold mb-6 ${
+                  isContentCreator 
+                    ? 'text-purple-900 dark:text-purple-100' 
+                    : 'text-gray-900 dark:text-white'
+                }`}>
+                  {isContentCreator ? '🌟 Creator City Stats' : 'City Stats'}
+                </h3>
                 <div className="space-y-4">
-                  <div className="text-center p-4 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-xl border border-green-200 dark:border-green-800">
-                    <div className="text-2xl lg:text-3xl font-bold text-green-700 dark:text-green-400 mb-1">
+                  <div className={`text-center p-4 rounded-xl border ${
+                    isContentCreator 
+                      ? 'bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border-purple-200 dark:border-purple-800' 
+                      : 'bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-green-200 dark:border-green-800'
+                  }`}>
+                    <div className={`text-2xl lg:text-3xl font-bold mb-1 ${
+                      isContentCreator 
+                        ? 'text-purple-700 dark:text-purple-400' 
+                        : 'text-green-700 dark:text-green-400'
+                    }`}>
                       {formatNumber(city.population)}
                     </div>
-                    <div className="text-sm font-semibold text-green-600 dark:text-green-300">Population</div>
+                    <div className={`text-sm font-semibold ${
+                      isContentCreator 
+                        ? 'text-purple-600 dark:text-purple-300' 
+                        : 'text-green-600 dark:text-green-300'
+                    }`}>Population</div>
                   </div>
-                  <div className="text-center p-4 bg-gradient-to-br from-yellow-50 to-amber-50 dark:from-yellow-900/20 dark:to-amber-900/20 rounded-xl border border-yellow-200 dark:border-yellow-800">
-                    <div className="text-2xl lg:text-3xl font-bold text-yellow-700 dark:text-yellow-400 mb-1">
+                  <div className={`text-center p-4 rounded-xl border ${
+                    isContentCreator 
+                      ? 'bg-gradient-to-br from-pink-50 to-indigo-50 dark:from-pink-900/20 dark:to-indigo-900/20 border-pink-200 dark:border-pink-800' 
+                      : 'bg-gradient-to-br from-yellow-50 to-amber-50 dark:from-yellow-900/20 dark:to-amber-900/20 border-yellow-200 dark:border-yellow-800'
+                  }`}>
+                    <div className={`text-2xl lg:text-3xl font-bold mb-1 ${
+                      isContentCreator 
+                        ? 'text-pink-700 dark:text-pink-400' 
+                        : 'text-yellow-700 dark:text-yellow-400'
+                    }`}>
                       {city.unlimitedMoney ? '∞' : `$${formatNumber(city.money)}`}
                     </div>
-                    <div className="text-sm font-semibold text-yellow-600 dark:text-yellow-300">Money</div>
+                    <div className={`text-sm font-semibold ${
+                      isContentCreator 
+                        ? 'text-pink-600 dark:text-pink-300' 
+                        : 'text-yellow-600 dark:text-yellow-300'
+                    }`}>Money</div>
                   </div>
-                  <div className="text-center p-4 bg-gradient-to-br from-purple-50 to-violet-50 dark:from-purple-900/20 dark:to-violet-900/20 rounded-xl border border-purple-200 dark:border-purple-800">
-                    <div className="text-2xl lg:text-3xl font-bold text-purple-700 dark:text-purple-400 mb-1">
+                  <div className={`text-center p-4 rounded-xl border ${
+                    isContentCreator 
+                      ? 'bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 border-indigo-200 dark:border-indigo-800' 
+                      : 'bg-gradient-to-br from-purple-50 to-violet-50 dark:from-purple-900/20 dark:to-violet-900/20 border-purple-200 dark:border-purple-800'
+                  }`}>
+                    <div className={`text-2xl lg:text-3xl font-bold mb-1 ${
+                      isContentCreator 
+                        ? 'text-indigo-700 dark:text-indigo-400' 
+                        : 'text-purple-700 dark:text-purple-400'
+                    }`}>
                       {formatNumber(city.xp)}
                     </div>
-                    <div className="text-sm font-semibold text-purple-600 dark:text-purple-300">Experience</div>
+                    <div className={`text-sm font-semibold ${
+                      isContentCreator 
+                        ? 'text-indigo-600 dark:text-indigo-300' 
+                        : 'text-purple-600 dark:text-purple-300'
+                    }`}>Experience</div>
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Game Settings */}
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div className={`rounded-2xl shadow-xl border overflow-hidden ${
+              isContentCreator 
+                ? 'bg-gradient-to-br from-purple-50/80 via-pink-50/80 to-indigo-50/80 dark:from-purple-900/20 dark:via-pink-900/20 dark:to-indigo-900/20 border-purple-200 dark:border-purple-700 shadow-2xl' 
+                : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+            }`}>
               <div className="p-6">
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Game Settings</h3>
+                <h3 className={`text-xl font-bold mb-6 ${
+                  isContentCreator 
+                    ? 'text-purple-900 dark:text-purple-100' 
+                    : 'text-gray-900 dark:text-white'
+                }`}>
+                  {isContentCreator ? '🎮 Creator Game Settings' : 'Game Settings'}
+                </h3>
                 <div className="space-y-3">
                   <div className={`flex items-center justify-between p-3 rounded-lg ${city.leftHandTraffic ? 'bg-blue-50 dark:bg-blue-900/20' : 'bg-gray-50 dark:bg-gray-700'}`}>
                     <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Left-hand Traffic</span>
@@ -357,9 +494,19 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
 
                         {/* City Settings - Only for owners */}
             {isOwner && (
-              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+              <div className={`rounded-2xl shadow-xl border overflow-hidden ${
+                isContentCreator 
+                  ? 'bg-gradient-to-br from-purple-50/80 via-pink-50/80 to-indigo-50/80 dark:from-purple-900/20 dark:via-pink-900/20 dark:to-indigo-900/20 border-purple-200 dark:border-purple-700 shadow-2xl' 
+                  : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+              }`}>
                 <div className="p-6">
-                  <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6">City Settings</h3>
+                  <h3 className={`text-xl font-bold mb-6 ${
+                    isContentCreator 
+                      ? 'text-purple-900 dark:text-purple-100' 
+                      : 'text-gray-900 dark:text-white'
+                  }`}>
+                    {isContentCreator ? '⚙️ Creator City Settings' : 'City Settings'}
+                  </h3>
                   <div className="space-y-6">
                     {/* Download Toggle */}
                     <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
@@ -388,9 +535,19 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
 
             {/* Simulation Date */}
             {simulationDate && (
-              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+              <div className={`rounded-2xl shadow-xl border overflow-hidden ${
+                isContentCreator 
+                  ? 'bg-gradient-to-br from-purple-50/80 via-pink-50/80 to-indigo-50/80 dark:from-purple-900/20 dark:via-pink-900/20 dark:to-indigo-900/20 border-purple-200 dark:border-purple-700 shadow-2xl' 
+                  : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+              }`}>
                 <div className="p-6">
-                  <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Simulation Date</h3>
+                  <h3 className={`text-xl font-bold mb-4 ${
+                    isContentCreator 
+                      ? 'text-purple-900 dark:text-purple-100' 
+                      : 'text-gray-900 dark:text-white'
+                  }`}>
+                    {isContentCreator ? '📅 Creator Simulation Date' : 'Simulation Date'}
+                  </h3>
                   <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
                     <div className="text-lg font-bold text-blue-700 dark:text-blue-400">
                       Year {simulationDate.year}, Month {simulationDate.month}
@@ -407,9 +564,19 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
 
             {/* Required DLC */}
             {city.contentPrerequisites && city.contentPrerequisites.length > 0 && (
-              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+              <div className={`rounded-2xl shadow-xl border overflow-hidden ${
+                isContentCreator 
+                  ? 'bg-gradient-to-br from-purple-50/80 via-pink-50/80 to-indigo-50/80 dark:from-purple-900/20 dark:via-pink-900/20 dark:to-indigo-900/20 border-purple-200 dark:border-purple-700 shadow-2xl' 
+                  : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+              }`}>
                 <div className="p-6">
-                  <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Required DLC</h3>
+                  <h3 className={`text-xl font-bold mb-4 ${
+                    isContentCreator 
+                      ? 'text-purple-900 dark:text-purple-100' 
+                      : 'text-gray-900 dark:text-white'
+                  }`}>
+                    {isContentCreator ? '🎯 Creator Required DLC' : 'Required DLC'}
+                  </h3>
                   <div className="space-y-2">
                     {city.contentPrerequisites.map((dlc: string, index: number) => (
                       <div
@@ -425,13 +592,21 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
             )}
 
             {/* Mods */}
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div className={`rounded-2xl shadow-xl border overflow-hidden ${
+              isContentCreator 
+                ? 'bg-gradient-to-br from-purple-50/80 via-pink-50/80 to-indigo-50/80 dark:from-purple-900/20 dark:via-pink-900/20 dark:to-indigo-900/20 border-purple-200 dark:border-purple-700 shadow-2xl' 
+                : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+            }`}>
               <div className="p-6">
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+                <h3 className={`text-xl font-bold mb-4 ${
+                  isContentCreator 
+                    ? 'text-purple-900 dark:text-purple-100' 
+                    : 'text-gray-900 dark:text-white'
+                }`}>
                   {city.modsEnabled && city.modsEnabled.length > 0 ? (
-                    <>Mods ({city.modsEnabled.length})</>
+                    <>{isContentCreator ? '🔧 Creator Mods' : 'Mods'} ({city.modsEnabled.length})</>
                   ) : (
-                    <>Mods - Vanilla</>
+                    <>{isContentCreator ? '🔧 Creator Mods - Vanilla' : 'Mods - Vanilla'}</>
                   )}
                 </h3>
                 {city.modsEnabled && city.modsEnabled.length > 0 ? (
@@ -481,9 +656,19 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
             </div>
 
             {/* File Info */}
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div className={`rounded-2xl shadow-xl border overflow-hidden ${
+              isContentCreator 
+                ? 'bg-gradient-to-br from-purple-50/80 via-pink-50/80 to-indigo-50/80 dark:from-purple-900/20 dark:via-pink-900/20 dark:to-indigo-900/20 border-purple-200 dark:border-purple-700 shadow-2xl' 
+                : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+            }`}>
               <div className="p-6">
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">File Info</h3>
+                <h3 className={`text-xl font-bold mb-4 ${
+                  isContentCreator 
+                    ? 'text-purple-900 dark:text-purple-100' 
+                    : 'text-gray-900 dark:text-white'
+                }`}>
+                  {isContentCreator ? '📁 Creator File Info' : 'File Info'}
+                </h3>
                 <div className="space-y-3">
                   <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                     <span className="text-sm font-medium text-gray-600 dark:text-gray-400 block">Filename</span>

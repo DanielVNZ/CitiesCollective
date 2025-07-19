@@ -54,7 +54,7 @@ export function CommunityFavorites({ cities }: CommunityFavoritesProps) {
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         {displayedCities.map((city, index) => (
-          <CityCard key={city.id} city={city} ranking={index + 1} />
+          <CityCard key={city.id} city={city} ranking={index + 1} hideCreatorBadge={true} />
         ))}
       </div>
       

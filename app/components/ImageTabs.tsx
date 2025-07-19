@@ -13,6 +13,7 @@ interface ImageTabsProps {
   cityName: string;
   isOwner: boolean;
   isFeaturedOnHomePage: boolean;
+  isContentCreator?: boolean;
 }
 
 export function ImageTabs({ 
@@ -22,7 +23,8 @@ export function ImageTabs({
   hofCreatorId, 
   cityName, 
   isOwner, 
-  isFeaturedOnHomePage 
+  isFeaturedOnHomePage,
+  isContentCreator = false
 }: ImageTabsProps) {
   const [activeTab, setActiveTab] = useState(() => {
     // Show Hall of Fame first if available, otherwise Screenshots
@@ -57,9 +59,19 @@ export function ImageTabs({
   // If only one type of images exists, don't show tabs
   if (hasScreenshots && !hasHallOfFame) {
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+      <div className={`rounded-2xl shadow-xl border overflow-hidden ${
+        isContentCreator 
+          ? 'bg-gradient-to-br from-purple-50/80 via-pink-50/80 to-indigo-50/80 dark:from-purple-900/20 dark:via-pink-900/20 dark:to-indigo-900/20 border-purple-200 dark:border-purple-700 shadow-2xl' 
+          : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+      }`}>
         <div className="p-6">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Screenshots</h2>
+          <h2 className={`text-2xl font-bold mb-4 ${
+            isContentCreator 
+              ? 'text-purple-900 dark:text-purple-100' 
+              : 'text-gray-900 dark:text-white'
+          }`}>
+            {isContentCreator ? '📸 Creator Screenshots' : 'Screenshots'}
+          </h2>
           <ImageSection 
             cityId={cityId} 
             initialImages={images} 
@@ -75,9 +87,19 @@ export function ImageTabs({
 
   if (hasHallOfFame && !hasScreenshots) {
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+      <div className={`rounded-2xl shadow-xl border overflow-hidden ${
+        isContentCreator 
+          ? 'bg-gradient-to-br from-purple-50/80 via-pink-50/80 to-indigo-50/80 dark:from-purple-900/20 dark:via-pink-900/20 dark:to-indigo-900/20 border-purple-200 dark:border-purple-700 shadow-2xl' 
+          : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+      }`}>
         <div className="p-6">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Hall of Fame</h2>
+          <h2 className={`text-2xl font-bold mb-4 ${
+            isContentCreator 
+              ? 'text-purple-900 dark:text-purple-100' 
+              : 'text-gray-900 dark:text-white'
+          }`}>
+            {isContentCreator ? '🏆 Creator Hall of Fame' : 'Hall of Fame'}
+          </h2>
           <CityHallOfFameImages 
             cityName={cityName} 
             hofCreatorId={hofCreatorId} 
@@ -96,31 +118,53 @@ export function ImageTabs({
   // If both exist, show tabs
   if (hasScreenshots && hasHallOfFame) {
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+      <div className={`rounded-2xl shadow-xl border overflow-hidden ${
+        isContentCreator 
+          ? 'bg-gradient-to-br from-purple-50/80 via-pink-50/80 to-indigo-50/80 dark:from-purple-900/20 dark:via-pink-900/20 dark:to-indigo-900/20 border-purple-200 dark:border-purple-700 shadow-2xl' 
+          : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+      }`}>
         <div className="p-6">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">City Images</h2>
+          <h2 className={`text-2xl font-bold mb-6 ${
+            isContentCreator 
+              ? 'text-purple-900 dark:text-purple-100' 
+              : 'text-gray-900 dark:text-white'
+          }`}>
+            {isContentCreator ? '🖼️ Creator City Images' : 'City Images'}
+          </h2>
           
           {/* Tab Navigation */}
-          <div className="flex space-x-1 mb-6 bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
+          <div className={`flex space-x-1 mb-6 rounded-lg p-1 ${
+            isContentCreator 
+              ? 'bg-gradient-to-r from-purple-100 to-pink-100 dark:from-purple-900/30 dark:to-pink-900/30' 
+              : 'bg-gray-100 dark:bg-gray-700'
+          }`}>
             <button
               onClick={() => setActiveTab('hof')}
               className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all duration-200 ${
                 activeTab === 'hof'
-                  ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                  ? isContentCreator
+                    ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg'
+                    : 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+                  : isContentCreator
+                    ? 'text-purple-700 dark:text-purple-300 hover:text-purple-900 dark:hover:text-purple-100'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
               }`}
             >
-              Hall of Fame
+              {isContentCreator ? '🏆 Creator Hall of Fame' : 'Hall of Fame'}
             </button>
             <button
               onClick={() => setActiveTab('screenshots')}
               className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all duration-200 ${
                 activeTab === 'screenshots'
-                  ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                  ? isContentCreator
+                    ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg'
+                    : 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+                  : isContentCreator
+                    ? 'text-purple-700 dark:text-purple-300 hover:text-purple-900 dark:hover:text-purple-100'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
               }`}
             >
-              Screenshots
+              {isContentCreator ? '📸 Creator Screenshots' : 'Screenshots'}
             </button>
           </div>
 
