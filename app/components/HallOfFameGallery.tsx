@@ -199,8 +199,153 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
 
   // Initialize Fancybox
   useEffect(() => {
-    // Bind Fancybox normally for v6
-    Fancybox.bind('[data-fancybox="hall-of-fame"]');
+    // Use a unique identifier for this specific Hall of Fame gallery
+    const galleryId = `hall-of-fame-${cityId}`;
+    
+    // Bind Fancybox to a specific container to avoid conflicts
+    const galleryContainer = document.querySelector('.hall-of-fame-gallery-container') as HTMLElement;
+    if (galleryContainer) {
+      Fancybox.bind(galleryContainer, `[data-fancybox="${galleryId}"]`);
+    }
+
+    // Add custom like button to Fancybox toolbar for Hall of Fame images
+    const addLikeButtonToFancybox = () => {
+      const toolbar = document.querySelector('.fancybox__toolbar');
+      if (toolbar && !toolbar.querySelector('.fancybox-like-btn-hof')) {
+        const likeButton = document.createElement('button');
+        likeButton.className = 'fancybox__toolbar__item fancybox__toolbar__btn fancybox-like-btn fancybox-like-btn-hof';
+        likeButton.setAttribute('data-fancybox-like-hof', '');
+        likeButton.innerHTML = `
+          <svg class="fancybox__toolbar__icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+          </svg>
+        `;
+        likeButton.title = 'Like this Hall of Fame image';
+        
+        // Insert before close button
+        const closeButton = toolbar.querySelector('[data-fancybox-close]');
+        if (closeButton) {
+          toolbar.insertBefore(likeButton, closeButton);
+        } else {
+          toolbar.appendChild(likeButton);
+        }
+        
+        // Add click handler
+        likeButton.addEventListener('click', async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          
+          // Get current slide and image ID
+          const currentSlide = document.querySelector('.fancybox__slide--current');
+          const imageElement = currentSlide?.querySelector('img');
+          const imageId = imageElement?.getAttribute('data-hof-image-id');
+          
+          if (imageId) {
+            try {
+              const response = await fetch(`/api/images/${imageId}/like?type=hall_of_fame&cityId=${cityId}`, {
+                method: 'POST',
+              });
+              
+              if (response.ok) {
+                const data = await response.json();
+                
+                // Update button appearance
+                const svg = likeButton.querySelector('svg') as SVGElement;
+                if (svg) {
+                  if (data.liked) {
+                    svg.style.fill = 'currentColor';
+                    (likeButton as HTMLElement).style.color = '#ef4444';
+                  } else {
+                    svg.style.fill = 'none';
+                    (likeButton as HTMLElement).style.color = '';
+                  }
+                }
+              }
+            } catch (error) {
+              console.error('Error toggling Hall of Fame image like:', error);
+            }
+          }
+        });
+      }
+    };
+
+    // Enhanced polling mechanism for Hall of Fame like button
+    let pollingIntervalHof: NodeJS.Timeout | null = null;
+    let isFancyboxOpenHof = false;
+    
+    const startPollingHof = () => {
+      isFancyboxOpenHof = true;
+      pollingIntervalHof = setInterval(() => {
+        // Check if Fancybox is still open
+        const fancyboxContainer = document.querySelector('.fancybox__container');
+        const fancyboxBackdrop = document.querySelector('.fancybox__backdrop');
+        
+        if (!fancyboxContainer && !fancyboxBackdrop) {
+          // Fancybox is closed, stop polling
+          if (pollingIntervalHof) {
+            clearInterval(pollingIntervalHof);
+            pollingIntervalHof = null;
+            isFancyboxOpenHof = false;
+          }
+          return;
+        }
+        
+        // Try to add like button if it doesn't exist
+        const existingButton = document.querySelector('.fancybox-like-btn-hof');
+        if (!existingButton) {
+          addLikeButtonToFancybox();
+        }
+      }, 200); // Check every 200ms
+    };
+
+    // Listen for Fancybox events for Hall of Fame images
+    const handleFancyboxOpenHof = () => {
+      setTimeout(startPollingHof, 100);
+    };
+
+    const handleFancyboxSlideChangeHof = () => {
+      setTimeout(() => {
+        const likeButton = document.querySelector('.fancybox-like-btn-hof');
+        if (likeButton) {
+          const currentSlide = document.querySelector('.fancybox__slide--current');
+          const imageElement = currentSlide?.querySelector('img');
+          const imageId = imageElement?.getAttribute('data-hof-image-id');
+          
+          if (imageId) {
+            // Fetch current like status
+            fetch(`/api/images/${imageId}/like?type=hall_of_fame`)
+              .then(response => response.json())
+              .then(data => {
+                const svg = likeButton.querySelector('svg') as SVGElement;
+                if (svg) {
+                  if (data.isLiked) {
+                    svg.style.fill = 'currentColor';
+                    (likeButton as HTMLElement).style.color = '#ef4444';
+                  } else {
+                    svg.style.fill = 'none';
+                    (likeButton as HTMLElement).style.color = '';
+                  }
+                }
+              })
+              .catch(error => {
+                console.error('Error fetching Hall of Fame image like status:', error);
+              });
+          }
+        }
+      }, 100);
+    };
+
+    // Global click listener to detect Hall of Fame Fancybox opens
+    const handleGlobalClickHof = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (target && target.closest(`[data-fancybox="hall-of-fame-${cityId}"]`)) {
+        setTimeout(startPollingHof, 200); // Small delay to let Fancybox open
+      }
+    };
+
+    document.addEventListener('fancybox:open', handleFancyboxOpenHof);
+    document.addEventListener('fancybox:slidechange', handleFancyboxSlideChangeHof);
+    document.addEventListener('click', handleGlobalClickHof);
 
     // Also try DOM events as backup
     const handleFancyboxReveal = (event: any) => {
@@ -330,7 +475,7 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
     // Global click listener to detect Fancybox opens
     const handleGlobalClick = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
-      if (target && target.closest('[data-fancybox="hall-of-fame"]')) {
+      if (target && target.closest(`[data-fancybox="hall-of-fame-${cityId}"]`)) {
         setTimeout(startPolling, 200); // Small delay to let Fancybox open
       }
     };
@@ -346,6 +491,14 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
       document.removeEventListener('fancybox:open', handleFancyboxOpen);
       document.removeEventListener('fancybox:open', handleFancyboxOpenPolling);
       document.removeEventListener('click', handleGlobalClick);
+      document.removeEventListener('fancybox:open', handleFancyboxOpenHof);
+      document.removeEventListener('fancybox:slidechange', handleFancyboxSlideChangeHof);
+      document.removeEventListener('click', handleGlobalClickHof);
+      
+      if (pollingIntervalHof) {
+        clearInterval(pollingIntervalHof);
+        pollingIntervalHof = null;
+      }
       
       // Remove Fancybox v6 specific events
       document.removeEventListener('fancybox:ready', () => {});
@@ -386,7 +539,32 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
     <>
       {/* Main Gallery View */}
       <div className="mb-6">
-        <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-lg p-4 mb-6 border border-gray-200 dark:border-gray-700 max-w-4xl mx-auto">
+                <div className="hall-of-fame-gallery-container relative bg-white dark:bg-gray-800 rounded-xl shadow-lg p-4 mb-6 border border-gray-200 dark:border-gray-700 max-w-4xl mx-auto">
+          {/* Hidden Fancybox Gallery - All Images except current main image (for Fancybox to discover) */}
+          <div className="hidden">
+            {images.map((image) => {
+              const currentMainImage = displayedThumbnails[mainGalleryIndex];
+              // Skip the currently displayed main image to avoid duplication
+              if (currentMainImage && image.hofImageId === currentMainImage.hofImageId) {
+                return null;
+              }
+              return (
+                <a
+                  key={`fancybox-hidden-hof-${image.id}`}
+                  href={image.imageUrl4K}
+                  data-fancybox={`hall-of-fame-${cityId}`}
+                  data-caption={`${image.cityName} - Hall of Fame Image`}
+                >
+                  <img 
+                    src={image.imageUrlThumbnail} 
+                    alt={`${image.cityName} - Hall of Fame Image`} 
+                    data-hof-image-id={image.hofImageId}
+                  />
+                </a>
+              );
+            })}
+          </div>
+          
           {/* Main Image with Touch Gestures */}
           <div 
             ref={mainImageRef}
@@ -397,7 +575,7 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
           >
             <a
               href={displayedThumbnails[mainGalleryIndex].imageUrl4K}
-              data-fancybox="hall-of-fame"
+              data-fancybox={`hall-of-fame-${cityId}`}
               data-caption={`${displayedThumbnails[mainGalleryIndex].cityName} - Hall of Fame Image`}
               onClick={() => {
                 // Track view when main image is clicked to open fullscreen
@@ -410,6 +588,7 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
                 src={displayedThumbnails[mainGalleryIndex].imageUrlFHD}
                 alt={`${displayedThumbnails[mainGalleryIndex].cityName} - Hall of Fame Image`}
                 className="w-full h-full object-contain transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-2xl"
+                data-hof-image-id={displayedThumbnails[mainGalleryIndex].hofImageId}
               />
             </a>
             
@@ -548,56 +727,58 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
             </button>
           )}
 
-          {/* Hidden Fancybox Gallery - All Images */}
-          <div className="hidden">
-            {images.map((image) => (
-              <a
-                key={`fancybox-hof-${image.id}`}
-                href={image.imageUrl4K}
-                data-fancybox="hall-of-fame"
-                data-caption={`${image.cityName} - Hall of Fame Image`}
-              >
-                <img src={image.imageUrlThumbnail} alt={`${image.cityName} - Hall of Fame Image`} />
-              </a>
-            ))}
-          </div>
+
 
           {/* Thumbnail Grid */}
           <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-12 gap-2 px-8">
             {displayedThumbnails.map((image, index) => (
-              <div
+                            <div
                 key={image.id}
-                className={`relative aspect-square cursor-pointer group overflow-hidden rounded-lg border-2 transition-all duration-200 ${
+                className={`relative aspect-square group overflow-hidden rounded-lg border-2 transition-all duration-200 ${
                   index === mainGalleryIndex 
-                    ? 'border-yellow-500 ring-2 ring-yellow-200' 
-                    : 'border-transparent hover:border-gray-300'
+                    ? 'border-yellow-500 ring-2 ring-yellow-200 cursor-default' 
+                    : 'border-transparent hover:border-gray-300 cursor-pointer'
                 }`}
-                onClick={() => {
-                  setMainGalleryIndex(index);
-                  // Track view when thumbnail is clicked to show larger image
-                  if (hofCreatorId && image.imageUrlFHD) {
-                    trackHallOfFameImageView(image.imageUrlFHD, hofCreatorId);
-                  }
-                }}
               >
-                <a
-                  href={image.imageUrl4K}
-                  data-fancybox="hall-of-fame"
-                  data-caption={`${image.cityName} - Hall of Fame Image`}
-                  className="block w-full h-full"
-                  onClick={() => {
-                    // Track view when thumbnail is clicked to open fullscreen
-                    if (hofCreatorId && image.imageUrl4K) {
-                      trackHallOfFameImageView(image.imageUrl4K, hofCreatorId);
-                    }
-                  }}
-                >
+                {index !== mainGalleryIndex ? (
+                  <a
+                    href={image.imageUrl4K}
+                    data-fancybox={`hall-of-fame-${cityId}`}
+                    data-caption={`${image.cityName} - Hall of Fame Image`}
+                    className="block w-full h-full absolute inset-0 z-10"
+                    onClick={(e) => {
+                      e.preventDefault(); // Prevent default link behavior
+                      e.stopPropagation(); // Prevent the div onClick from firing
+                      // Track view when thumbnail is clicked to open fullscreen
+                      if (hofCreatorId && image.imageUrl4K) {
+                        trackHallOfFameImageView(image.imageUrl4K, hofCreatorId);
+                      }
+                      // Find the index of this image in the full images array
+                      const imageIndex = images.findIndex(img => img.hofImageId === image.hofImageId);
+                      if (imageIndex !== -1) {
+                        // Find the corresponding hidden Fancybox link and click it
+                        const hiddenLink = document.querySelector(`[data-fancybox="hall-of-fame-${cityId}"][href="${image.imageUrl4K}"]`) as HTMLElement;
+                        if (hiddenLink) {
+                          hiddenLink.click();
+                        }
+                      }
+                    }}
+                  >
+                    <img
+                      src={image.imageUrlThumbnail}
+                      alt={`${image.cityName} - Hall of Fame Image`}
+                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      data-hof-image-id={image.hofImageId}
+                    />
+                  </a>
+                ) : (
                   <img
                     src={image.imageUrlThumbnail}
                     alt={`${image.cityName} - Hall of Fame Image`}
-                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    className="w-full h-full object-cover"
+                    data-hof-image-id={image.hofImageId}
                   />
-                </a>
+                )}
                 
                 {/* Primary Badge */}
                 {image.isPrimary && (
@@ -617,37 +798,41 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
                   </div>
                 </div>
 
-                {/* Hover Overlay */}
-                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-opacity duration-300 flex items-center justify-center pointer-events-none">
-                  <div className="text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
-                    </svg>
-                  </div>
-                </div>
-
-                {/* Owner Controls */}
-                {isOwner && (
-                  <div className="absolute bottom-1 right-1 flex space-x-1">
-                    {/* Set Primary Button */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleSetPrimary(image.hofImageId);
-                      }}
-                      className={`w-6 h-6 rounded-full text-xs font-medium transition-all duration-200 flex items-center justify-center ${
-                        image.isPrimary 
-                          ? 'bg-yellow-500 text-white' 
-                          : 'bg-black bg-opacity-50 text-white hover:bg-opacity-70'
-                      }`}
-                      title={image.isPrimary ? 'This is your featured Hall of Fame image' : 'Set as featured Hall of Fame image'}
-                    >
-                      <span className={image.isPrimary ? '' : 'transform translate-y-[-1px]'}>
-                        {image.isPrimary ? '✓' : '★'}
-                      </span>
-                    </button>
+                {/* Hover Overlay - Show for all thumbnails EXCEPT currently selected */}
+                {index !== mainGalleryIndex && (
+                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-opacity duration-300 flex items-center justify-center pointer-events-none">
+                    <div className="text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+                      </svg>
+                    </div>
                   </div>
                 )}
+
+                {/* Primary Button - Always visible to show current primary status */}
+                <div className="absolute bottom-1 right-1 flex space-x-1 z-20">
+                  {/* Set Primary Button */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (isOwner) {
+                        handleSetPrimary(image.hofImageId);
+                      }
+                    }}
+                    className={`w-6 h-6 rounded-full text-xs font-medium transition-all duration-200 flex items-center justify-center ${
+                      image.isPrimary 
+                        ? 'bg-yellow-500 text-white' 
+                        : isOwner 
+                          ? 'bg-black bg-opacity-50 text-white hover:bg-opacity-70' 
+                          : 'bg-black bg-opacity-30 text-white'
+                    }`}
+                    title={image.isPrimary ? 'This is the featured Hall of Fame image' : isOwner ? 'Set as featured Hall of Fame image' : 'Featured Hall of Fame image'}
+                  >
+                    <span className={image.isPrimary ? '' : 'transform translate-y-[-1px]'}>
+                      {image.isPrimary ? '✓' : '★'}
+                    </span>
+                  </button>
+                </div>
               </div>
             ))}
           </div>

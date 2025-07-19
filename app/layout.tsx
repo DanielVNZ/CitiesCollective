@@ -21,19 +21,19 @@ export const metadata = {
   metadataBase: new URL('https://citiescollective.space'),
   icons: {
     icon: [
-      { url: '/favicon.ico?v=2', sizes: 'any' },
-      { url: '/favicons/favicon-16x16.png?v=2', sizes: '16x16', type: 'image/png' },
-      { url: '/favicons/favicon-32x32.png?v=2', sizes: '32x32', type: 'image/png' },
+      { url: '/favicon.ico', sizes: 'any' },
+      { url: '/favicons/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
+      { url: '/favicons/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
     ],
     apple: [
-      { url: '/favicons/apple-touch-icon.png?v=2', sizes: '180x180', type: 'image/png' },
+      { url: '/favicons/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
     ],
     other: [
-      { url: '/favicons/android-chrome-192x192.png?v=2', sizes: '192x192', type: 'image/png' },
-      { url: '/favicons/android-chrome-512x512.png?v=2', sizes: '512x512', type: 'image/png' },
+      { url: '/favicons/android-chrome-192x192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/favicons/android-chrome-512x512.png', sizes: '512x512', type: 'image/png' },
     ],
   },
-  manifest: '/favicons/site.webmanifest?v=2',
+  manifest: '/favicons/site.webmanifest',
 };
 
 export default function RootLayout({
@@ -44,11 +44,6 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <link rel="icon" href="/favicon.ico?v=2" sizes="any" />
-        <link rel="icon" href="/favicons/favicon-16x16.png?v=2" type="image/png" sizes="16x16" />
-        <link rel="icon" href="/favicons/favicon-32x32.png?v=2" type="image/png" sizes="32x32" />
-        <link rel="apple-touch-icon" href="/favicons/apple-touch-icon.png?v=2" />
-        <link rel="manifest" href="/favicons/site.webmanifest?v=2" />
         <Script
           src="https://challenges.cloudflare.com/turnstile/v0/api.js"
           strategy="beforeInteractive"

@@ -15,6 +15,7 @@ interface ViewCounterProps {
 export function ViewCounter({ cityId, initialViewCount = 0, className = '', isContentCreator = false, trackView = false, compact = false }: ViewCounterProps) {
   const [viewCount, setViewCount] = useState(initialViewCount);
   const [hasTracked, setHasTracked] = useState(false);
+  const [hasFetched, setHasFetched] = useState(false);
 
   useEffect(() => {
     // Only track view if trackView prop is true (city details page) and not already tracked
@@ -44,8 +45,8 @@ export function ViewCounter({ cityId, initialViewCount = 0, className = '', isCo
       };
 
       recordView();
-    } else if (!trackView && initialViewCount === 0) {
-      // If not tracking views but we don't have an initial count, fetch the current count
+    } else if (!trackView && initialViewCount === 0 && !hasFetched) {
+      // Only fetch view count if we don't have an initial count and haven't fetched yet
       const fetchViewCount = async () => {
         try {
           const response = await fetch(`/api/cities/${cityId}/view`, {
@@ -55,15 +56,17 @@ export function ViewCounter({ cityId, initialViewCount = 0, className = '', isCo
           if (response.ok) {
             const data = await response.json();
             setViewCount(data.viewCount);
+            setHasFetched(true);
           }
         } catch (error) {
-          console.error('Error fetching view count:', error);
+          // Silently fail for view count fetching to avoid console spam
+          setHasFetched(true);
         }
       };
 
       fetchViewCount();
     }
-  }, [cityId, hasTracked, trackView, initialViewCount]);
+  }, [cityId, hasTracked, hasFetched, trackView, initialViewCount]);
 
   // Format view count
   const formatViewCount = (count: number) => {

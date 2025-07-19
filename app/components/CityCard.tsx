@@ -28,9 +28,10 @@ const formatDate = (date: Date | null) => {
 };
 
 export function CityCard({ city, ranking, hideCreatorBadge = false }: { city: any; ranking?: number; hideCreatorBadge?: boolean }) {
+  // Find primary image, prioritizing Hall of Fame images if they exist
   const primaryImage = city.images?.find((img: any) => img.isPrimary) || city.images?.[0];
-  const imagePath = primaryImage?.mediumPath;
-  const isPlaceholder = !imagePath || imagePath.includes('placeholder-image.png');
+  const imagePath = primaryImage?.mediumPath || primaryImage?.largePath || primaryImage?.thumbnailPath || '/placeholder-image.png';
+  const isPlaceholder = !imagePath || imagePath.includes('placeholder-image.png') || !primaryImage;
   const isHallOfFameImage = primaryImage?.isHallOfFame;
   const username = city.user?.username;
   const isContentCreator = city.user?.isContentCreator;
@@ -69,6 +70,7 @@ export function CityCard({ city, ranking, hideCreatorBadge = false }: { city: an
                 style={{ objectFit: 'cover' }}
                 className="group-hover:scale-105 transition-transform duration-300"
                 priority
+                sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
               />
             )}
             
@@ -193,7 +195,7 @@ export function CityCard({ city, ranking, hideCreatorBadge = false }: { city: an
             </div>
             <div className="flex items-center gap-2">
               <CommentCount cityId={city.id} initialCount={city.commentCount} />
-              <ViewCounter cityId={city.id} isContentCreator={isContentCreator} trackView={false} compact={true} />
+              <ViewCounter cityId={city.id} initialViewCount={city.viewCount} isContentCreator={isContentCreator} trackView={false} compact={true} />
             </div>
           </div>
           <Link href={`/city/${city.id}`} className={`block w-full text-center font-semibold py-2 rounded-lg transition-colors ${

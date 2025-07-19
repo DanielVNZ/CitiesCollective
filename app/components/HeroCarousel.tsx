@@ -6,6 +6,22 @@ import Slider from 'react-slick';
 import Image from 'next/image';
 import Link from 'next/link';
 import { QuickSearch } from 'app/components/QuickSearch';
+import { useEffect, useRef } from 'react';
+
+// Custom CSS to fix accessibility issues with Slick Carousel
+const carouselStyles = `
+  .slick-slide[aria-hidden="true"] {
+    pointer-events: none !important;
+  }
+  .slick-slide[aria-hidden="true"] * {
+    pointer-events: none !important;
+  }
+  .slick-slide[aria-hidden="true"] a,
+  .slick-slide[aria-hidden="true"] button,
+  .slick-slide[aria-hidden="true"] div[tabindex] {
+    tabindex: -1 !important;
+  }
+`;
 
 type HeroCarouselProps = {
   topCities: {
@@ -17,9 +33,47 @@ type HeroCarouselProps = {
 };
 
 export function HeroCarousel({ topCities }: HeroCarouselProps) {
+  const sliderRef = useRef<Slider>(null);
+
+  // Fix accessibility issues with Slick Carousel
+  useEffect(() => {
+    const handleSlideChange = () => {
+      // Find all slides with aria-hidden="true" and set them as inert
+      const hiddenSlides = document.querySelectorAll('.slick-slide[aria-hidden="true"]');
+      hiddenSlides.forEach((slide) => {
+        slide.setAttribute('inert', '');
+        // Also remove any focusable elements from tab order
+        const focusableElements = slide.querySelectorAll('a, button, [tabindex]');
+        focusableElements.forEach((element) => {
+          element.setAttribute('tabindex', '-1');
+        });
+      });
+    };
+
+    // Initial setup
+    handleSlideChange();
+
+    // Set up observer to watch for changes
+    const observer = new MutationObserver(handleSlideChange);
+    const sliderElement = document.querySelector('.slick-slider');
+    if (sliderElement) {
+      observer.observe(sliderElement, {
+        attributes: true,
+        attributeFilter: ['aria-hidden'],
+        subtree: true
+      });
+    }
+
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+
   return (
     <div className="relative">
+      <style dangerouslySetInnerHTML={{ __html: carouselStyles }} />
       <Slider
+        ref={sliderRef}
         dots={true}
         infinite={true}
         speed={500}
@@ -29,11 +83,13 @@ export function HeroCarousel({ topCities }: HeroCarouselProps) {
         autoplaySpeed={15000}
         arrows={true}
         className="w-full h-[500px] sm:h-[600px]"
+        accessibility={true}
+        focusOnSelect={false}
       >
         {topCities.map((city, index) => {
           const primaryImage = city.images?.find((img: { isPrimary: boolean }) => img.isPrimary) || city.images?.[0];
-          const imagePath = primaryImage?.originalPath || primaryImage?.largePath || primaryImage?.mediumPath;
-          const isPlaceholder = !imagePath || imagePath.includes('placeholder-image.png');
+          const imagePath = primaryImage?.originalPath || primaryImage?.largePath || primaryImage?.mediumPath || '/placeholder-image.png';
+          const isPlaceholder = !imagePath || imagePath.includes('placeholder-image.png') || !primaryImage;
           
           return (
             <div key={city.id} className="relative h-[500px] sm:h-[600px] w-full">
@@ -50,12 +106,58 @@ export function HeroCarousel({ topCities }: HeroCarouselProps) {
                   height={1080}
                   className="w-full h-full object-cover brightness-50"
                   loading="eager"
-                  srcSet={[
-                    primaryImage?.thumbnailPath && `${primaryImage.thumbnailPath} 400w`,
-                    primaryImage?.mediumPath && `${primaryImage.mediumPath} 800w`,
-                    primaryImage?.largePath && `${primaryImage.largePath} 1200w`,
-                    primaryImage?.originalPath && `${primaryImage.originalPath} 3840w`
-                  ].filter(Boolean).join(', ')}
+                  srcSet={(() => {
+                    const srcSetParts = [];
+                    
+                    // Helper function to validate and clean URL
+                    const isValidImageUrl = (url: string, requiredExtension: string) => {
+                      if (!url || typeof url !== 'string') return false;
+                      if (!url.startsWith('http')) return false;
+                      if (url.length < 10) return false;
+                      if (!url.includes(requiredExtension)) return false;
+                      // Check for common URL issues
+                      if (url.includes('undefined') || url.includes('null')) return false;
+                      // Check for invalid characters that could break srcset
+                      if (url.includes('\n') || url.includes('\r') || url.includes('\t')) return false;
+                      return true;
+                    };
+                    
+                    // Helper function to encode URL for srcset
+                    const encodeUrlForSrcset = (url: string) => {
+                      try {
+                        // Encode the URL to handle special characters
+                        return encodeURI(url.trim());
+                      } catch {
+                        return null;
+                      }
+                    };
+                    
+                    // Only add URLs that are valid and complete
+                    const thumbnailUrl = encodeUrlForSrcset(primaryImage?.thumbnailPath);
+                    if (isValidImageUrl(primaryImage?.thumbnailPath, '.webp') && thumbnailUrl) {
+                      srcSetParts.push(`${thumbnailUrl} 400w`);
+                    }
+                    
+                    const mediumUrl = encodeUrlForSrcset(primaryImage?.mediumPath);
+                    if (isValidImageUrl(primaryImage?.mediumPath, '.webp') && mediumUrl) {
+                      srcSetParts.push(`${mediumUrl} 800w`);
+                    }
+                    
+                    const largeUrl = encodeUrlForSrcset(primaryImage?.largePath);
+                    if (isValidImageUrl(primaryImage?.largePath, '.webp') && largeUrl) {
+                      srcSetParts.push(`${largeUrl} 1200w`);
+                    }
+                    
+                    const originalUrl = encodeUrlForSrcset(primaryImage?.originalPath);
+                    if ((isValidImageUrl(primaryImage?.originalPath, '.webp') || 
+                         isValidImageUrl(primaryImage?.originalPath, '.jpg') ||
+                         isValidImageUrl(primaryImage?.originalPath, '.jpeg') ||
+                         isValidImageUrl(primaryImage?.originalPath, '.png')) && originalUrl) {
+                      srcSetParts.push(`${originalUrl} 3840w`);
+                    }
+                    
+                    return srcSetParts.join(', ');
+                  })()}
                   sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 1920px"
                   style={{ width: '100%', height: '100%' }}
                 />

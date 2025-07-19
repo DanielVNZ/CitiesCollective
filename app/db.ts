@@ -97,10 +97,10 @@ const cityImagesTable = pgTable('cityImages', {
   mimeType: varchar('mimeType', { length: 100 }),
   width: integer('width'),
   height: integer('height'),
-  thumbnailPath: varchar('thumbnailPath', { length: 255 }),
-  mediumPath: varchar('mediumPath', { length: 255 }),
-  largePath: varchar('largePath', { length: 255 }),
-  originalPath: varchar('originalPath', { length: 255 }),
+  thumbnailPath: varchar('thumbnailPath', { length: 500 }),
+  mediumPath: varchar('mediumPath', { length: 500 }),
+  largePath: varchar('largePath', { length: 500 }),
+  originalPath: varchar('originalPath', { length: 500 }),
   isPrimary: boolean('isPrimary').default(false),
   sortOrder: integer('sortOrder').default(0),
   uploadedAt: timestamp('uploadedAt').defaultNow(),
@@ -825,6 +825,8 @@ export async function getRecentCities(limit: number = 12, offset: number = 0) {
         )
       `,
       commentCount: sql<number>`(SELECT COUNT(*) FROM "comments" WHERE "cityId" = "City".id)`.as('commentCount'),
+      // Subquery for view count
+      viewCount: sql<number>`(SELECT COUNT(*) FROM "cityViews" WHERE "cityId" = "City".id)`.as('viewCount'),
     })
     .from(cityTable)
     .leftJoin(users, eq(cityTable.userId, users.id))
@@ -857,6 +859,8 @@ export async function getRecentCities(limit: number = 12, offset: number = 0) {
         )
       `,
       commentCount: sql<number>`(SELECT COUNT(*) FROM "comments" WHERE "cityId" = "City".id)`.as('commentCount'),
+      // Subquery for view count
+      viewCount: sql<number>`(SELECT COUNT(*) FROM "cityViews" WHERE "cityId" = "City".id)`.as('viewCount'),
     })
     .from(cityTable)
     .leftJoin(users, eq(cityTable.userId, users.id))
@@ -925,6 +929,8 @@ export async function getTopCitiesByMoney(limit: number = 3) {
         )
       `,
       commentCount: sql<number>`(SELECT COUNT(*) FROM "comments" WHERE "cityId" = "City".id)`.as('commentCount'),
+      // Subquery for view count
+      viewCount: sql<number>`(SELECT COUNT(*) FROM "cityViews" WHERE "cityId" = "City".id)`.as('viewCount'),
     })
     .from(cityTable)
     .leftJoin(users, eq(cityTable.userId, users.id))
@@ -957,6 +963,8 @@ export async function getTopCitiesByMoney(limit: number = 3) {
         )
       `,
       commentCount: sql<number>`(SELECT COUNT(*) FROM "comments" WHERE "cityId" = "City".id)`.as('commentCount'),
+      // Subquery for view count
+      viewCount: sql<number>`(SELECT COUNT(*) FROM "cityViews" WHERE "cityId" = "City".id)`.as('viewCount'),
     })
     .from(cityTable)
     .leftJoin(users, eq(cityTable.userId, users.id))
@@ -1007,6 +1015,8 @@ export async function getTopCitiesByLikes(limit: number = 3) {
         )
       `,
       commentCount: sql<number>`(SELECT COUNT(*) FROM "comments" WHERE "cityId" = "City".id)`.as('commentCount'),
+      // Subquery for view count
+      viewCount: sql<number>`(SELECT COUNT(*) FROM "cityViews" WHERE "cityId" = "City".id)`.as('viewCount'),
     })
     .from(cityTable)
     .leftJoin(likesTable, eq(cityTable.id, likesTable.cityId))
@@ -1042,6 +1052,8 @@ export async function getTopCitiesByLikes(limit: number = 3) {
         )
       `,
       commentCount: sql<number>`(SELECT COUNT(*) FROM "comments" WHERE "cityId" = "City".id)`.as('commentCount'),
+      // Subquery for view count
+      viewCount: sql<number>`(SELECT COUNT(*) FROM "cityViews" WHERE "cityId" = "City".id)`.as('viewCount'),
     })
     .from(cityTable)
     .leftJoin(likesTable, eq(cityTable.id, likesTable.cityId))
@@ -1103,6 +1115,8 @@ export async function getTopCitiesWithImages(limit: number = 25) {
         )
       `,
       commentCount: sql<number>`(SELECT COUNT(*) FROM "comments" WHERE "cityId" = "City".id)`.as('commentCount'),
+      // Subquery for view count
+      viewCount: sql<number>`(SELECT COUNT(*) FROM "cityViews" WHERE "cityId" = "City".id)`.as('viewCount'),
     })
     .from(cityTable)
     .leftJoin(users, eq(cityTable.userId, users.id))
@@ -1145,6 +1159,8 @@ export async function getTopCitiesWithImages(limit: number = 25) {
         )
       `,
       commentCount: sql<number>`(SELECT COUNT(*) FROM "comments" WHERE "cityId" = "City".id)`.as('commentCount'),
+      // Subquery for view count
+      viewCount: sql<number>`(SELECT COUNT(*) FROM "cityViews" WHERE "cityId" = "City".id)`.as('viewCount'),
     })
     .from(cityTable)
     .leftJoin(users, eq(cityTable.userId, users.id))
@@ -1196,6 +1212,8 @@ export async function getContentCreatorCities(limit: number = 6) {
         )
       `,
       commentCount: sql<number>`(SELECT COUNT(*) FROM "comments" WHERE "cityId" = "City".id)`.as('commentCount'),
+      // Subquery for view count
+      viewCount: sql<number>`(SELECT COUNT(*) FROM "cityViews" WHERE "cityId" = "City".id)`.as('viewCount'),
     })
     .from(cityTable)
     .leftJoin(users, eq(cityTable.userId, users.id))
@@ -1228,6 +1246,8 @@ export async function getContentCreatorCities(limit: number = 6) {
         )
       `,
       commentCount: sql<number>`(SELECT COUNT(*) FROM "comments" WHERE "cityId" = "City".id)`.as('commentCount'),
+      // Subquery for view count
+      viewCount: sql<number>`(SELECT COUNT(*) FROM "cityViews" WHERE "cityId" = "City".id)`.as('viewCount'),
     })
     .from(cityTable)
     .leftJoin(users, eq(cityTable.userId, users.id))
@@ -1394,6 +1414,10 @@ export async function getCityCountByUser(userId: number) {
 
 export async function getCityById(id: number) {
   await ensureCityTableExists();
+  await ensureCityViewsTableExists();
+  
+  const cityViewsTable = await ensureCityViewsTableExists();
+  
   const result = await db.select({
     id: cityTable.id,
     userId: cityTable.userId,
@@ -1424,6 +1448,11 @@ export async function getCityById(id: number) {
     osmMapPath: cityTable.osmMapPath,
     uploadedAt: cityTable.uploadedAt,
     updatedAt: cityTable.updatedAt,
+    viewCount: sql<number>`COALESCE((
+      SELECT COUNT(*)::integer 
+      FROM ${cityViewsTable} 
+      WHERE ${cityViewsTable.cityId} = ${cityTable.id}
+    ), 0)`,
   }).from(cityTable).where(eq(cityTable.id, id)).limit(1);
   return result[0] || null;
 }
@@ -1509,6 +1538,8 @@ export async function searchCities(
   offset: number = 0
 ) {
   await ensureCityTableExists();
+  await ensureCityImagesTableExists();
+  await ensureHallOfFameCacheTableExists();
   const userTable = await ensureTableExists();
   const conditions = [];
 
@@ -1546,8 +1577,8 @@ export async function searchCities(
     default: orderByClause = sortOrder === 'desc' ? desc(cityTable.uploadedAt) : asc(cityTable.uploadedAt);
   }
 
-  // Base query with subqueries to prevent row duplication
-  const query = db
+  // Get cities with primary screenshots
+  const citiesWithScreenshots = await db
     .select({
       id: cityTable.id,
       userId: cityTable.userId,
@@ -1567,16 +1598,66 @@ export async function searchCities(
         username: userTable.username,
         isContentCreator: userTable.isContentCreator,
       },
-      // Subquery for images to prevent row duplication
-      images: sql<Array<{ id: number; fileName: string; isPrimary: boolean; mediumPath: string; largePath: string; thumbnailPath: string; isHallOfFame: boolean }>>`
+      // Subquery for images to prevent row duplication (including Hall of Fame images)
+      images: sql<Array<{ id: number; fileName: string; isPrimary: boolean; mediumPath: string; largePath: string; thumbnailPath: string; isHallOfFame?: boolean }>>`
         (
-          SELECT COALESCE(json_agg(json_build_object('id', i.id, 'fileName', i."fileName", 'isPrimary', i."isPrimary", 'mediumPath', i."mediumPath", 'largePath', i."largePath", 'thumbnailPath', i."thumbnailPath", 'isHallOfFame', i."isHallOfFame")), '[]'::json)
-          FROM "cityImages" i
-          WHERE i."cityId" = "City".id
+          SELECT COALESCE(
+            json_agg(
+              CASE 
+                WHEN img_type = 'screenshot' THEN json_build_object(
+                  'id', img_id, 
+                  'fileName', img_file_name, 
+                  'isPrimary', img_is_primary, 
+                  'mediumPath', img_medium_path, 
+                  'largePath', img_large_path, 
+                  'thumbnailPath', img_thumbnail_path,
+                  'isHallOfFame', false
+                )
+                WHEN img_type = 'hall_of_fame' THEN json_build_object(
+                  'id', img_id, 
+                  'fileName', img_file_name, 
+                  'isPrimary', img_is_primary, 
+                  'mediumPath', img_medium_path, 
+                  'largePath', img_large_path, 
+                  'thumbnailPath', img_thumbnail_path,
+                  'isHallOfFame', true
+                )
+              END
+            ), '[]'::json
+          )
+          FROM (
+            -- Screenshot images
+            SELECT 
+              CAST(i.id AS TEXT) as img_id,
+              i."fileName" as img_file_name,
+              i."isPrimary" as img_is_primary,
+              i."mediumPath" as img_medium_path,
+              i."largePath" as img_large_path,
+              i."thumbnailPath" as img_thumbnail_path,
+              'screenshot' as img_type
+            FROM "cityImages" i
+            WHERE i."cityId" = "City".id
+            
+            UNION ALL
+            
+            -- Hall of Fame images
+            SELECT 
+              h."hofImageId" as img_id,
+              h."cityName" as img_file_name,
+              h."isPrimary" as img_is_primary,
+              h."imageUrlFHD" as img_medium_path,
+              h."imageUrl4K" as img_large_path,
+              h."imageUrlThumbnail" as img_thumbnail_path,
+              'hall_of_fame' as img_type
+            FROM "hallOfFameCache" h
+            WHERE h."cityName" = "City"."cityName"
+          ) combined_images
         )
       `,
       // Subquery for comment count
       commentCount: sql<number>`(SELECT COUNT(*) FROM "comments" WHERE "cityId" = "City".id)`.as('commentCount'),
+      // Subquery for view count
+      viewCount: sql<number>`(SELECT COUNT(*) FROM "cityViews" WHERE "cityId" = "City".id)`.as('viewCount'),
     })
     .from(cityTable)
     .leftJoin(userTable, eq(cityTable.userId, userTable.id))
@@ -1585,11 +1666,98 @@ export async function searchCities(
     .offset(offset);
 
   // Apply conditions if they exist
+  let results = citiesWithScreenshots;
   if (conditions.length > 0) {
-    return await query.where(and(...conditions));
+    results = await db
+      .select({
+        id: cityTable.id,
+        userId: cityTable.userId,
+        cityName: cityTable.cityName,
+        mapName: cityTable.mapName,
+        population: cityTable.population,
+        money: cityTable.money,
+        xp: cityTable.xp,
+        unlimitedMoney: cityTable.unlimitedMoney,
+        theme: cityTable.theme,
+        gameMode: cityTable.gameMode,
+        uploadedAt: cityTable.uploadedAt,
+        modsEnabled: cityTable.modsEnabled,
+        authorUsername: userTable.username,
+        user: {
+          id: userTable.id,
+          username: userTable.username,
+          isContentCreator: userTable.isContentCreator,
+        },
+        // Subquery for images to prevent row duplication (including Hall of Fame images)
+        images: sql<Array<{ id: number; fileName: string; isPrimary: boolean; mediumPath: string; largePath: string; thumbnailPath: string; isHallOfFame?: boolean }>>`
+          (
+            SELECT COALESCE(
+              json_agg(
+                CASE 
+                  WHEN img_type = 'screenshot' THEN json_build_object(
+                    'id', img_id, 
+                    'fileName', img_file_name, 
+                    'isPrimary', img_is_primary, 
+                    'mediumPath', img_medium_path, 
+                    'largePath', img_large_path, 
+                    'thumbnailPath', img_thumbnail_path,
+                    'isHallOfFame', false
+                  )
+                  WHEN img_type = 'hall_of_fame' THEN json_build_object(
+                    'id', img_id, 
+                    'fileName', img_file_name, 
+                    'isPrimary', img_is_primary, 
+                    'mediumPath', img_medium_path, 
+                    'largePath', img_large_path, 
+                    'thumbnailPath', img_thumbnail_path,
+                    'isHallOfFame', true
+                  )
+                END
+              ), '[]'::json
+            )
+            FROM (
+              -- Screenshot images
+              SELECT 
+                CAST(i.id AS TEXT) as img_id,
+                i."fileName" as img_file_name,
+                i."isPrimary" as img_is_primary,
+                i."mediumPath" as img_medium_path,
+                i."largePath" as img_large_path,
+                i."thumbnailPath" as img_thumbnail_path,
+                'screenshot' as img_type
+              FROM "cityImages" i
+              WHERE i."cityId" = "City".id
+              
+              UNION ALL
+              
+              -- Hall of Fame images
+              SELECT 
+                h."hofImageId" as img_id,
+                h."cityName" as img_file_name,
+                h."isPrimary" as img_is_primary,
+                h."imageUrlFHD" as img_medium_path,
+                h."imageUrl4K" as img_large_path,
+                h."imageUrlThumbnail" as img_thumbnail_path,
+                'hall_of_fame' as img_type
+              FROM "hallOfFameCache" h
+              WHERE h."cityName" = "City"."cityName"
+            ) combined_images
+          )
+        `,
+        // Subquery for comment count
+        commentCount: sql<number>`(SELECT COUNT(*) FROM "comments" WHERE "cityId" = "City".id)`.as('commentCount'),
+        // Subquery for view count
+        viewCount: sql<number>`(SELECT COUNT(*) FROM "cityViews" WHERE "cityId" = "City".id)`.as('viewCount'),
+      })
+      .from(cityTable)
+      .leftJoin(userTable, eq(cityTable.userId, userTable.id))
+      .where(and(...conditions))
+      .orderBy(orderByClause)
+      .limit(limit)
+      .offset(offset);
   }
   
-  return await query;
+  return results;
 }
 
 export async function getSearchCitiesCount(filters: SearchFilters = {}) {
@@ -1706,10 +1874,10 @@ async function ensureCityImagesTableExists() {
         "mimeType" VARCHAR(100),
         "width" INTEGER,
         "height" INTEGER,
-        "thumbnailPath" VARCHAR(255),
-        "mediumPath" VARCHAR(255),
-        "largePath" VARCHAR(255),
-        "originalPath" VARCHAR(255),
+        "thumbnailPath" VARCHAR(500),
+        "mediumPath" VARCHAR(500),
+        "largePath" VARCHAR(500),
+        "originalPath" VARCHAR(500),
         "isPrimary" BOOLEAN DEFAULT FALSE,
         "sortOrder" INTEGER DEFAULT 0,
         "uploadedAt" TIMESTAMP DEFAULT NOW()
@@ -3836,9 +4004,6 @@ async function ensureCityViewsTableExists() {
     sessionId: text('sessionId').notNull(),
     viewedAt: timestamp('viewedAt').defaultNow().notNull(),
   });
-
-  // Create unique index on cityId + sessionId to ensure one view per session per city
-  const uniqueIndex = index('city_views_unique_idx').on(cityViewsTable.cityId, cityViewsTable.sessionId);
 
   try {
     await db.execute(sql`CREATE TABLE IF NOT EXISTS "cityViews" (

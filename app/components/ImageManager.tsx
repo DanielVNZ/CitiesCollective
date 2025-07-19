@@ -246,11 +246,12 @@ export function ImageManager({ cityId, images, onImagesChange }: ImageManagerPro
                 {/* Image */}
                 <div className="aspect-square relative">
                   <Image
-                    src={image.mediumPath || image.thumbnailPath || ''}
+                    src={image.mediumPath || image.thumbnailPath || '/placeholder-image.png'}
                     alt={image.originalName || 'City image'}
                     fill
                     style={{ objectFit: 'cover' }}
                     className="w-full h-full"
+                    sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
                   />
                   
                   {/* Primary Badge */}

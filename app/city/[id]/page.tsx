@@ -239,7 +239,7 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
               {/* Right Side - Download Button and View Counter */}
               <div className="lg:flex-shrink-0 flex flex-col items-center lg:items-end gap-4">
                 {/* View Counter */}
-                <ViewCounter cityId={cityId} isContentCreator={isContentCreator || false} trackView={true} />
+                <ViewCounter cityId={cityId} initialViewCount={city.viewCount || 0} isContentCreator={isContentCreator || false} trackView={true} />
                 
                 {/* Download Button */}
                 {city.filePath && (city.downloadable || isOwner) && session ? (

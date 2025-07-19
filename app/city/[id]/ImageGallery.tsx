@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
 import { Fancybox } from '@fancyapps/ui';
+import '@fancyapps/ui/dist/fancybox/fancybox.css';
 import { ImageLikeButton } from 'app/components/ImageLikeButton';
 import { ImageComments } from 'app/components/ImageComments';
 import { useSearchParams } from 'next/navigation';
@@ -45,8 +46,10 @@ export function ImageGallery({ images, cityId, isOwner, onImagesChange, deepLink
 
   // Filter out images with missing required data
   const validImages = images.filter(image => 
-    image.mediumPath && image.largePath && image.originalName && image.thumbnailPath
+    image.mediumPath && image.largePath && image.originalName && image.thumbnailPath && image.originalPath
   );
+  
+
 
   // Show 12 thumbnails at a time (more with smaller thumbnails)
   const thumbnailsPerPage = 12;
@@ -233,22 +236,40 @@ export function ImageGallery({ images, cityId, isOwner, onImagesChange, deepLink
         
         // If there's also a comment ID, we'll handle it in the ImageComments component
         if (deepLinkCommentId) {
-          // The ImageComments component will handle scrolling to the specific comment
+          setShowComments(true);
         }
+        
+        hasHandledDeepLink.current = true;
       }, 100);
-      
-      hasHandledDeepLink.current = true;
     }
   }, [deepLinkImageId, deepLinkImageType, deepLinkCommentId]);
 
-  // Initialize Fancybox
+  // Initialize PhotoSwipe for screenshots
   useEffect(() => {
-    Fancybox.bind('[data-fancybox="screenshots"]');
+    // PhotoSwipe will be initialized when images are clicked
+    // No need to pre-initialize like lightGallery
+  }, [validImages, cityId]);
+
+
+
+  // Initialize Fancybox for screenshots
+  useEffect(() => {
+    // Use a unique identifier for this specific gallery to avoid conflicts
+    const galleryId = `screenshots-${cityId}`;
+    
+    // Destroy any existing Fancybox instances for this gallery
+    Fancybox.close();
+    
+    // Bind only to screenshots gallery with specific container
+    const galleryContainer = document.getElementById(`screenshots-gallery-${cityId}`);
+    if (galleryContainer) {
+      Fancybox.bind(galleryContainer, `[data-fancybox="${galleryId}"]`);
+    }
 
     return () => {
       Fancybox.destroy();
     };
-  }, [validImages]);
+  }, [validImages, cityId]);
 
   if (validImages.length === 0) {
     return (
@@ -260,9 +281,35 @@ export function ImageGallery({ images, cityId, isOwner, onImagesChange, deepLink
 
   return (
     <>
+
+      
       {/* Main Gallery View */}
       <div className="mb-6">
-        <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-lg p-4 mb-6 border border-gray-200 dark:border-gray-700 max-w-4xl mx-auto">
+        <div id={`screenshots-gallery-${cityId}`} className="relative bg-white dark:bg-gray-800 rounded-xl shadow-lg p-4 mb-6 border border-gray-200 dark:border-gray-700 max-w-4xl mx-auto">
+          {/* Hidden Fancybox Gallery - All Images except current main image (for Fancybox to discover) */}
+          <div className="hidden">
+            {validImages.map((image) => {
+              const currentMainImage = displayedThumbnails[mainGalleryIndex];
+              // Skip the currently displayed main image to avoid duplication
+              if (currentMainImage && image.id === currentMainImage.id) {
+                return null;
+              }
+              return (
+                <a
+                  key={`fancybox-hidden-${image.id}`}
+                  href={image.originalPath!}
+                  data-fancybox={`screenshots-${cityId}`}
+                  data-caption={image.originalName!}
+                >
+                  <img 
+                    src={image.thumbnailPath || image.mediumPath || ''} 
+                    alt={image.originalName || ''} 
+                  />
+                </a>
+              );
+            })}
+          </div>
+          
           {/* Main Image with Touch Gestures */}
           <div 
             ref={mainImageRef}
@@ -271,24 +318,24 @@ export function ImageGallery({ images, cityId, isOwner, onImagesChange, deepLink
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
           >
-            <a
-              href={displayedThumbnails[mainGalleryIndex].originalPath!}
-              data-fancybox="screenshots"
-              data-caption={displayedThumbnails[mainGalleryIndex].originalName!}
-              data-width={displayedThumbnails[mainGalleryIndex].width}
-              data-height={displayedThumbnails[mainGalleryIndex].height}
-              data-original-name={displayedThumbnails[mainGalleryIndex].originalName!}
-              data-is-primary={displayedThumbnails[mainGalleryIndex].isPrimary}
-            >
-              <Image
-                src={displayedThumbnails[mainGalleryIndex].originalPath!}
-                alt={displayedThumbnails[mainGalleryIndex].originalName!}
-                width={1200}
-                height={675}
-                className="w-full h-full object-contain transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-2xl"
-                quality={100}
-              />
-            </a>
+            {displayedThumbnails[mainGalleryIndex] && (
+              <a
+                href={displayedThumbnails[mainGalleryIndex].originalPath!}
+                data-fancybox={`screenshots-${cityId}`}
+                data-caption={displayedThumbnails[mainGalleryIndex].originalName!}
+                className="block w-full h-full cursor-pointer"
+              >
+                <Image
+                  src={displayedThumbnails[mainGalleryIndex].originalPath!}
+                  alt={displayedThumbnails[mainGalleryIndex].originalName!}
+                  width={1200}
+                  height={675}
+                  className="w-full h-full object-contain transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-2xl"
+                  quality={100}
+                  data-image-id={displayedThumbnails[mainGalleryIndex].id.toString()}
+                />
+              </a>
+            )}
             
             {/* Hover overlay */}
             <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-300 rounded-lg flex items-center justify-center pointer-events-none">
@@ -300,7 +347,7 @@ export function ImageGallery({ images, cityId, isOwner, onImagesChange, deepLink
             </div>
             
             {/* Primary Badge */}
-            {displayedThumbnails[mainGalleryIndex].isPrimary && (
+            {displayedThumbnails[mainGalleryIndex]?.isPrimary && (
               <div className="absolute top-4 left-4 bg-blue-500 text-white px-3 py-1 rounded-full text-sm font-medium">
                 Primary
               </div>
@@ -308,12 +355,14 @@ export function ImageGallery({ images, cityId, isOwner, onImagesChange, deepLink
 
             {/* Like and Comment Controls */}
             <div className="absolute bottom-4 right-4 flex space-x-2">
-              <ImageLikeButton
-                imageId={displayedThumbnails[mainGalleryIndex].id.toString()}
-                imageType="screenshot"
-                cityId={cityId}
-                size="md"
-              />
+              {displayedThumbnails[mainGalleryIndex] && (
+                <ImageLikeButton
+                  imageId={displayedThumbnails[mainGalleryIndex].id.toString()}
+                  imageType="screenshot"
+                  cityId={cityId}
+                  size="md"
+                />
+              )}
               <button
                 onClick={(e) => {
                   e.preventDefault();
@@ -378,11 +427,13 @@ export function ImageGallery({ images, cityId, isOwner, onImagesChange, deepLink
                 : 'opacity-100 translate-y-0 max-h-[2000px]'
             }`}
           >
-            <ImageComments
-              imageId={displayedThumbnails[mainGalleryIndex].id.toString()}
-              imageType="screenshot"
-              cityId={cityId}
-            />
+            {displayedThumbnails[mainGalleryIndex] && (
+              <ImageComments
+                imageId={displayedThumbnails[mainGalleryIndex].id.toString()}
+                imageType="screenshot"
+                cityId={cityId}
+              />
+            )}
           </div>
         )}
       </div>
@@ -414,55 +465,58 @@ export function ImageGallery({ images, cityId, isOwner, onImagesChange, deepLink
             </button>
           )}
 
-          {/* Hidden Fancybox Gallery - All Images */}
-          <div className="hidden">
-            {validImages.map((image) => (
-              <a
-                key={`fancybox-${image.id}`}
-                href={image.originalPath!}
-                data-fancybox="screenshots"
-                data-caption={image.originalName!}
-                data-width={image.width}
-                data-height={image.height}
-                data-original-name={image.originalName!}
-                data-is-primary={image.isPrimary}
-              >
-                <img src={image.thumbnailPath!} alt={image.originalName!} />
-              </a>
-            ))}
-          </div>
+
+
+
 
           {/* Thumbnail Grid */}
           <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-12 gap-2 px-8">
             {displayedThumbnails.map((image, index) => (
               <div
                 key={image.id}
-                className={`relative aspect-square cursor-pointer group overflow-hidden rounded-lg border-2 transition-all duration-200 ${
+                className={`relative aspect-square group overflow-hidden rounded-lg border-2 transition-all duration-200 ${
                   index === mainGalleryIndex 
-                    ? 'border-blue-500 ring-2 ring-blue-200' 
-                    : 'border-transparent hover:border-gray-300'
+                    ? 'border-blue-500 ring-2 ring-blue-200 cursor-default' 
+                    : 'border-transparent hover:border-gray-300 cursor-pointer'
                 }`}
-                onClick={() => setMainGalleryIndex(index)}
               >
-                <a
-                  href={image.originalPath!}
-                  data-fancybox="screenshots"
-                  data-caption={image.originalName!}
-                  data-width={image.width}
-                  data-height={image.height}
-                  data-original-name={image.originalName!}
-                  data-is-primary={image.isPrimary}
-                  className="block w-full h-full"
-                >
+                {index !== mainGalleryIndex ? (
+                  <a
+                    href={image.originalPath!}
+                    data-fancybox={`screenshots-${cityId}`}
+                    data-caption={image.originalName!}
+                    className="block w-full h-full absolute inset-0 z-10"
+                    onClick={(e) => {
+                      e.preventDefault(); // Prevent default link behavior
+                      e.stopPropagation(); // Prevent the div onClick from firing
+                      // Find the corresponding hidden Fancybox link and click it
+                      const hiddenLink = document.querySelector(`[data-fancybox="screenshots-${cityId}"][href="${image.originalPath}"]`) as HTMLElement;
+                      if (hiddenLink) {
+                        hiddenLink.click();
+                      }
+                    }}
+                  >
+                    <Image
+                      src={image.mediumPath!}
+                      alt={image.originalName!}
+                      width={400}
+                      height={400}
+                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      quality={85}
+                      data-image-id={image.id.toString()}
+                    />
+                  </a>
+                ) : (
                   <Image
                     src={image.mediumPath!}
                     alt={image.originalName!}
                     width={400}
                     height={400}
-                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    className="w-full h-full object-cover"
                     quality={85}
+                    data-image-id={image.id.toString()}
                   />
-                </a>
+                )}
                 
                 {/* Primary Badge */}
                 {image.isPrimary && (
@@ -471,18 +525,20 @@ export function ImageGallery({ images, cityId, isOwner, onImagesChange, deepLink
                   </div>
                 )}
 
-                {/* Hover Overlay */}
-                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-opacity duration-300 flex items-center justify-center pointer-events-none">
-                  <div className="text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
-                    </svg>
+                {/* Hover Overlay - Show for all thumbnails EXCEPT currently selected */}
+                {index !== mainGalleryIndex && (
+                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-opacity duration-300 flex items-center justify-center pointer-events-none">
+                    <div className="text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+                      </svg>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Owner Controls */}
                 {isOwner && (
-                  <div className="absolute top-1 right-1 flex space-x-1">
+                  <div className="absolute top-1 right-1 flex space-x-1 z-20">
                     {/* Set Primary Button */}
                     <button
                       onClick={(e) => {
@@ -519,6 +575,8 @@ export function ImageGallery({ images, cityId, isOwner, onImagesChange, deepLink
           </div>
         </div>
       </div>
+
+
     </>
   );
 } 

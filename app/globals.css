@@ -24,3 +24,37 @@ html.dark {
 html.light {
   color-scheme: light;
 }
+
+/* Fancybox Like Button Styles */
+.fancybox-like-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: none;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-radius: 8px;
+}
+
+.fancybox-like-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ef4444;
+}
+
+.fancybox-like-btn svg {
+  width: 24px;
+  height: 24px;
+  transition: all 0.2s ease;
+}
+
+.fancybox-like-btn.liked {
+  color: #ef4444;
+}
+
+.fancybox-like-btn.liked svg {
+  fill: currentColor;
+}

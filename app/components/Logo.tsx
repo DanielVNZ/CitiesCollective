@@ -13,21 +13,12 @@ interface LogoProps {
 
 export function Logo({ className = '', height = 40, showText = true }: LogoProps) {
   const [mounted, setMounted] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
   const { resolvedTheme } = useTheme();
 
   useEffect(() => {
     setMounted(true);
   }, []);
-
-  if (!mounted) {
-    return (
-      <Link href="/" className={`flex items-center ${className}`}>
-        <div className="text-2xl font-bold text-gray-900 dark:text-white">
-          Cities Collective
-        </div>
-      </Link>
-    );
-  }
 
   const isDark = resolvedTheme === 'dark';
   const logoSrc = isDark 
@@ -35,14 +26,28 @@ export function Logo({ className = '', height = 40, showText = true }: LogoProps
     : '/logo/default-monochrome-black.svg';
 
   return (
-    <Link href="/" className={`flex items-center ${className}`}>
-      <Image 
-        src={logoSrc} 
-        alt="Cities Collective" 
-        height={height}
-        width={height * 6.9} // Approximate aspect ratio
-        className="h-auto"
-      />
+    <Link href="/" className={`flex items-center ${className} relative`}>
+      {/* Text fallback - always visible */}
+      <div className={`text-2xl font-bold text-gray-900 dark:text-white transition-opacity duration-200 ${
+        imageLoaded ? 'opacity-0' : 'opacity-100'
+      }`}>
+        Cities Collective
+      </div>
+      
+      {/* Logo image - positioned absolutely over the text */}
+      {mounted && (
+        <Image 
+          src={logoSrc} 
+          alt="Cities Collective" 
+          height={height}
+          width={height * 6.9} // Approximate aspect ratio
+          className={`h-auto w-auto absolute left-0 transition-opacity duration-200 ${
+            imageLoaded ? 'opacity-100' : 'opacity-0'
+          }`}
+          priority
+          onLoad={() => setImageLoaded(true)}
+        />
+      )}
     </Link>
   );
 } 
