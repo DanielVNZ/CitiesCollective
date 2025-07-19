@@ -92,6 +92,7 @@ export default function CityHallOfFameImages({ cityName, hofCreatorId, cityId, i
         cityId={cityId}
         isOwner={isOwner}
         isFeaturedOnHomePage={isFeaturedOnHomePage}
+        hofCreatorId={hofCreatorId}
         deepLinkImageId={deepLinkImageId}
         deepLinkImageType={deepLinkImageType}
         deepLinkCommentId={deepLinkCommentId}

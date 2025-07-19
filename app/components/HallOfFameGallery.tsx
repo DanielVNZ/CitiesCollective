@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Fancybox } from '@fancyapps/ui';
 import { ImageLikeButton } from './ImageLikeButton';
 import { ImageComments } from './ImageComments';
+import { trackHallOfFameImageView } from '../utils/hallOfFameViewTracking';
 
 interface HallOfFameImage {
   id: number;
@@ -25,12 +26,13 @@ interface HallOfFameGalleryProps {
   cityId: number;
   isOwner: boolean;
   isFeaturedOnHomePage?: boolean;
+  hofCreatorId?: string | null;
   deepLinkImageId?: string | null;
   deepLinkImageType?: string | null;
   deepLinkCommentId?: string | null;
 }
 
-export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePage = false, deepLinkImageId, deepLinkImageType, deepLinkCommentId }: HallOfFameGalleryProps) {
+export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePage = false, hofCreatorId, deepLinkImageId, deepLinkImageType, deepLinkCommentId }: HallOfFameGalleryProps) {
   const [mainGalleryIndex, setMainGalleryIndex] = useState(0);
   const [thumbnailStartIndex, setThumbnailStartIndex] = useState(0);
   const [touchStart, setTouchStart] = useState<number | null>(null);
@@ -197,12 +199,180 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
 
   // Initialize Fancybox
   useEffect(() => {
+    // Bind Fancybox normally for v6
     Fancybox.bind('[data-fancybox="hall-of-fame"]');
+
+    // Also try DOM events as backup
+    const handleFancyboxReveal = (event: any) => {
+      if (hofCreatorId && event.detail?.slide?.src) {
+        trackHallOfFameImageView(event.detail.slide.src, hofCreatorId);
+      }
+    };
+
+    const handleFancyboxDone = (event: any) => {
+      if (hofCreatorId && event.detail?.slide?.src) {
+        trackHallOfFameImageView(event.detail.slide.src, hofCreatorId);
+      }
+    };
+
+    const handleFancyboxSlideChange = (event: any) => {
+      if (hofCreatorId && event.detail?.slide?.src) {
+        trackHallOfFameImageView(event.detail.slide.src, hofCreatorId);
+      }
+    };
+
+    const handleFancyboxSelect = (event: any) => {
+      if (hofCreatorId && event.detail?.slide?.src) {
+        trackHallOfFameImageView(event.detail.slide.src, hofCreatorId);
+      }
+    };
+
+    // Add multiple event listeners to catch the right one for Fancybox v6
+    document.addEventListener('fancybox:reveal', handleFancyboxReveal);
+    document.addEventListener('fancybox:done', handleFancyboxDone);
+    document.addEventListener('fancybox:slidechange', handleFancyboxSlideChange);
+    document.addEventListener('fancybox:select', handleFancyboxSelect);
+    
+    // Try Fancybox v6 specific events
+    document.addEventListener('fancybox:change', (event: any) => {
+      if (hofCreatorId && event.detail?.slide?.src) {
+        trackHallOfFameImageView(event.detail.slide.src, hofCreatorId);
+      }
+    });
+
+    // Fallback: Use MutationObserver to detect Fancybox content changes
+    let mutationObserver: MutationObserver | null = null;
+    let lastTrackedImageUrl = '';
+    
+    const startMutationObserver = () => {
+      // Look for Fancybox container
+      const fancyboxContainer = document.querySelector('.fancybox__container');
+      if (fancyboxContainer && hofCreatorId) {
+        mutationObserver = new MutationObserver((mutations) => {
+          mutations.forEach((mutation) => {
+            if (mutation.type === 'childList' || mutation.type === 'attributes') {
+              // Look for the current image in Fancybox
+              const currentImage = document.querySelector('.fancybox__content img') as HTMLImageElement;
+              if (currentImage && currentImage.src && currentImage.src !== lastTrackedImageUrl) {
+                lastTrackedImageUrl = currentImage.src;
+                trackHallOfFameImageView(currentImage.src, hofCreatorId);
+              }
+            }
+          });
+        });
+        
+        mutationObserver.observe(fancyboxContainer, {
+          childList: true,
+          subtree: true,
+          attributes: true,
+          attributeFilter: ['src']
+        });
+      }
+    };
+
+    // Start observing when Fancybox opens
+    const handleFancyboxOpen = () => {
+      setTimeout(startMutationObserver, 100); // Small delay to ensure Fancybox is fully rendered
+    };
+
+    document.addEventListener('fancybox:open', handleFancyboxOpen);
+
+    // Enhanced polling mechanism as a fallback
+    let pollingInterval: NodeJS.Timeout | null = null;
+    let lastPolledImageUrl = '';
+    let isFancyboxOpen = false;
+    
+    const startPolling = () => {
+      isFancyboxOpen = true;
+      pollingInterval = setInterval(() => {
+        // Check if Fancybox is still open
+        const fancyboxContainer = document.querySelector('.fancybox__container');
+        const fancyboxBackdrop = document.querySelector('.fancybox__backdrop');
+        
+        if (!fancyboxContainer && !fancyboxBackdrop) {
+          // Fancybox is closed, stop polling
+          if (pollingInterval) {
+            clearInterval(pollingInterval);
+            pollingInterval = null;
+            lastPolledImageUrl = '';
+            isFancyboxOpen = false;
+          }
+          return;
+        }
+        
+        if (hofCreatorId) {
+          // Try multiple selectors for the current image
+          const currentImage = document.querySelector('.fancybox__content img, .fancybox__slide img, .fancybox__container img') as HTMLImageElement;
+          if (currentImage && currentImage.src && currentImage.src !== lastPolledImageUrl) {
+            lastPolledImageUrl = currentImage.src;
+            trackHallOfFameImageView(currentImage.src, hofCreatorId);
+          }
+        }
+      }, 200); // Check every 200ms for more responsive tracking
+    };
+
+    // Start polling when Fancybox opens
+    const handleFancyboxOpenPolling = () => {
+      setTimeout(startPolling, 100);
+    };
+
+    document.addEventListener('fancybox:open', handleFancyboxOpenPolling);
+    
+    // Also start polling immediately in case Fancybox events don't fire
+    setTimeout(() => {
+      const fancyboxContainer = document.querySelector('.fancybox__container');
+      const fancyboxBackdrop = document.querySelector('.fancybox__backdrop');
+      if (fancyboxContainer || fancyboxBackdrop) {
+        startPolling();
+      }
+    }, 1000); // Check after 1 second
+    
+    // Global click listener to detect Fancybox opens
+    const handleGlobalClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (target && target.closest('[data-fancybox="hall-of-fame"]')) {
+        setTimeout(startPolling, 200); // Small delay to let Fancybox open
+      }
+    };
+    
+    document.addEventListener('click', handleGlobalClick);
 
     return () => {
       Fancybox.destroy();
+      document.removeEventListener('fancybox:reveal', handleFancyboxReveal);
+      document.removeEventListener('fancybox:done', handleFancyboxDone);
+      document.removeEventListener('fancybox:slidechange', handleFancyboxSlideChange);
+      document.removeEventListener('fancybox:select', handleFancyboxSelect);
+      document.removeEventListener('fancybox:open', handleFancyboxOpen);
+      document.removeEventListener('fancybox:open', handleFancyboxOpenPolling);
+      document.removeEventListener('click', handleGlobalClick);
+      
+      // Remove Fancybox v6 specific events
+      document.removeEventListener('fancybox:ready', () => {});
+      document.removeEventListener('fancybox:show', () => {});
+      document.removeEventListener('fancybox:shown', () => {});
+      document.removeEventListener('fancybox:change', () => {});
+      
+      if (mutationObserver) {
+        mutationObserver.disconnect();
+        mutationObserver = null;
+      }
+      
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+        pollingInterval = null;
+      }
     };
-  }, [images]);
+  }, [images, hofCreatorId]);
+
+  // Track view when main image is displayed (larger format)
+  useEffect(() => {
+    if (hofCreatorId && displayedThumbnails[mainGalleryIndex]?.imageUrlFHD) {
+      // Only track if this is a different image than the last one tracked
+      const currentImageUrl = displayedThumbnails[mainGalleryIndex].imageUrlFHD;
+      trackHallOfFameImageView(currentImageUrl, hofCreatorId);
+    }
+  }, [mainGalleryIndex, hofCreatorId]);
 
   if (images.length === 0) {
     return (
@@ -229,6 +399,12 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
               href={displayedThumbnails[mainGalleryIndex].imageUrl4K}
               data-fancybox="hall-of-fame"
               data-caption={`${displayedThumbnails[mainGalleryIndex].cityName} - Hall of Fame Image`}
+              onClick={() => {
+                // Track view when main image is clicked to open fullscreen
+                if (hofCreatorId && displayedThumbnails[mainGalleryIndex].imageUrl4K) {
+                  trackHallOfFameImageView(displayedThumbnails[mainGalleryIndex].imageUrl4K, hofCreatorId);
+                }
+              }}
             >
               <img
                 src={displayedThumbnails[mainGalleryIndex].imageUrlFHD}
@@ -396,13 +572,25 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
                     ? 'border-yellow-500 ring-2 ring-yellow-200' 
                     : 'border-transparent hover:border-gray-300'
                 }`}
-                onClick={() => setMainGalleryIndex(index)}
+                onClick={() => {
+                  setMainGalleryIndex(index);
+                  // Track view when thumbnail is clicked to show larger image
+                  if (hofCreatorId && image.imageUrlFHD) {
+                    trackHallOfFameImageView(image.imageUrlFHD, hofCreatorId);
+                  }
+                }}
               >
                 <a
                   href={image.imageUrl4K}
                   data-fancybox="hall-of-fame"
                   data-caption={`${image.cityName} - Hall of Fame Image`}
                   className="block w-full h-full"
+                  onClick={() => {
+                    // Track view when thumbnail is clicked to open fullscreen
+                    if (hofCreatorId && image.imageUrl4K) {
+                      trackHallOfFameImageView(image.imageUrl4K, hofCreatorId);
+                    }
+                  }}
                 >
                   <img
                     src={image.imageUrlThumbnail}
