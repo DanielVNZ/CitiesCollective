@@ -8,6 +8,7 @@ import { Header } from 'app/components/Header';
 import { auth } from 'app/auth';
 import { HeroCarousel } from 'app/components/HeroCarousel';
 import { CommunityFavorites } from 'app/components/CommunityFavorites';
+import { ClientPaginationWrapper } from 'app/components/ClientPaginationWrapper';
 
 export default async function Page({ searchParams }: { searchParams?: { page?: string } }) {
   const currentPage = Math.max(1, parseInt(searchParams?.page || '1'));
@@ -147,75 +148,14 @@ export default async function Page({ searchParams }: { searchParams?: { page?: s
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {cities.map((city) => (
-                  <CityCard key={city.id} city={city} />
-                ))}
-              </div>
-
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="mt-12 flex justify-center items-center space-x-2">
-                  {/* Previous Button */}
-                  <Link
-                    href={`/?page=${currentPage - 1}`}
-                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                      currentPage === 1
-                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed dark:bg-gray-800 dark:text-gray-600'
-                        : 'bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600'
-                    }`}
-                    {...(currentPage === 1 && { 'aria-disabled': true })}
-                  >
-                    Previous
-                  </Link>
-
-                  {/* Page Numbers */}
-                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                    let pageNumber;
-                    if (totalPages <= 5) {
-                      pageNumber = i + 1;
-                    } else if (currentPage <= 3) {
-                      pageNumber = i + 1;
-                    } else if (currentPage >= totalPages - 2) {
-                      pageNumber = totalPages - 4 + i;
-                    } else {
-                      pageNumber = currentPage - 2 + i;
-                    }
-
-                    return (
-                      <Link
-                        key={pageNumber}
-                        href={`/?page=${pageNumber}`}
-                        className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                          currentPage === pageNumber
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600'
-                        }`}
-                      >
-                        {pageNumber}
-                      </Link>
-                    );
-                  })}
-
-                  {/* Next Button */}
-                  <Link
-                    href={`/?page=${currentPage + 1}`}
-                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                      currentPage === totalPages
-                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed dark:bg-gray-800 dark:text-gray-600'
-                        : 'bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600'
-                    }`}
-                    {...(currentPage === totalPages && { 'aria-disabled': true })}
-                  >
-                    Next
-                  </Link>
-                </div>
-              )}
-
-              {/* Page Info */}
-              <div className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
-                Showing {offset + 1} to {Math.min(offset + citiesPerPage, totalCities)} of {totalCities} cities
-              </div>
+              <ClientPaginationWrapper
+                initialCities={cities}
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={totalCities}
+                itemsPerPage={citiesPerPage}
+                offset={offset}
+              />
             </>
           )}
         </section>

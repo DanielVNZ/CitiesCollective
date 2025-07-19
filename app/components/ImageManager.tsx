@@ -213,7 +213,7 @@ export function ImageManager({ cityId, images, onImagesChange }: ImageManagerPro
           )}
         </div>
         <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-          You can upload up to 5 images per city. Supported formats: JPEG, PNG, WebP, GIF (max 10MB each)
+          You can upload up to 25 images per city. Supported formats: JPEG, PNG, WebP, GIF (max 10MB each)
         </p>
       </div>
 

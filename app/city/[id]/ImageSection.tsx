@@ -31,6 +31,7 @@ interface ImageSectionProps {
 
 export function ImageSection({ cityId, initialImages, isOwner, deepLinkImageId, deepLinkImageType, deepLinkCommentId }: ImageSectionProps) {
   const [images, setImages] = useState<CityImage[]>(initialImages);
+  const [showManager, setShowManager] = useState(false);
 
   const handleImagesChange = (newImages: CityImage[]) => {
     setImages(newImages);
@@ -57,6 +58,33 @@ export function ImageSection({ cityId, initialImages, isOwner, deepLinkImageId, 
             deepLinkImageType={deepLinkImageType}
             deepLinkCommentId={deepLinkCommentId}
           />
+        </div>
+      )}
+
+      {/* Image Management Section for Owners */}
+      {isOwner && (
+        <div className="mt-8">
+          <button
+            onClick={() => setShowManager(!showManager)}
+            className="flex items-center space-x-2 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium"
+          >
+            {showManager ? (
+              <ChevronDownIcon className="w-5 h-5" />
+            ) : (
+              <ChevronRightIcon className="w-5 h-5" />
+            )}
+            <span>{showManager ? 'Hide' : 'Show'} Image Management</span>
+          </button>
+          
+          {showManager && (
+            <div className="mt-4">
+              <ImageManager 
+                cityId={cityId} 
+                images={images} 
+                onImagesChange={handleImagesChange}
+              />
+            </div>
+          )}
         </div>
       )}
 

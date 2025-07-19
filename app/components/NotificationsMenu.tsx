@@ -161,6 +161,53 @@ export function NotificationsMenu() {
     return `${Math.floor(diffInSeconds / 86400)}d ago`;
   };
 
+  // Get the main action URL for a notification
+  const getNotificationActionUrl = (notification: Notification): string | null => {
+    if (notification.relatedCity) {
+      // For comment notifications, link to the specific comment
+      if ((notification.type === 'comment_tag' || notification.type === 'new_comment') && notification.relatedCommentId) {
+        return `/city/${notification.relatedCity.id}#comment-${notification.relatedCommentId}`;
+      }
+      
+      // For image comment notifications
+      if (notification.type === 'image_comment_tag' && notification.relatedCommentId) {
+        const metadata = notification.metadata ? JSON.parse(notification.metadata) : {};
+        return `/city/${notification.relatedCity.id}?image=${metadata.imageId || ''}&type=${metadata.imageType || ''}&comment=${notification.relatedCommentId}`;
+      }
+      
+      // For other city-related notifications
+      return `/city/${notification.relatedCity.id}`;
+    }
+    
+    // For user-related notifications
+    if (notification.relatedUser) {
+      return `/user/${notification.relatedUser.id}`;
+    }
+    
+    return null;
+  };
+
+  // Handle notification click
+  const handleNotificationClick = (notification: Notification, event: React.MouseEvent) => {
+    // Don't trigger if clicking on action buttons
+    const target = event.target as HTMLElement;
+    if (target.closest('button') || target.closest('a')) {
+      return;
+    }
+    
+    const actionUrl = getNotificationActionUrl(notification);
+    if (actionUrl) {
+      // Mark as read if unread
+      if (!notification.isRead) {
+        markAsRead(notification.id);
+      }
+      
+      // Close dropdown and navigate
+      setIsOpen(false);
+      window.location.href = actionUrl;
+    }
+  };
+
   return (
     <div className="relative" ref={dropdownRef}>
       {/* Notification Bell Button */}
@@ -218,97 +265,79 @@ export function NotificationsMenu() {
               </div>
             ) : (
               <div className="divide-y divide-gray-200 dark:divide-gray-700">
-                {notifications.map((notification) => (
-                  <div
-                    key={notification.id}
-                    className={`p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${
-                      !notification.isRead ? 'bg-blue-50 dark:bg-blue-900/20' : ''
-                    }`}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center space-x-2">
-                          <h4 className="text-sm font-medium text-gray-900 dark:text-white">
-                            {notification.title}
-                          </h4>
-                          {!notification.isRead && (
-                            <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                          )}
-                        </div>
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                          {notification.message}
-                        </p>
-                        <div className="flex items-center justify-between mt-2">
-                          <span className="text-xs text-gray-500 dark:text-gray-400">
-                            {formatRelativeTime(notification.createdAt)}
-                          </span>
-                          <div className="flex items-center space-x-1">
-                                                         {!notification.isRead && (
-                               <button
-                                 onClick={() => markAsRead(notification.id)}
-                                 className="p-1 text-gray-400 hover:text-green-600 dark:hover:text-green-400"
-                                 title="Mark as read"
-                               >
-                                 <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                 </svg>
-                               </button>
-                             )}
-                             <button
-                               onClick={() => deleteNotification(notification.id)}
-                               className="p-1 text-gray-400 hover:text-red-600 dark:hover:text-red-400"
-                               title="Delete notification"
-                             >
-                               <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                               </svg>
-                             </button>
-                          </div>
-                        </div>
-                        {/* Related content links */}
-                        {notification.relatedCity && (
-                          <div className="mt-2">
-                            {/* For comment notifications, link to the specific comment */}
-                            {(notification.type === 'comment_tag' || notification.type === 'new_comment') && notification.relatedCommentId ? (
-                              <Link
-                                href={`/city/${notification.relatedCity.id}#comment-${notification.relatedCommentId}`}
-                                className="block text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-                                onClick={() => setIsOpen(false)}
-                              >
-                                View comment on {notification.relatedCity.cityName}
-                              </Link>
-                            ) : notification.type === 'image_comment_tag' ? (
-                              <Link
-                                href={`/city/${notification.relatedCity.id}?image=${notification.metadata ? JSON.parse(notification.metadata).imageId : ''}&type=${notification.metadata ? JSON.parse(notification.metadata).imageType : ''}&comment=${notification.relatedCommentId}`}
-                                className="block text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-                                onClick={() => setIsOpen(false)}
-                              >
-                                View comment on {notification.relatedCity.cityName}
-                              </Link>
-                            ) : (
-                              <Link
-                                href={`/city/${notification.relatedCity.id}`}
-                                className="block text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-                                onClick={() => setIsOpen(false)}
-                              >
-                                View city: {notification.relatedCity.cityName}
-                              </Link>
+                {notifications.map((notification) => {
+                  const actionUrl = getNotificationActionUrl(notification);
+                  const isClickable = actionUrl !== null;
+                  
+                  return (
+                    <div
+                      key={notification.id}
+                      onClick={(e) => handleNotificationClick(notification, e)}
+                      className={`p-4 transition-colors ${
+                        !notification.isRead ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+                      } ${
+                        isClickable 
+                          ? 'hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer' 
+                          : ''
+                      }`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center space-x-2">
+                            <h4 className="text-sm font-medium text-gray-900 dark:text-white">
+                              {notification.title}
+                            </h4>
+                            {!notification.isRead && (
+                              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
                             )}
                           </div>
-                        )}
-                        {notification.relatedUser && (
-                          <Link
-                            href={`/user/${notification.relatedUser.id}`}
-                            className="block mt-1 text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-                            onClick={() => setIsOpen(false)}
-                          >
-                            View profile: {notification.relatedUser.username || notification.relatedUser.name || 'Unknown User'}
-                          </Link>
-                        )}
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                            {notification.message}
+                          </p>
+                          <div className="flex items-center justify-between mt-2">
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                              {formatRelativeTime(notification.createdAt)}
+                            </span>
+                            <div className="flex items-center space-x-1">
+                              {!notification.isRead && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    markAsRead(notification.id);
+                                  }}
+                                  className="p-1 text-gray-400 hover:text-green-600 dark:hover:text-green-400"
+                                  title="Mark as read"
+                                >
+                                  <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                </button>
+                              )}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deleteNotification(notification.id);
+                                }}
+                                className="p-1 text-gray-400 hover:text-red-600 dark:hover:text-red-400"
+                                title="Delete notification"
+                              >
+                                <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
+                            </div>
+                          </div>
+                          {/* Show clickable indicator for clickable notifications */}
+                          {isClickable && (
+                            <div className="mt-2 text-xs text-blue-600 dark:text-blue-400">
+                              Click to view →
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

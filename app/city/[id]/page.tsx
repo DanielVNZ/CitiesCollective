@@ -9,7 +9,6 @@ import { Comments } from 'app/components/Comments';
 import { CityDescription } from 'app/components/CityDescription';
 import { OsmMapManager } from 'app/components/OsmMapManager';
 import { MapLegend } from 'app/components/MapLegend';
-import { SaveGameManager } from 'app/components/SaveGameManager';
 import { ImageTabs } from 'app/components/ImageTabs';
 import { auth } from 'app/auth';
 import { ImageSection } from './ImageSection';
@@ -18,6 +17,9 @@ import { Header } from 'app/components/Header';
 import { isUserAdmin } from 'app/db';
 import { ClientComponents } from './ClientComponents';
 import CityHallOfFameImages from 'app/components/CityHallOfFameImages';
+import { DownloadToggle } from './DownloadToggle';
+import { SaveGameSection } from './SaveGameSection';
+import { CityNameEditor } from './CityNameEditor';
 
 // Force dynamic rendering to prevent caching
 export const dynamic = 'force-dynamic';
@@ -170,18 +172,14 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
             <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
               {/* City Info */}
               <div className="flex-1">
-                <div className="flex items-center gap-3 mb-4">
-                  <h1 className="text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white">
-                    {city.cityName || 'Unnamed City'}
-                  </h1>
-                  <span className="inline-flex items-center px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-sm font-medium rounded-full">
-                    {city.gameMode || 'Normal Mode'}
-                  </span>
-                </div>
-                
-                <p className="text-xl text-gray-600 dark:text-gray-400 mb-4">
-                  {city.mapName || 'Unknown Map'} • {city.theme || 'Default Theme'}
-                </p>
+                <CityNameEditor
+                  cityId={cityId}
+                  initialCityName={city.cityName}
+                  initialMapName={city.mapName}
+                  theme={city.theme}
+                  hasHallOfFameImages={hallOfFameImages.length > 0}
+                  isOwner={isOwner}
+                />
 
                 {/* Creator Information */}
                 {user && (
@@ -265,28 +263,13 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
             {(isOwner || city.osmMapPath) && (
               <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
                 <div className="p-6">
-                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">City Map & Files</h2>
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">City Map</h2>
                   {isOwner ? (
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                      {/* Map */}
-                      <div className="lg:col-span-2">
-                        <OsmMapManager 
-                          cityId={cityId} 
-                          initialOsmMapPath={city.osmMapPath} 
-                          isOwner={isOwner} 
-                        />
-                      </div>
-                      
-                      {/* File Management */}
-                      <div className="lg:col-span-1">
-                        <SaveGameManager 
-                          cityId={cityId} 
-                          initialFilePath={city.filePath} 
-                          initialFileName={city.fileName}
-                          isOwner={isOwner} 
-                        />
-                      </div>
-                    </div>
+                    <OsmMapManager 
+                      cityId={cityId} 
+                      initialOsmMapPath={city.osmMapPath} 
+                      isOwner={isOwner} 
+                    />
                   ) : (
                     /* For non-owners, map takes full width if it exists */
                     city.osmMapPath ? (
@@ -371,6 +354,37 @@ export default async function CityDetailPage({ params }: CityDetailPageProps) {
                 </div>
               </div>
             </div>
+
+                        {/* City Settings - Only for owners */}
+            {isOwner && (
+              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+                <div className="p-6">
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6">City Settings</h3>
+                  <div className="space-y-6">
+                    {/* Download Toggle */}
+                    <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                      <div>
+                        <div className="text-sm font-medium text-gray-900 dark:text-white">
+                          Allow Downloads
+                        </div>
+                        <div className="text-xs text-gray-600 dark:text-gray-400">
+                          Let others download your .cok save file
+                        </div>
+                      </div>
+                      <DownloadToggle cityId={cityId} initialDownloadable={city.downloadable ?? true} />
+                    </div>
+                    
+                    {/* SaveGame Section */}
+                    <SaveGameSection 
+                      cityId={cityId} 
+                      initialFilePath={city.filePath} 
+                      initialFileName={city.fileName}
+                      isOwner={isOwner} 
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Simulation Date */}
             {simulationDate && (

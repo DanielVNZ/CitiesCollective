@@ -216,14 +216,6 @@ export function CityManagementCard({ city }: CityManagementCardProps) {
               Share Link
             </button>
           </div>
-          <div className="flex space-x-2">
-            <Link
-              href={`/city/${city.id}/update`}
-              className="flex-1 bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors text-center text-sm font-medium"
-            >
-              Update City
-            </Link>
-          </div>
           
           <button
             onClick={handleDelete}

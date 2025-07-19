@@ -46,13 +46,13 @@ export async function POST(
       return NextResponse.json({ error: 'No images provided' }, { status: 400 });
     }
 
-    if (files.length > 15) {
-      return NextResponse.json({ error: 'Maximum 15 images allowed per upload' }, { status: 400 });
+    if (files.length > 25) {
+      return NextResponse.json({ error: 'Maximum 25 images allowed per upload' }, { status: 400 });
     }
 
-    if (existingImageCount + files.length > 15) {
+    if (existingImageCount + files.length > 25) {
       return NextResponse.json({ 
-        error: `Cannot upload ${files.length} images. This city already has ${existingImageCount} images. Maximum 15 images allowed per city.` 
+        error: `Cannot upload ${files.length} images. This city already has ${existingImageCount} images. Maximum 25 images allowed per city.` 
       }, { status: 400 });
     }
 
