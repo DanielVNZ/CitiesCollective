@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Fancybox } from '@fancyapps/ui';
 import { ImageLikeButton } from './ImageLikeButton';
 import { ImageComments } from './ImageComments';
@@ -39,8 +39,140 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
   const [showComments, setShowComments] = useState(false);
   const [isClosingComments, setIsClosingComments] = useState(false);
+  const [imageLikeStates, setImageLikeStates] = useState<Record<string, { liked: boolean; count: number }>>({});
   const mainImageRef = useRef<HTMLDivElement>(null);
   const hasHandledDeepLink = useRef(false);
+
+  // Fetch like states for all images
+  useEffect(() => {
+    const fetchLikeStates = async () => {
+      const likeStates: Record<string, { liked: boolean; count: number }> = {};
+      
+      for (const image of images) {
+        try {
+          const response = await fetch(`/api/images/${image.hofImageId}/like?type=hall_of_fame`);
+          if (response.ok) {
+            const data = await response.json();
+            likeStates[image.hofImageId] = {
+              liked: data.isLiked,
+              count: data.likeCount
+            };
+          }
+        } catch (error) {
+          console.error(`Error fetching like state for Hall of Fame image ${image.hofImageId}:`, error);
+          likeStates[image.hofImageId] = { liked: false, count: 0 };
+        }
+      }
+      
+      setImageLikeStates(likeStates);
+    };
+
+    if (images.length > 0) {
+      fetchLikeStates();
+    }
+  }, [images]); // Re-run if images changes
+
+  // Update like button when like states change
+  useEffect(() => {
+    if (Object.keys(imageLikeStates).length > 0) {
+      // Function to update like button for current image
+      const updateCurrentLikeButton = () => {
+        const likeButton = document.querySelector('.f-button--like');
+        if (likeButton) {
+          // Get current image ID from Fancybox instance
+          const fancyboxInstance = Fancybox.getInstance();
+          if (fancyboxInstance) {
+            const currentSlideData = fancyboxInstance.getSlide();
+            if (currentSlideData?.src) {
+              const fancyboxLinks = document.querySelectorAll(`[data-fancybox="hall-of-fame-${cityId}"]`);
+              const currentHref = currentSlideData.src;
+              
+              for (const link of Array.from(fancyboxLinks)) {
+                const linkHref = link.getAttribute('href');
+                if (linkHref === currentHref) {
+                  const currentImageId = link.getAttribute('data-image-id');
+                  
+                  if (currentImageId) {
+                    const likeState = imageLikeStates[currentImageId];
+                    if (likeState) {
+                      const countElement = likeButton.querySelector('.like-count');
+                      if (countElement) {
+                        countElement.textContent = likeState.count.toString();
+                      }
+                      
+                      if (likeState.liked) {
+                        likeButton.classList.add('is-liked');
+                        likeButton.innerHTML = '❤️ <span class="like-count">' + likeState.count + '</span>';
+                      } else {
+                        likeButton.classList.remove('is-liked');
+                        likeButton.innerHTML = '🤍 <span class="like-count">' + likeState.count + '</span>';
+                      }
+                    }
+                  }
+                  break;
+                }
+              }
+            }
+          }
+        }
+      };
+      
+      // Try to update immediately
+      updateCurrentLikeButton();
+      
+      // Also try again after a short delay in case Fancybox is still loading
+      setTimeout(updateCurrentLikeButton, 200);
+      
+      // Also try again after a longer delay to ensure Fancybox is fully initialized
+      setTimeout(updateCurrentLikeButton, 500);
+      
+      // Additional timeout to ensure like button is updated after all initialization
+      setTimeout(updateCurrentLikeButton, 1000);
+    }
+  }, [imageLikeStates, cityId]);
+
+  // Handle like toggle from Fancybox
+  const handleFancyboxLike = useCallback(async (imageId: string) => {
+    try {
+      const response = await fetch(`/api/images/${imageId}/like?type=hall_of_fame&cityId=${cityId}`, {
+        method: 'POST',
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Update local state
+        setImageLikeStates(prev => ({
+          ...prev,
+          [imageId]: {
+            liked: data.liked,
+            count: data.likeCount
+          }
+        }));
+        
+        // Update the data attribute on the Fancybox slide
+        const currentSlide = document.querySelector('.fancybox__slide.is-selected, .fancybox__slide--current');
+        if (currentSlide) {
+          currentSlide.setAttribute('data-liked', data.liked.toString());
+          currentSlide.setAttribute('data-like-count', data.likeCount.toString());
+        }
+        
+        // Update the like button in Fancybox toolbar
+        const likeButton = document.querySelector('.f-button--like') as HTMLElement;
+        if (likeButton) {
+          if (data.liked) {
+            likeButton.classList.add('is-liked');
+            likeButton.innerHTML = '❤️ <span class="like-count">' + data.likeCount + '</span>';
+          } else {
+            likeButton.classList.remove('is-liked');
+            likeButton.innerHTML = '🤍 <span class="like-count">' + data.likeCount + '</span>';
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error toggling Hall of Fame image like:', error);
+    }
+  }, [cityId]);
 
   // Show 12 thumbnails at a time (more with smaller thumbnails)
   const thumbnailsPerPage = 12;
@@ -202,321 +334,219 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
     // Use a unique identifier for this specific Hall of Fame gallery
     const galleryId = `hall-of-fame-${cityId}`;
     
-    // Bind Fancybox to a specific container to avoid conflicts
-    const galleryContainer = document.querySelector('.hall-of-fame-gallery-container') as HTMLElement;
+    // Destroy any existing Fancybox instances for this gallery
+    Fancybox.close();
+    
+    // Simple function to update like button based on current image
+    const updateLikeButtonForCurrentImage = () => {
+      const likeButton = document.querySelector('.f-button--like');
+      if (!likeButton) {
+        return;
+      }
+      
+      // Get current image ID from Fancybox instance
+      const fancyboxInstance = Fancybox.getInstance();
+      if (fancyboxInstance) {
+        const currentSlideData = fancyboxInstance.getSlide();
+        if (currentSlideData?.src) {
+          const fancyboxLinks = document.querySelectorAll(`[data-fancybox="${galleryId}"]`);
+          const currentHref = currentSlideData.src;
+          
+          for (const link of Array.from(fancyboxLinks)) {
+            const linkHref = link.getAttribute('href');
+            if (linkHref === currentHref) {
+              const imageId = link.getAttribute('data-image-id');
+              if (imageId) {
+                // Get fresh like state from API instead of using cached state
+                const fetchAndUpdateLikeState = async () => {
+                  try {
+                    const response = await fetch(`/api/images/${imageId}/like?type=hall_of_fame`);
+                    if (response.ok) {
+                      const data = await response.json();
+                      
+                      const countElement = likeButton.querySelector('.like-count');
+                      if (countElement) {
+                        countElement.textContent = data.likeCount.toString();
+                      }
+                      
+                      if (data.isLiked) {
+                        likeButton.classList.add('is-liked');
+                        likeButton.innerHTML = '❤️ <span class="like-count">' + data.likeCount + '</span>';
+                      } else {
+                        likeButton.classList.remove('is-liked');
+                        likeButton.innerHTML = '🤍 <span class="like-count">' + data.likeCount + '</span>';
+                      }
+                    }
+                  } catch (error) {
+                    console.error('Error fetching fresh Hall of Fame like state:', error);
+                    // Fallback to cached state
+                    const likeState = imageLikeStates[imageId];
+                    if (likeState) {
+                      const countElement = likeButton.querySelector('.like-count');
+                      if (countElement) {
+                        countElement.textContent = likeState.count.toString();
+                      }
+                      
+                      if (likeState.liked) {
+                        likeButton.classList.add('is-liked');
+                      } else {
+                        likeButton.classList.remove('is-liked');
+                      }
+                    }
+                  }
+                };
+                
+                fetchAndUpdateLikeState();
+              }
+              break;
+            }
+          }
+        }
+      }
+    };
+    
+    // Set up polling to check for image changes
+    let lastImageSrc = '';
+    const pollForChanges = setInterval(() => {
+      const fancyboxInstance = Fancybox.getInstance();
+      if (fancyboxInstance) {
+        const currentSlideData = fancyboxInstance.getSlide();
+        if (currentSlideData?.src && currentSlideData.src !== lastImageSrc) {
+          lastImageSrc = currentSlideData.src;
+          
+          // Update like button immediately
+          setTimeout(() => {
+            updateLikeButtonForCurrentImage();
+          }, 50);
+        }
+      }
+    }, 200); // Check every 200ms
+    
+    // Bind only to Hall of Fame gallery with specific container
+    const galleryContainer = document.getElementById(`hall-of-fame-gallery-${cityId}`);
     if (galleryContainer) {
-      Fancybox.bind(galleryContainer, `[data-fancybox="${galleryId}"]`);
+      Fancybox.bind(galleryContainer, `[data-fancybox="${galleryId}"]`, {
+        on: {
+          init: (fancybox: any) => {
+            // Initial setup for first slide
+            updateLikeButtonForCurrentImage();
+            
+            // Add like button after initialization
+            setTimeout(() => {
+              // Try multiple selectors and log what we find
+              const selectors = [
+                '.f-carousel_toolbar',
+                '.fancybox__toolbar', 
+                '.fancybox-toolbar',
+                '.fancybox__container .f-carousel_toolbar',
+                '.fancybox__container .fancybox__toolbar',
+                '[class*="toolbar"]',
+                '[class*="carousel"]'
+              ];
+              
+              let toolbar = null;
+              for (const selector of selectors) {
+                toolbar = document.querySelector(selector);
+                if (toolbar) {
+                  break;
+                }
+              }
+              
+              if (toolbar) {
+                const likeButton = document.createElement('button');
+                likeButton.className = 'f-button f-button--like';
+                likeButton.title = 'Like this Hall of Fame image';
+                likeButton.innerHTML = '🤍 <span class="like-count">0</span>';
+                // Remove inline styles to use CSS classes
+                likeButton.style.cssText = '';
+                
+                // Insert into the right column of the toolbar
+                const rightColumn = toolbar.querySelector('.f-carousel__toolbar__column.is-right');
+                if (rightColumn) {
+                  rightColumn.insertBefore(likeButton, rightColumn.firstChild);
+                } else {
+                  // Fallback: try to add to the toolbar directly
+                  toolbar.appendChild(likeButton);
+                }
+                
+                // Function to update like button state
+                const updateLikeButtonState = (imageId: string) => {
+                  const likeState = imageLikeStates[imageId];
+                  if (likeState) {
+                    const countElement = likeButton.querySelector('.like-count');
+                    if (countElement) {
+                      countElement.textContent = likeState.count.toString();
+                    }
+                    
+                    if (likeState.liked) {
+                      likeButton.classList.add('is-liked');
+                      likeButton.innerHTML = '❤️ <span class="like-count">' + likeState.count + '</span>';
+                    } else {
+                      likeButton.classList.remove('is-liked');
+                      likeButton.innerHTML = '🤍 <span class="like-count">' + likeState.count + '</span>';
+                    }
+                  }
+                };
+
+                // Get current image data and update button
+                updateLikeButtonForCurrentImage();
+
+                // Add click handler
+                likeButton.addEventListener('click', (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  
+                  // Get current image ID from Fancybox instance
+                  const fancyboxInstance = Fancybox.getInstance();
+                  if (fancyboxInstance) {
+                    const currentSlideData = fancyboxInstance.getSlide();
+                    if (currentSlideData?.src) {
+                      const fancyboxLinks = document.querySelectorAll(`[data-fancybox="${galleryId}"]`);
+                      const currentHref = currentSlideData.src;
+                      
+                      for (const link of Array.from(fancyboxLinks)) {
+                        const linkHref = link.getAttribute('href');
+                        if (linkHref === currentHref) {
+                          const imageId = link.getAttribute('data-image-id');
+                          if (imageId) {
+                            handleFancyboxLike(imageId);
+                            
+                            // Update button state after a short delay to allow API response
+                            setTimeout(() => {
+                              updateLikeButtonForCurrentImage();
+                            }, 100);
+                          }
+                          break;
+                        }
+                      }
+                    }
+                  }
+                });
+
+                // Listen for slide changes to update like button
+                const handleSlideChange = () => {
+                  setTimeout(() => {
+                    updateLikeButtonForCurrentImage();
+                  }, 100);
+                };
+
+                // Add slide change listener
+                document.addEventListener('fancybox:slidechange', handleSlideChange);
+                document.addEventListener('fancybox:change', handleSlideChange);
+              }
+            }, 200);
+          }
+        }
+      });
     }
 
-    // Add custom like button to Fancybox toolbar for Hall of Fame images
-    const addLikeButtonToFancybox = () => {
-      const toolbar = document.querySelector('.fancybox__toolbar');
-      if (toolbar && !toolbar.querySelector('.fancybox-like-btn-hof')) {
-        const likeButton = document.createElement('button');
-        likeButton.className = 'fancybox__toolbar__item fancybox__toolbar__btn fancybox-like-btn fancybox-like-btn-hof';
-        likeButton.setAttribute('data-fancybox-like-hof', '');
-        likeButton.innerHTML = `
-          <svg class="fancybox__toolbar__icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
-          </svg>
-        `;
-        likeButton.title = 'Like this Hall of Fame image';
-        
-        // Insert before close button
-        const closeButton = toolbar.querySelector('[data-fancybox-close]');
-        if (closeButton) {
-          toolbar.insertBefore(likeButton, closeButton);
-        } else {
-          toolbar.appendChild(likeButton);
-        }
-        
-        // Add click handler
-        likeButton.addEventListener('click', async (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          
-          // Get current slide and image ID
-          const currentSlide = document.querySelector('.fancybox__slide--current');
-          const imageElement = currentSlide?.querySelector('img');
-          const imageId = imageElement?.getAttribute('data-hof-image-id');
-          
-          if (imageId) {
-            try {
-              const response = await fetch(`/api/images/${imageId}/like?type=hall_of_fame&cityId=${cityId}`, {
-                method: 'POST',
-              });
-              
-              if (response.ok) {
-                const data = await response.json();
-                
-                // Update button appearance
-                const svg = likeButton.querySelector('svg') as SVGElement;
-                if (svg) {
-                  if (data.liked) {
-                    svg.style.fill = 'currentColor';
-                    (likeButton as HTMLElement).style.color = '#ef4444';
-                  } else {
-                    svg.style.fill = 'none';
-                    (likeButton as HTMLElement).style.color = '';
-                  }
-                }
-              }
-            } catch (error) {
-              console.error('Error toggling Hall of Fame image like:', error);
-            }
-          }
-        });
-      }
-    };
-
-    // Enhanced polling mechanism for Hall of Fame like button
-    let pollingIntervalHof: NodeJS.Timeout | null = null;
-    let isFancyboxOpenHof = false;
-    
-    const startPollingHof = () => {
-      isFancyboxOpenHof = true;
-      pollingIntervalHof = setInterval(() => {
-        // Check if Fancybox is still open
-        const fancyboxContainer = document.querySelector('.fancybox__container');
-        const fancyboxBackdrop = document.querySelector('.fancybox__backdrop');
-        
-        if (!fancyboxContainer && !fancyboxBackdrop) {
-          // Fancybox is closed, stop polling
-          if (pollingIntervalHof) {
-            clearInterval(pollingIntervalHof);
-            pollingIntervalHof = null;
-            isFancyboxOpenHof = false;
-          }
-          return;
-        }
-        
-        // Try to add like button if it doesn't exist
-        const existingButton = document.querySelector('.fancybox-like-btn-hof');
-        if (!existingButton) {
-          addLikeButtonToFancybox();
-        }
-      }, 200); // Check every 200ms
-    };
-
-    // Listen for Fancybox events for Hall of Fame images
-    const handleFancyboxOpenHof = () => {
-      setTimeout(startPollingHof, 100);
-    };
-
-    const handleFancyboxSlideChangeHof = () => {
-      setTimeout(() => {
-        const likeButton = document.querySelector('.fancybox-like-btn-hof');
-        if (likeButton) {
-          const currentSlide = document.querySelector('.fancybox__slide--current');
-          const imageElement = currentSlide?.querySelector('img');
-          const imageId = imageElement?.getAttribute('data-hof-image-id');
-          
-          if (imageId) {
-            // Fetch current like status
-            fetch(`/api/images/${imageId}/like?type=hall_of_fame`)
-              .then(response => response.json())
-              .then(data => {
-                const svg = likeButton.querySelector('svg') as SVGElement;
-                if (svg) {
-                  if (data.isLiked) {
-                    svg.style.fill = 'currentColor';
-                    (likeButton as HTMLElement).style.color = '#ef4444';
-                  } else {
-                    svg.style.fill = 'none';
-                    (likeButton as HTMLElement).style.color = '';
-                  }
-                }
-              })
-              .catch(error => {
-                console.error('Error fetching Hall of Fame image like status:', error);
-              });
-          }
-        }
-      }, 100);
-    };
-
-    // Global click listener to detect Hall of Fame Fancybox opens
-    const handleGlobalClickHof = (event: MouseEvent) => {
-      const target = event.target as HTMLElement;
-      if (target && target.closest(`[data-fancybox="hall-of-fame-${cityId}"]`)) {
-        setTimeout(startPollingHof, 200); // Small delay to let Fancybox open
-      }
-    };
-
-    document.addEventListener('fancybox:open', handleFancyboxOpenHof);
-    document.addEventListener('fancybox:slidechange', handleFancyboxSlideChangeHof);
-    document.addEventListener('click', handleGlobalClickHof);
-
-    // Also try DOM events as backup
-    const handleFancyboxReveal = (event: any) => {
-      if (hofCreatorId && event.detail?.slide?.src) {
-        trackHallOfFameImageView(event.detail.slide.src, hofCreatorId);
-      }
-    };
-
-    const handleFancyboxDone = (event: any) => {
-      if (hofCreatorId && event.detail?.slide?.src) {
-        trackHallOfFameImageView(event.detail.slide.src, hofCreatorId);
-      }
-    };
-
-    const handleFancyboxSlideChange = (event: any) => {
-      if (hofCreatorId && event.detail?.slide?.src) {
-        trackHallOfFameImageView(event.detail.slide.src, hofCreatorId);
-      }
-    };
-
-    const handleFancyboxSelect = (event: any) => {
-      if (hofCreatorId && event.detail?.slide?.src) {
-        trackHallOfFameImageView(event.detail.slide.src, hofCreatorId);
-      }
-    };
-
-    // Add multiple event listeners to catch the right one for Fancybox v6
-    document.addEventListener('fancybox:reveal', handleFancyboxReveal);
-    document.addEventListener('fancybox:done', handleFancyboxDone);
-    document.addEventListener('fancybox:slidechange', handleFancyboxSlideChange);
-    document.addEventListener('fancybox:select', handleFancyboxSelect);
-    
-    // Try Fancybox v6 specific events
-    document.addEventListener('fancybox:change', (event: any) => {
-      if (hofCreatorId && event.detail?.slide?.src) {
-        trackHallOfFameImageView(event.detail.slide.src, hofCreatorId);
-      }
-    });
-
-    // Fallback: Use MutationObserver to detect Fancybox content changes
-    let mutationObserver: MutationObserver | null = null;
-    let lastTrackedImageUrl = '';
-    
-    const startMutationObserver = () => {
-      // Look for Fancybox container
-      const fancyboxContainer = document.querySelector('.fancybox__container');
-      if (fancyboxContainer && hofCreatorId) {
-        mutationObserver = new MutationObserver((mutations) => {
-          mutations.forEach((mutation) => {
-            if (mutation.type === 'childList' || mutation.type === 'attributes') {
-              // Look for the current image in Fancybox
-              const currentImage = document.querySelector('.fancybox__content img') as HTMLImageElement;
-              if (currentImage && currentImage.src && currentImage.src !== lastTrackedImageUrl) {
-                lastTrackedImageUrl = currentImage.src;
-                trackHallOfFameImageView(currentImage.src, hofCreatorId);
-              }
-            }
-          });
-        });
-        
-        mutationObserver.observe(fancyboxContainer, {
-          childList: true,
-          subtree: true,
-          attributes: true,
-          attributeFilter: ['src']
-        });
-      }
-    };
-
-    // Start observing when Fancybox opens
-    const handleFancyboxOpen = () => {
-      setTimeout(startMutationObserver, 100); // Small delay to ensure Fancybox is fully rendered
-    };
-
-    document.addEventListener('fancybox:open', handleFancyboxOpen);
-
-    // Enhanced polling mechanism as a fallback
-    let pollingInterval: NodeJS.Timeout | null = null;
-    let lastPolledImageUrl = '';
-    let isFancyboxOpen = false;
-    
-    const startPolling = () => {
-      isFancyboxOpen = true;
-      pollingInterval = setInterval(() => {
-        // Check if Fancybox is still open
-        const fancyboxContainer = document.querySelector('.fancybox__container');
-        const fancyboxBackdrop = document.querySelector('.fancybox__backdrop');
-        
-        if (!fancyboxContainer && !fancyboxBackdrop) {
-          // Fancybox is closed, stop polling
-          if (pollingInterval) {
-            clearInterval(pollingInterval);
-            pollingInterval = null;
-            lastPolledImageUrl = '';
-            isFancyboxOpen = false;
-          }
-          return;
-        }
-        
-        if (hofCreatorId) {
-          // Try multiple selectors for the current image
-          const currentImage = document.querySelector('.fancybox__content img, .fancybox__slide img, .fancybox__container img') as HTMLImageElement;
-          if (currentImage && currentImage.src && currentImage.src !== lastPolledImageUrl) {
-            lastPolledImageUrl = currentImage.src;
-            trackHallOfFameImageView(currentImage.src, hofCreatorId);
-          }
-        }
-      }, 200); // Check every 200ms for more responsive tracking
-    };
-
-    // Start polling when Fancybox opens
-    const handleFancyboxOpenPolling = () => {
-      setTimeout(startPolling, 100);
-    };
-
-    document.addEventListener('fancybox:open', handleFancyboxOpenPolling);
-    
-    // Also start polling immediately in case Fancybox events don't fire
-    setTimeout(() => {
-      const fancyboxContainer = document.querySelector('.fancybox__container');
-      const fancyboxBackdrop = document.querySelector('.fancybox__backdrop');
-      if (fancyboxContainer || fancyboxBackdrop) {
-        startPolling();
-      }
-    }, 1000); // Check after 1 second
-    
-    // Global click listener to detect Fancybox opens
-    const handleGlobalClick = (event: MouseEvent) => {
-      const target = event.target as HTMLElement;
-      if (target && target.closest(`[data-fancybox="hall-of-fame-${cityId}"]`)) {
-        setTimeout(startPolling, 200); // Small delay to let Fancybox open
-      }
-    };
-    
-    document.addEventListener('click', handleGlobalClick);
-
     return () => {
+      // Clear polling interval
+      clearInterval(pollForChanges);
+      
       Fancybox.destroy();
-      document.removeEventListener('fancybox:reveal', handleFancyboxReveal);
-      document.removeEventListener('fancybox:done', handleFancyboxDone);
-      document.removeEventListener('fancybox:slidechange', handleFancyboxSlideChange);
-      document.removeEventListener('fancybox:select', handleFancyboxSelect);
-      document.removeEventListener('fancybox:open', handleFancyboxOpen);
-      document.removeEventListener('fancybox:open', handleFancyboxOpenPolling);
-      document.removeEventListener('click', handleGlobalClick);
-      document.removeEventListener('fancybox:open', handleFancyboxOpenHof);
-      document.removeEventListener('fancybox:slidechange', handleFancyboxSlideChangeHof);
-      document.removeEventListener('click', handleGlobalClickHof);
-      
-      if (pollingIntervalHof) {
-        clearInterval(pollingIntervalHof);
-        pollingIntervalHof = null;
-      }
-      
-      // Remove Fancybox v6 specific events
-      document.removeEventListener('fancybox:ready', () => {});
-      document.removeEventListener('fancybox:show', () => {});
-      document.removeEventListener('fancybox:shown', () => {});
-      document.removeEventListener('fancybox:change', () => {});
-      
-      if (mutationObserver) {
-        mutationObserver.disconnect();
-        mutationObserver = null;
-      }
-      
-      if (pollingInterval) {
-        clearInterval(pollingInterval);
-        pollingInterval = null;
-      }
     };
-  }, [images, hofCreatorId]);
+  }, [cityId, handleFancyboxLike, imageLikeStates]);
 
   // Track view when main image is displayed (larger format)
   useEffect(() => {
@@ -525,7 +555,7 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
       const currentImageUrl = displayedThumbnails[mainGalleryIndex].imageUrlFHD;
       trackHallOfFameImageView(currentImageUrl, hofCreatorId);
     }
-  }, [mainGalleryIndex, hofCreatorId]);
+  }, [mainGalleryIndex, hofCreatorId, displayedThumbnails]);
 
   if (images.length === 0) {
     return (
@@ -537,9 +567,52 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
 
   return (
     <>
+      {/* Fancybox Like Button Styles */}
+      <style jsx global>{`
+        .f-button--like {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          padding: 8px;
+          border-radius: 4px;
+          transition: all 0.2s ease;
+          color: #ffffff;
+          font-size: 16px;
+          background: rgba(75, 85, 99, 0.8);
+          border: none;
+          cursor: pointer;
+          opacity: 0.9;
+          margin: 0 4px;
+          min-width: 32px;
+          height: 32px;
+          justify-content: center;
+        }
+        
+        .f-button--like:hover {
+          opacity: 1;
+          background-color: rgba(75, 85, 99, 1);
+        }
+        
+        .f-button--like.is-liked {
+          color: #ec4899;
+          opacity: 1;
+        }
+        
+        .f-button--like .like-count {
+          font-weight: 500;
+          font-size: 12px;
+          color: #9ca3af;
+          margin-left: 2px;
+        }
+        
+        .f-button--like.is-liked .like-count {
+          color: #ec4899;
+        }
+      `}</style>
+      
       {/* Main Gallery View */}
       <div className="mb-6">
-                <div className="hall-of-fame-gallery-container relative bg-white dark:bg-gray-800 rounded-xl shadow-lg p-4 mb-6 border border-gray-200 dark:border-gray-700 max-w-4xl mx-auto">
+        <div id={`hall-of-fame-gallery-${cityId}`} className="hall-of-fame-gallery-container relative bg-white dark:bg-gray-800 rounded-xl shadow-lg p-4 mb-6 border border-gray-200 dark:border-gray-700 max-w-4xl mx-auto">
           {/* Hidden Fancybox Gallery - All Images except current main image (for Fancybox to discover) */}
           <div className="hidden">
             {images.map((image) => {
@@ -548,17 +621,20 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
               if (currentMainImage && image.hofImageId === currentMainImage.hofImageId) {
                 return null;
               }
+              const likeState = imageLikeStates[image.hofImageId] || { liked: false, count: 0 };
               return (
                 <a
                   key={`fancybox-hidden-hof-${image.id}`}
                   href={image.imageUrl4K}
                   data-fancybox={`hall-of-fame-${cityId}`}
                   data-caption={`${image.cityName} - Hall of Fame Image`}
+                  data-image-id={image.hofImageId}
+                  data-liked={likeState.liked.toString()}
+                  data-like-count={likeState.count.toString()}
                 >
                   <img 
                     src={image.imageUrlThumbnail} 
                     alt={`${image.cityName} - Hall of Fame Image`} 
-                    data-hof-image-id={image.hofImageId}
                   />
                 </a>
               );
@@ -577,6 +653,9 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
               href={displayedThumbnails[mainGalleryIndex].imageUrl4K}
               data-fancybox={`hall-of-fame-${cityId}`}
               data-caption={`${displayedThumbnails[mainGalleryIndex].cityName} - Hall of Fame Image`}
+              data-image-id={displayedThumbnails[mainGalleryIndex].hofImageId}
+              data-liked={(imageLikeStates[displayedThumbnails[mainGalleryIndex].hofImageId]?.liked || false).toString()}
+              data-like-count={(imageLikeStates[displayedThumbnails[mainGalleryIndex].hofImageId]?.count || 0).toString()}
               onClick={() => {
                 // Track view when main image is clicked to open fullscreen
                 if (hofCreatorId && displayedThumbnails[mainGalleryIndex].imageUrl4K) {
@@ -584,12 +663,12 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
                 }
               }}
             >
-              <img
-                src={displayedThumbnails[mainGalleryIndex].imageUrlFHD}
-                alt={`${displayedThumbnails[mainGalleryIndex].cityName} - Hall of Fame Image`}
-                className="w-full h-full object-contain transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-2xl"
-                data-hof-image-id={displayedThumbnails[mainGalleryIndex].hofImageId}
-              />
+                              <img
+                  src={displayedThumbnails[mainGalleryIndex].imageUrlFHD}
+                  alt={`${displayedThumbnails[mainGalleryIndex].cityName} - Hall of Fame Image`}
+                  className="w-full h-full object-contain transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-2xl"
+                  data-image-id={displayedThumbnails[mainGalleryIndex].hofImageId}
+                />
             </a>
             
             {/* Hover overlay */}
@@ -727,12 +806,10 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
             </button>
           )}
 
-
-
           {/* Thumbnail Grid */}
           <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-12 gap-2 px-8">
             {displayedThumbnails.map((image, index) => (
-                            <div
+              <div
                 key={image.id}
                 className={`relative aspect-square group overflow-hidden rounded-lg border-2 transition-all duration-200 ${
                   index === mainGalleryIndex 
@@ -745,6 +822,9 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
                     href={image.imageUrl4K}
                     data-fancybox={`hall-of-fame-${cityId}`}
                     data-caption={`${image.cityName} - Hall of Fame Image`}
+                    data-image-id={image.hofImageId}
+                    data-liked={(imageLikeStates[image.hofImageId]?.liked || false).toString()}
+                    data-like-count={(imageLikeStates[image.hofImageId]?.count || 0).toString()}
                     className="block w-full h-full absolute inset-0 z-10"
                     onClick={(e) => {
                       e.preventDefault(); // Prevent default link behavior

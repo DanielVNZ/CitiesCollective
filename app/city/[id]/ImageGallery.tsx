@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { Fancybox } from '@fancyapps/ui';
 import '@fancyapps/ui/dist/fancybox/fancybox.css';
@@ -40,6 +40,7 @@ export function ImageGallery({ images, cityId, isOwner, onImagesChange, deepLink
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
   const [showComments, setShowComments] = useState(false);
   const [isClosingComments, setIsClosingComments] = useState(false);
+  const [imageLikeStates, setImageLikeStates] = useState<Record<string, { liked: boolean; count: number }>>({});
   const mainImageRef = useRef<HTMLDivElement>(null);
   const searchParams = useSearchParams();
   const hasHandledDeepLink = useRef(false);
@@ -48,8 +49,137 @@ export function ImageGallery({ images, cityId, isOwner, onImagesChange, deepLink
   const validImages = images.filter(image => 
     image.mediumPath && image.largePath && image.originalName && image.thumbnailPath && image.originalPath
   );
-  
 
+  // Fetch like states for all images
+  useEffect(() => {
+    const fetchLikeStates = async () => {
+      const likeStates: Record<string, { liked: boolean; count: number }> = {};
+      
+      for (const image of validImages) {
+        try {
+          const response = await fetch(`/api/images/${image.id}/like?type=screenshot`);
+          if (response.ok) {
+            const data = await response.json();
+            likeStates[image.id.toString()] = {
+              liked: data.isLiked,
+              count: data.likeCount
+            };
+          }
+        } catch (error) {
+          console.error(`Error fetching like state for image ${image.id}:`, error);
+          likeStates[image.id.toString()] = { liked: false, count: 0 };
+        }
+      }
+      
+      setImageLikeStates(likeStates);
+    };
+
+    if (validImages.length > 0) {
+      fetchLikeStates();
+    }
+  }, [validImages]); // Re-run if validImages changes
+
+  // Update like button when like states change
+  useEffect(() => {
+    if (Object.keys(imageLikeStates).length > 0) {
+      // Function to update like button for current image
+      const updateCurrentLikeButton = () => {
+        const likeButton = document.querySelector('.f-button--like');
+        if (likeButton) {
+          // Get current image ID from Fancybox instance
+          const fancyboxInstance = Fancybox.getInstance();
+          if (fancyboxInstance) {
+            const currentSlideData = fancyboxInstance.getSlide();
+            if (currentSlideData?.src) {
+              const fancyboxLinks = document.querySelectorAll(`[data-fancybox="screenshots-${cityId}"]`);
+              const currentHref = currentSlideData.src;
+              
+              for (const link of Array.from(fancyboxLinks)) {
+                const linkHref = link.getAttribute('href');
+                if (linkHref === currentHref) {
+                  const currentImageId = link.getAttribute('data-image-id');
+                  
+                  if (currentImageId) {
+                    const likeState = imageLikeStates[currentImageId];
+                    if (likeState) {
+                      const countElement = likeButton.querySelector('.like-count');
+                      if (countElement) {
+                        countElement.textContent = likeState.count.toString();
+                      }
+                      
+                      if (likeState.liked) {
+                        likeButton.classList.add('is-liked');
+                        likeButton.innerHTML = '❤️ <span class="like-count">' + likeState.count + '</span>';
+                      } else {
+                        likeButton.classList.remove('is-liked');
+                        likeButton.innerHTML = '🤍 <span class="like-count">' + likeState.count + '</span>';
+                      }
+                    }
+                  }
+                  break;
+                }
+              }
+            }
+          }
+        }
+      };
+      
+      // Try to update immediately
+      updateCurrentLikeButton();
+      
+      // Also try again after a short delay in case Fancybox is still loading
+      setTimeout(updateCurrentLikeButton, 200);
+      
+      // Also try again after a longer delay to ensure Fancybox is fully initialized
+      setTimeout(updateCurrentLikeButton, 500);
+      
+      // Additional timeout to ensure like button is updated after all initialization
+      setTimeout(updateCurrentLikeButton, 1000);
+    }
+  }, [imageLikeStates, cityId]);
+
+  // Handle like toggle from Fancybox
+  const handleFancyboxLike = useCallback(async (imageId: string) => {
+    try {
+      const response = await fetch(`/api/images/${imageId}/like?type=screenshot&cityId=${cityId}`, {
+        method: 'POST',
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Update local state
+        setImageLikeStates(prev => ({
+          ...prev,
+          [imageId]: {
+            liked: data.liked,
+            count: data.likeCount
+          }
+        }));
+        
+        // Update the data attribute on the Fancybox slide
+        const currentSlide = document.querySelector('.fancybox__slide.is-selected, .fancybox__slide--current');
+        if (currentSlide) {
+          currentSlide.setAttribute('data-liked', data.liked.toString());
+          currentSlide.setAttribute('data-like-count', data.likeCount.toString());
+        }
+        
+        // Update the like button in Fancybox toolbar
+        const likeButton = document.querySelector('.f-button--like') as HTMLElement;
+        if (likeButton) {
+          if (data.liked) {
+            likeButton.classList.add('is-liked');
+            likeButton.innerHTML = '❤️ <span class="like-count">' + data.likeCount + '</span>';
+          } else {
+            likeButton.classList.remove('is-liked');
+            likeButton.innerHTML = '🤍 <span class="like-count">' + data.likeCount + '</span>';
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error toggling image like:', error);
+    }
+  }, [cityId]);
 
   // Show 12 thumbnails at a time (more with smaller thumbnails)
   const thumbnailsPerPage = 12;
@@ -203,7 +333,7 @@ export function ImageGallery({ images, cityId, isOwner, onImagesChange, deepLink
   };
 
   // Method to navigate to a specific image (for deep linking)
-  const navigateToImage = (imageId: string, imageType: string) => {
+  const navigateToImage = useCallback((imageId: string, imageType: string) => {
     if (imageType === 'screenshot') {
       // Find the image by ID (convert string to number for city images)
       const targetImageIndex = validImages.findIndex(img => img.id.toString() === imageId);
@@ -223,7 +353,7 @@ export function ImageGallery({ images, cityId, isOwner, onImagesChange, deepLink
     if (imageType === 'screenshot' || imageType === 'hall_of_fame') {
       setShowComments(true);
     }
-  };
+  }, [validImages, thumbnailsPerPage]);
 
   // Handle deep link navigation from props
   useEffect(() => {
@@ -242,7 +372,7 @@ export function ImageGallery({ images, cityId, isOwner, onImagesChange, deepLink
         hasHandledDeepLink.current = true;
       }, 100);
     }
-  }, [deepLinkImageId, deepLinkImageType, deepLinkCommentId]);
+  }, [deepLinkImageId, deepLinkImageType, deepLinkCommentId, navigateToImage]);
 
   // Initialize PhotoSwipe for screenshots
   useEffect(() => {
@@ -260,16 +390,231 @@ export function ImageGallery({ images, cityId, isOwner, onImagesChange, deepLink
     // Destroy any existing Fancybox instances for this gallery
     Fancybox.close();
     
+    // Simple function to update like button based on current image
+    const updateLikeButtonForCurrentImage = () => {
+      const likeButton = document.querySelector('.f-button--like');
+      if (!likeButton) {
+        return;
+      }
+      
+      // Check if like states are loaded
+      if (Object.keys(imageLikeStates).length === 0) {
+        return;
+      }
+      
+      // Get current image ID from Fancybox instance
+      const fancyboxInstance = Fancybox.getInstance();
+      if (fancyboxInstance) {
+        const currentSlideData = fancyboxInstance.getSlide();
+        if (currentSlideData?.src) {
+          const fancyboxLinks = document.querySelectorAll(`[data-fancybox="${galleryId}"]`);
+          const currentHref = currentSlideData.src;
+          
+          for (const link of Array.from(fancyboxLinks)) {
+            const linkHref = link.getAttribute('href');
+            if (linkHref === currentHref) {
+              const imageId = link.getAttribute('data-image-id');
+              if (imageId) {
+                // Get fresh like state from API instead of using cached state
+                const fetchAndUpdateLikeState = async () => {
+                  try {
+                    const response = await fetch(`/api/images/${imageId}/like?type=screenshot`);
+                    if (response.ok) {
+                      const data = await response.json();
+                      
+                      const countElement = likeButton.querySelector('.like-count');
+                      if (countElement) {
+                        countElement.textContent = data.likeCount.toString();
+                      }
+                      
+                      if (data.isLiked) {
+                        likeButton.classList.add('is-liked');
+                        likeButton.innerHTML = '❤️ <span class="like-count">' + data.likeCount + '</span>';
+                      } else {
+                        likeButton.classList.remove('is-liked');
+                        likeButton.innerHTML = '🤍 <span class="like-count">' + data.likeCount + '</span>';
+                      }
+                    }
+                  } catch (error) {
+                    console.error('Error fetching fresh like state:', error);
+                    // Fallback to cached state
+                    const likeState = imageLikeStates[imageId];
+                    if (likeState) {
+                      const countElement = likeButton.querySelector('.like-count');
+                      if (countElement) {
+                        countElement.textContent = likeState.count.toString();
+                      }
+                      
+                      if (likeState.liked) {
+                        likeButton.classList.add('is-liked');
+                      } else {
+                        likeButton.classList.remove('is-liked');
+                      }
+                    }
+                  }
+                };
+                
+                fetchAndUpdateLikeState();
+              }
+              break;
+            }
+          }
+        }
+      }
+    };
+    
+    // Set up polling to check for image changes
+    let lastImageSrc = '';
+    const pollForChanges = setInterval(() => {
+      const fancyboxInstance = Fancybox.getInstance();
+      if (fancyboxInstance) {
+        const currentSlideData = fancyboxInstance.getSlide();
+        if (currentSlideData?.src && currentSlideData.src !== lastImageSrc) {
+          lastImageSrc = currentSlideData.src;
+          
+          // Update like button immediately
+          setTimeout(() => {
+            updateLikeButtonForCurrentImage();
+          }, 50);
+        }
+      }
+    }, 200); // Check every 200ms
+    
     // Bind only to screenshots gallery with specific container
     const galleryContainer = document.getElementById(`screenshots-gallery-${cityId}`);
     if (galleryContainer) {
-      Fancybox.bind(galleryContainer, `[data-fancybox="${galleryId}"]`);
+      Fancybox.bind(galleryContainer, `[data-fancybox="${galleryId}"]`, {
+        on: {
+          init: (fancybox: any) => {
+            // Initial setup for first slide
+            updateLikeButtonForCurrentImage();
+            
+            // Add like button after initialization
+            setTimeout(() => {
+              // Try multiple selectors and log what we find
+              const selectors = [
+                '.f-carousel_toolbar',
+                '.fancybox__toolbar', 
+                '.fancybox-toolbar',
+                '.fancybox__container .f-carousel_toolbar',
+                '.fancybox__container .fancybox__toolbar',
+                '[class*="toolbar"]',
+                '[class*="carousel"]'
+              ];
+              
+              let toolbar = null;
+              for (const selector of selectors) {
+                toolbar = document.querySelector(selector);
+                if (toolbar) {
+                  break;
+                }
+              }
+              
+              if (toolbar) {
+                const likeButton = document.createElement('button');
+                likeButton.className = 'f-button f-button--like';
+                likeButton.title = 'Like this image';
+                likeButton.innerHTML = '🤍 <span class="like-count">0</span>';
+                // Remove inline styles to use CSS classes
+                likeButton.style.cssText = '';
+                
+                // Insert into the right column of the toolbar
+                const rightColumn = toolbar.querySelector('.f-carousel__toolbar__column.is-right');
+                if (rightColumn) {
+                  rightColumn.insertBefore(likeButton, rightColumn.firstChild);
+                } else {
+                  // Fallback: try to add to the toolbar directly
+                  toolbar.appendChild(likeButton);
+                }
+                
+                // Function to update like button state
+                const updateLikeButtonState = (imageId: string) => {
+                  const likeState = imageLikeStates[imageId];
+                  if (likeState) {
+                    const countElement = likeButton.querySelector('.like-count');
+                    if (countElement) {
+                      countElement.textContent = likeState.count.toString();
+                    }
+                    
+                    if (likeState.liked) {
+                      likeButton.classList.add('is-liked');
+                      likeButton.innerHTML = '❤️ <span class="like-count">' + likeState.count + '</span>';
+                    } else {
+                      likeButton.classList.remove('is-liked');
+                      likeButton.innerHTML = '🤍 <span class="like-count">' + likeState.count + '</span>';
+                    }
+                  }
+                };
+
+                // Get current image data and update button
+                const currentSlide = document.querySelector('.fancybox__slide.is-selected, .fancybox__slide--current');
+                if (currentSlide) {
+                  // Get image ID from slide (should now be set by our slide change handler)
+                  const imageId = currentSlide.getAttribute('data-image-id');
+                
+                  if (imageId) {
+                    updateLikeButtonState(imageId);
+                  }
+                }
+
+                // Add click handler
+                likeButton.addEventListener('click', (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  
+                  // Get current image ID from Fancybox instance
+                  const fancyboxInstance = Fancybox.getInstance();
+                  if (fancyboxInstance) {
+                    const currentSlideData = fancyboxInstance.getSlide();
+                    if (currentSlideData?.src) {
+                      const fancyboxLinks = document.querySelectorAll(`[data-fancybox="${galleryId}"]`);
+                      const currentHref = currentSlideData.src;
+                      
+                      for (const link of Array.from(fancyboxLinks)) {
+                        const linkHref = link.getAttribute('href');
+                        if (linkHref === currentHref) {
+                          const imageId = link.getAttribute('data-image-id');
+                          if (imageId) {
+                            handleFancyboxLike(imageId);
+                            
+                            // Update button state after a short delay to allow API response
+                            setTimeout(() => {
+                              updateLikeButtonForCurrentImage();
+                            }, 100);
+                          }
+                          break;
+                        }
+                      }
+                    }
+                  }
+                });
+
+                // Listen for slide changes to update like button
+                const handleSlideChange = () => {
+                  setTimeout(() => {
+                    updateLikeButtonForCurrentImage();
+                  }, 100);
+                };
+
+                // Add slide change listener
+                document.addEventListener('fancybox:slidechange', handleSlideChange);
+                document.addEventListener('fancybox:change', handleSlideChange);
+              }
+            }, 200);
+          }
+        }
+      });
     }
 
     return () => {
+      // Clear polling interval
+      clearInterval(pollForChanges);
+      
       Fancybox.destroy();
     };
-  }, [validImages, cityId]);
+  }, [cityId, handleFancyboxLike, imageLikeStates]);
+
+
 
   if (validImages.length === 0) {
     return (
@@ -281,7 +626,48 @@ export function ImageGallery({ images, cityId, isOwner, onImagesChange, deepLink
 
   return (
     <>
-
+      {/* Fancybox Like Button Styles */}
+      <style jsx global>{`
+        .f-button--like {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          padding: 8px;
+          border-radius: 4px;
+          transition: all 0.2s ease;
+          color: #ffffff;
+          font-size: 16px;
+          background: rgba(75, 85, 99, 0.8);
+          border: none;
+          cursor: pointer;
+          opacity: 0.9;
+          margin: 0 4px;
+          min-width: 32px;
+          height: 32px;
+          justify-content: center;
+        }
+        
+        .f-button--like:hover {
+          opacity: 1;
+          background-color: rgba(75, 85, 99, 1);
+        }
+        
+        .f-button--like.is-liked {
+          color: #ec4899;
+          opacity: 1;
+        }
+        
+        .f-button--like .like-count {
+          font-weight: 500;
+          font-size: 12px;
+          color: #9ca3af;
+          margin-left: 2px;
+        }
+        
+        .f-button--like.is-liked .like-count {
+          color: #ec4899;
+        }
+      `}</style>
       
       {/* Main Gallery View */}
       <div className="mb-6">
@@ -294,12 +680,16 @@ export function ImageGallery({ images, cityId, isOwner, onImagesChange, deepLink
               if (currentMainImage && image.id === currentMainImage.id) {
                 return null;
               }
+              const likeState = imageLikeStates[image.id.toString()] || { liked: false, count: 0 };
               return (
                 <a
                   key={`fancybox-hidden-${image.id}`}
                   href={image.originalPath!}
                   data-fancybox={`screenshots-${cityId}`}
                   data-caption={image.originalName!}
+                  data-image-id={image.id.toString()}
+                  data-liked={likeState.liked.toString()}
+                  data-like-count={likeState.count.toString()}
                 >
                   <img 
                     src={image.thumbnailPath || image.mediumPath || ''} 
@@ -323,6 +713,9 @@ export function ImageGallery({ images, cityId, isOwner, onImagesChange, deepLink
                 href={displayedThumbnails[mainGalleryIndex].originalPath!}
                 data-fancybox={`screenshots-${cityId}`}
                 data-caption={displayedThumbnails[mainGalleryIndex].originalName!}
+                data-image-id={displayedThumbnails[mainGalleryIndex].id.toString()}
+                data-liked={(imageLikeStates[displayedThumbnails[mainGalleryIndex].id.toString()]?.liked || false).toString()}
+                data-like-count={(imageLikeStates[displayedThumbnails[mainGalleryIndex].id.toString()]?.count || 0).toString()}
                 className="block w-full h-full cursor-pointer"
               >
                 <Image
@@ -485,6 +878,9 @@ export function ImageGallery({ images, cityId, isOwner, onImagesChange, deepLink
                     href={image.originalPath!}
                     data-fancybox={`screenshots-${cityId}`}
                     data-caption={image.originalName!}
+                    data-image-id={image.id.toString()}
+                    data-liked={(imageLikeStates[image.id.toString()]?.liked || false).toString()}
+                    data-like-count={(imageLikeStates[image.id.toString()]?.count || 0).toString()}
                     className="block w-full h-full absolute inset-0 z-10"
                     onClick={(e) => {
                       e.preventDefault(); // Prevent default link behavior

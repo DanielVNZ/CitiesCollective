@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { CityCard } from 'app/components/CityCard';
 
@@ -52,7 +52,7 @@ export function ClientPaginationWrapper({
   const [isLoading, setIsLoading] = useState(false);
   const searchParams = useSearchParams();
 
-  const navigateToPage = async (newPage: number) => {
+  const navigateToPage = useCallback(async (newPage: number) => {
     if (newPage < 1 || newPage > totalPages || newPage === page || isLoading) return;
     
     setIsLoading(true);
@@ -78,7 +78,7 @@ export function ClientPaginationWrapper({
     const params = new URLSearchParams(searchParams.toString());
     params.set('page', newPage.toString());
     window.history.replaceState({}, '', `/?${params.toString()}`);
-  };
+  }, [page, totalPages, isLoading, itemsPerPage, searchParams]);
 
   // Update local state when URL changes (e.g., browser back/forward)
   useEffect(() => {
@@ -86,7 +86,7 @@ export function ClientPaginationWrapper({
     if (urlPage !== page) {
       navigateToPage(urlPage);
     }
-  }, [searchParams]);
+  }, [searchParams, navigateToPage, page]);
 
   const newOffset = (page - 1) * itemsPerPage;
 

@@ -334,7 +334,7 @@ export function Comments({ cityId }: CommentsProps) {
       };
 
       fetchUserId();
-    }, [username, userIdCache]);
+    }, [username]);
 
     if (isLoading) {
       return <span className={`${usernameTextColor} font-medium`}>@{username}</span>;
