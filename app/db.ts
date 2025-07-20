@@ -407,6 +407,61 @@ export async function getTotalCityCount() {
   return result[0]?.count || 0;
 }
 
+export async function getTotalUserCount() {
+  const users = await ensureTableExists();
+  
+  const result = await db.select({ count: sql<number>`COUNT(*)` })
+    .from(users);
+  
+  return result[0]?.count || 0;
+}
+
+export async function getTotalLikesCount() {
+  await ensureLikesTableExists();
+  await ensureImageLikesTableExists();
+  
+  // Count city likes + image likes
+  const cityLikes = await client`SELECT COUNT(*) as count FROM likes`;
+  const imageLikes = await client`SELECT COUNT(*) as count FROM "imageLikes"`;
+  
+  // Convert to numbers to ensure proper addition
+  const cityLikesCount = parseInt(cityLikes[0]?.count || 0);
+  const imageLikesCount = parseInt(imageLikes[0]?.count || 0);
+  
+  return cityLikesCount + imageLikesCount;
+}
+
+export async function getTotalCommentsCount() {
+  await ensureCommentsTableExists();
+  await ensureImageCommentsTableExists();
+  
+  // Count city comments + image comments
+  const cityComments = await client`SELECT COUNT(*) as count FROM comments`;
+  const imageComments = await client`SELECT COUNT(*) as count FROM "imageComments"`;
+  
+  // Convert to numbers to ensure proper addition
+  const cityCommentsCount = parseInt(cityComments[0]?.count || 0);
+  const imageCommentsCount = parseInt(imageComments[0]?.count || 0);
+  
+  return cityCommentsCount + imageCommentsCount;
+}
+
+export async function getCommunityStats() {
+  const [totalUsers, totalCities, totalLikes, totalComments] = await Promise.all([
+    getTotalUserCount(),
+    getTotalCityCount(),
+    getTotalLikesCount(),
+    getTotalCommentsCount(),
+  ]);
+
+  return {
+    totalUsers,
+    totalCities,
+    totalLikes,
+    totalComments,
+  };
+}
+
 async function ensureTableExists() {
   const cacheKey = 'User';
   

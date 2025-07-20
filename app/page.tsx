@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import Link from 'next/link';
-import { getRecentCities, getTopCitiesWithImages, getContentCreatorCities, isUserAdmin, getTotalCityCount } from 'app/db';
+import { getRecentCities, getTopCitiesWithImages, getContentCreatorCities, isUserAdmin, getTotalCityCount, getCommunityStats } from 'app/db';
 import { CityCard } from 'app/components/CityCard';
 import { QuickSearch } from 'app/components/QuickSearch';
 import { Header } from 'app/components/Header';
@@ -9,6 +9,7 @@ import { auth } from 'app/auth';
 import { HeroCarousel } from 'app/components/HeroCarousel';
 import { CommunityFavorites } from 'app/components/CommunityFavorites';
 import { ClientPaginationWrapper } from 'app/components/ClientPaginationWrapper';
+import { StatsSection } from 'app/components/StatsSection';
 
 export default async function Page({ searchParams }: { searchParams?: { page?: string } }) {
   const currentPage = Math.max(1, parseInt(searchParams?.page || '1'));
@@ -21,6 +22,7 @@ export default async function Page({ searchParams }: { searchParams?: { page?: s
   
   const topCitiesWithImages = await getTopCitiesWithImages(25);
   const contentCreatorCities = await getContentCreatorCities(6);
+  const communityStats = await getCommunityStats();
   const session = await auth();
   const isAdmin = session?.user?.email ? await isUserAdmin(session.user.email) : false;
 
@@ -89,7 +91,11 @@ export default async function Page({ searchParams }: { searchParams?: { page?: s
 
         {/* Quick Links Section */}
         <section className="mb-16 sm:mb-24 bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700">
-           <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-8 text-center">Get Started</h2>
+           <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-8 text-center">Quick Actions and Stats</h2>
+           
+           {/* Community Stats Section */}
+           <StatsSection stats={communityStats} />
+           
            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
              {quickLinks.map((link) => (
                <Link

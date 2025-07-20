@@ -49,3 +49,4 @@ public/uploads/cities/*
 # package manager conflicts
 package-lock.json
 yarn.lock
+update-osm-urls.js

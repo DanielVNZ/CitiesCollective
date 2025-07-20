@@ -6,7 +6,7 @@ const R2_ENDPOINT = process.env.R2_ENDPOINT!;
 const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID!;
 const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY!;
 const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME!;
-const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL!; // e.g., https://pub-ba1c78e7f54646c4bd11875db43f3c72.r2.dev
+const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL!; // e.g., https://bucket.citiescollective.space
 
 // Initialize S3 client for R2
 const s3Client = new S3Client({
