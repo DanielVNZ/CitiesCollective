@@ -460,11 +460,12 @@ export async function getTotalCommentsCount() {
 }
 
 export async function getCommunityStats() {
-  const [totalUsers, totalCities, totalLikes, totalComments] = await Promise.all([
+  const [totalUsers, totalCities, totalLikes, totalComments, totalViews] = await Promise.all([
     getTotalUserCount(),
     getTotalCityCount(),
     getTotalLikesCount(),
     getTotalCommentsCount(),
+    getTotalHomePageViews()
   ]);
 
   return {
@@ -472,6 +473,7 @@ export async function getCommunityStats() {
     totalCities,
     totalLikes,
     totalComments,
+    totalViews
   };
 }
 
@@ -4187,4 +4189,84 @@ export async function hasViewedCity(cityId: number, sessionId: string) {
     .limit(1);
   
   return result.length > 0;
+}
+
+// Home page views tracking
+const homePageViewsTable = pgTable('homePageViews', {
+  id: serial('id').primaryKey(),
+  sessionId: varchar('sessionId', { length: 255 }).notNull(),
+  lastViewedAt: timestamp('lastViewedAt').defaultNow(),
+  createdAt: timestamp('createdAt').defaultNow(),
+});
+
+async function ensureHomePageViewsTableExists() {
+  if (tableInitCache.has('homePageViews')) {
+    return homePageViewsTable;
+  }
+
+  const result = await client`
+    SELECT EXISTS (
+      SELECT FROM information_schema.tables 
+      WHERE table_schema = 'public' 
+      AND table_name = 'homePageViews'
+    );`;
+
+  if (!result[0].exists) {
+    await client`
+      CREATE TABLE "homePageViews" (
+        "id" SERIAL PRIMARY KEY,
+        "sessionId" VARCHAR(255) NOT NULL,
+        "lastViewedAt" TIMESTAMP DEFAULT NOW(),
+        "createdAt" TIMESTAMP DEFAULT NOW()
+      );`;
+  }
+
+  tableInitCache.add('homePageViews');
+  return homePageViewsTable;
+}
+
+export async function recordHomePageView(sessionId: string) {
+  await ensureHomePageViewsTableExists();
+  
+  const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
+  
+  // Check if this session has viewed the home page in the last 30 minutes
+  const existingView = await db.select()
+    .from(homePageViewsTable)
+    .where(and(
+      eq(homePageViewsTable.sessionId, sessionId),
+      gte(homePageViewsTable.lastViewedAt, thirtyMinutesAgo)
+    ))
+    .limit(1);
+  
+  if (existingView.length === 0) {
+    // No recent view, create a new record or update existing
+    const existingRecord = await db.select()
+      .from(homePageViewsTable)
+      .where(eq(homePageViewsTable.sessionId, sessionId))
+      .limit(1);
+    
+    if (existingRecord.length > 0) {
+      // Update existing record
+      await db.update(homePageViewsTable)
+        .set({ lastViewedAt: new Date() })
+        .where(eq(homePageViewsTable.sessionId, sessionId));
+    } else {
+      // Create new record
+      await db.insert(homePageViewsTable).values({
+        sessionId,
+        lastViewedAt: new Date(),
+        createdAt: new Date()
+      });
+    }
+  }
+}
+
+export async function getTotalHomePageViews() {
+  await ensureHomePageViewsTableExists();
+  
+  const result = await db.select({ count: homePageViewsTable.id })
+    .from(homePageViewsTable);
+  
+  return result.length;
 }
