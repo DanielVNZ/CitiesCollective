@@ -59,7 +59,7 @@ export function StatsSection({ stats }: StatsSectionProps) {
           <div className="text-2xl font-bold text-red-700 dark:text-red-300 mb-1">
             {formatNumber(stats.totalViews)}
           </div>
-          <div className="text-sm text-red-600 dark:text-red-400">Total Website Views</div>
+          <div className="text-sm text-red-600 dark:text-red-400">Total Home Page Views</div>
           <div className="text-[10px] text-red-600 dark:text-red-400 mt-1">from 20/07/2025</div>
         </div>
       </div>

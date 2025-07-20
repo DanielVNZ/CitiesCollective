@@ -4228,38 +4228,12 @@ async function ensureHomePageViewsTableExists() {
 export async function recordHomePageView(sessionId: string) {
   await ensureHomePageViewsTableExists();
   
-  const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
-  
-  // Check if this session has viewed the home page in the last 30 minutes
-  const existingView = await db.select()
-    .from(homePageViewsTable)
-    .where(and(
-      eq(homePageViewsTable.sessionId, sessionId),
-      gte(homePageViewsTable.lastViewedAt, thirtyMinutesAgo)
-    ))
-    .limit(1);
-  
-  if (existingView.length === 0) {
-    // No recent view, create a new record or update existing
-    const existingRecord = await db.select()
-      .from(homePageViewsTable)
-      .where(eq(homePageViewsTable.sessionId, sessionId))
-      .limit(1);
-    
-    if (existingRecord.length > 0) {
-      // Update existing record
-      await db.update(homePageViewsTable)
-        .set({ lastViewedAt: new Date() })
-        .where(eq(homePageViewsTable.sessionId, sessionId));
-    } else {
-      // Create new record
-      await db.insert(homePageViewsTable).values({
-        sessionId,
-        lastViewedAt: new Date(),
-        createdAt: new Date()
-      });
-    }
-  }
+  // Industry standard: Record every page view, no timeout restrictions
+  await db.insert(homePageViewsTable).values({
+    sessionId,
+    lastViewedAt: new Date(),
+    createdAt: new Date()
+  });
 }
 
 export async function getTotalHomePageViews() {
