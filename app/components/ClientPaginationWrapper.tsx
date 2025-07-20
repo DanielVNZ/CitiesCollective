@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { CityCard } from 'app/components/CityCard';
+import { ImageFilterToggle } from 'app/components/ImageFilterToggle';
 
 interface City {
   id: number;
@@ -37,6 +38,7 @@ interface ClientPaginationWrapperProps {
   totalItems: number;
   itemsPerPage: number;
   offset: number;
+  citiesWithImages: number;
 }
 
 export function ClientPaginationWrapper({ 
@@ -45,12 +47,14 @@ export function ClientPaginationWrapper({
   totalPages, 
   totalItems, 
   itemsPerPage, 
-  offset 
+  offset,
+  citiesWithImages
 }: ClientPaginationWrapperProps) {
+  const searchParams = useSearchParams();
   const [page, setPage] = useState(currentPage);
   const [cities, setCities] = useState<City[]>(initialCities);
   const [isLoading, setIsLoading] = useState(false);
-  const searchParams = useSearchParams();
+  const [showOnlyWithImages, setShowOnlyWithImages] = useState(searchParams.get('withImages') === 'true');
 
   const navigateToPage = useCallback(async (newPage: number) => {
     if (newPage < 1 || newPage > totalPages || newPage === page || isLoading) return;
@@ -60,7 +64,7 @@ export function ClientPaginationWrapper({
     
     try {
       const newOffset = (newPage - 1) * itemsPerPage;
-      const response = await fetch(`/api/cities/recent?limit=${itemsPerPage}&offset=${newOffset}`);
+      const response = await fetch(`/api/cities/recent?limit=${itemsPerPage}&offset=${newOffset}&withImages=${showOnlyWithImages}`);
       
       if (response.ok) {
         const data = await response.json();
@@ -77,21 +81,78 @@ export function ClientPaginationWrapper({
     // Update URL without causing navigation
     const params = new URLSearchParams(searchParams.toString());
     params.set('page', newPage.toString());
+    if (showOnlyWithImages) {
+      params.set('withImages', 'true');
+    } else {
+      params.delete('withImages');
+    }
     window.history.replaceState({}, '', `/?${params.toString()}`);
-  }, [page, totalPages, isLoading, itemsPerPage, searchParams]);
+  }, [page, totalPages, isLoading, itemsPerPage, searchParams, showOnlyWithImages]);
 
   // Update local state when URL changes (e.g., browser back/forward)
   useEffect(() => {
     const urlPage = parseInt(searchParams.get('page') || '1');
+    const urlWithImages = searchParams.get('withImages') === 'true';
+    
+    // Only update page if different
     if (urlPage !== page) {
-      navigateToPage(urlPage);
+      setPage(urlPage);
     }
-  }, [searchParams, navigateToPage, page]);
+  }, [searchParams, page]);
 
   const newOffset = (page - 1) * itemsPerPage;
 
+  const handleToggleImages = useCallback(async (showOnly: boolean) => {
+    // Update state immediately for visual feedback
+    setShowOnlyWithImages(showOnly);
+    setPage(1); // Reset to first page when filtering
+    setIsLoading(true);
+    
+    try {
+      const response = await fetch(`/api/cities/recent?limit=${itemsPerPage}&offset=0&withImages=${showOnly}`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        setCities(data.cities || []);
+      } else {
+        console.error('Failed to fetch cities');
+        // Revert state if fetch failed
+        setShowOnlyWithImages(!showOnly);
+      }
+    } catch (error) {
+      console.error('Error fetching cities:', error);
+      // Revert state if fetch failed
+      setShowOnlyWithImages(!showOnly);
+    } finally {
+      setIsLoading(false);
+    }
+    
+    // Update URL without causing navigation
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('page', '1');
+    if (showOnly) {
+      params.set('withImages', 'true');
+    } else {
+      params.delete('withImages');
+    }
+    window.history.replaceState({}, '', `/?${params.toString()}`);
+  }, [itemsPerPage, searchParams]);
+
+  // Filter cities based on toggle
+  const filteredCities = showOnlyWithImages 
+    ? cities.filter(city => city.images && city.images.length > 0)
+    : cities;
+
   return (
     <>
+      {/* Image Filter Toggle */}
+      <ImageFilterToggle
+        showOnlyWithImages={showOnlyWithImages}
+        onToggle={handleToggleImages}
+        citiesWithImages={citiesWithImages}
+        totalCities={totalItems}
+      />
+
       {/* Cities Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         {isLoading ? (
@@ -111,7 +172,7 @@ export function ClientPaginationWrapper({
             </div>
           ))
         ) : (
-          cities.map((city) => (
+          filteredCities.map((city) => (
             <CityCard key={city.id} city={city} />
           ))
         )}

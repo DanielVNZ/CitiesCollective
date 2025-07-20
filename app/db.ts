@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/postgres-js';
 import { pgTable, serial, varchar, integer, boolean, json, text, timestamp, index } from 'drizzle-orm/pg-core';
-import { eq, desc, and, ilike, gte, lte, or, asc, sql } from 'drizzle-orm';
+import { eq, desc, and, ilike, gte, lte, or, asc, sql, exists } from 'drizzle-orm';
 import postgres from 'postgres';
 import { genSaltSync, hashSync } from 'bcrypt-ts';
 import { getDownloadUrl } from 'app/utils/r2';
@@ -405,6 +405,19 @@ export async function getTotalCityCount() {
     .from(cityTable);
   
   return result[0]?.count || 0;
+}
+
+export async function getCitiesWithImagesCount() {
+  await ensureCityTableExists();
+  await ensureCityImagesTableExists();
+  
+  const result = await client`
+    SELECT COUNT(DISTINCT c.id) as count 
+    FROM "City" c 
+    INNER JOIN "cityImages" ci ON c.id = ci."cityId"
+  `;
+  
+  return parseInt(result[0]?.count || 0);
 }
 
 export async function getTotalUserCount() {
@@ -849,7 +862,7 @@ async function ensureCityTableExists() {
   return cityTable;
 }
 
-export async function getRecentCities(limit: number = 12, offset: number = 0) {
+export async function getRecentCities(limit: number = 12, offset: number = 0, withImages: boolean = false) {
   await ensureCityTableExists();
   await ensureCityImagesTableExists();
   await ensureHallOfFameCacheTableExists();
@@ -951,6 +964,11 @@ export async function getRecentCities(limit: number = 12, offset: number = 0) {
     const dateB = b.uploadedAt ? new Date(b.uploadedAt).getTime() : 0;
     return dateB - dateA;
   });
+
+  // Filter by images if requested
+  if (withImages) {
+    return allCitiesWithHof.filter(city => city.images && city.images.length > 0);
+  }
 
   return allCitiesWithHof;
 }
@@ -1579,10 +1597,12 @@ export interface SearchFilters {
   query?: string;
   theme?: string;
   gameMode?: string;
+  contentCreator?: string;
   minPopulation?: number;
   maxPopulation?: number;
   minMoney?: number;
   maxMoney?: number;
+  withImages?: boolean;
   sortBy?: 'newest' | 'oldest' | 'population' | 'money' | 'xp' | 'name';
   sortOrder?: 'asc' | 'desc';
 }
@@ -1615,10 +1635,23 @@ export async function searchCities(
   }
   if (filters.theme) conditions.push(eq(cityTable.theme, filters.theme));
   if (filters.gameMode) conditions.push(eq(cityTable.gameMode, filters.gameMode));
+  if (filters.contentCreator) conditions.push(eq(userTable.username, filters.contentCreator));
   if (filters.minPopulation) conditions.push(gte(cityTable.population, filters.minPopulation));
   if (filters.maxPopulation) conditions.push(lte(cityTable.population, filters.maxPopulation));
   if (filters.minMoney) conditions.push(gte(cityTable.money, filters.minMoney));
   if (filters.maxMoney) conditions.push(lte(cityTable.money, filters.maxMoney));
+  if (filters.withImages) {
+    conditions.push(
+      or(
+        exists(
+          db.select().from(cityImagesTable).where(eq(cityImagesTable.cityId, cityTable.id))
+        ),
+        exists(
+          db.select().from(hallOfFameCacheTable).where(eq(hallOfFameCacheTable.cityName, cityTable.cityName))
+        )
+      )
+    );
+  }
 
   // Determine sorting
   const sortBy = filters.sortBy || 'newest';
@@ -1857,6 +1890,11 @@ export async function getSearchCitiesCount(filters: SearchFilters = {}) {
     conditions.push(eq(cityTable.gameMode, filters.gameMode));
   }
   
+  // Content creator filter
+  if (filters.contentCreator) {
+    conditions.push(eq(userTable.username, filters.contentCreator));
+  }
+  
   // Population range
   if (filters.minPopulation !== undefined) {
     conditions.push(gte(cityTable.population, filters.minPopulation));
@@ -1871,6 +1909,22 @@ export async function getSearchCitiesCount(filters: SearchFilters = {}) {
   }
   if (filters.maxMoney !== undefined) {
     conditions.push(lte(cityTable.money, filters.maxMoney));
+  }
+  
+  // With images filter
+  if (filters.withImages) {
+    await ensureCityImagesTableExists();
+    await ensureHallOfFameCacheTableExists();
+    conditions.push(
+      or(
+        exists(
+          db.select().from(cityImagesTable).where(eq(cityImagesTable.cityId, cityTable.id))
+        ),
+        exists(
+          db.select().from(hallOfFameCacheTable).where(eq(hallOfFameCacheTable.cityName, cityTable.cityName))
+        )
+      )
+    );
   }
   
   // Build and execute the count query
@@ -1904,6 +1958,19 @@ export async function getUniqueGameModes() {
     .groupBy(cityTable.gameMode)
     .orderBy(asc(cityTable.gameMode));
   return result.map(row => row.gameMode).filter(gameMode => gameMode);
+}
+
+export async function getContentCreators() {
+  const userTable = await ensureTableExists();
+  const result = await db.select({ 
+    id: userTable.id,
+    username: userTable.username,
+    email: userTable.email
+  })
+    .from(userTable)
+    .where(eq(userTable.isContentCreator, true))
+    .orderBy(asc(userTable.username));
+  return result.filter(user => user.username); // Only return users with usernames
 }
 
 async function ensureCityImagesTableExists() {

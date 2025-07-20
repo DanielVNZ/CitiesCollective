@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { searchCities, getSearchCitiesCount, getUniqueThemes, getUniqueGameModes, SearchFilters } from 'app/db';
+import { searchCities, getSearchCitiesCount, getUniqueThemes, getUniqueGameModes, getContentCreators, SearchFilters } from 'app/db';
 
 export async function GET(req: NextRequest) {
   try {
@@ -10,9 +10,16 @@ export async function GET(req: NextRequest) {
       query: searchParams.get('query') || undefined,
       theme: searchParams.get('theme') || undefined,
       gameMode: searchParams.get('gameMode') || undefined,
+      contentCreator: searchParams.get('contentCreator') || undefined,
       sortBy: (searchParams.get('sortBy') as SearchFilters['sortBy']) || 'newest',
       sortOrder: (searchParams.get('sortOrder') as SearchFilters['sortOrder']) || 'desc',
     };
+    
+    // Handle withImages filter
+    const withImages = searchParams.get('withImages');
+    if (withImages === 'true') {
+      filters.withImages = true;
+    }
     
     // Handle numeric filters
     const minPopulation = searchParams.get('minPopulation');
@@ -69,14 +76,19 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     
     if (body.action === 'getFilterOptions') {
-      const [themes, gameModes] = await Promise.all([
+      const [themes, gameModes, contentCreators] = await Promise.all([
         getUniqueThemes(),
-        getUniqueGameModes()
+        getUniqueGameModes(),
+        getContentCreators()
       ]);
       
       return NextResponse.json({
         themes,
         gameModes,
+        contentCreators: contentCreators.map(creator => ({
+          value: creator.username,
+          label: creator.username
+        })),
         sortOptions: [
           { value: 'newest', label: 'Newest First' },
           { value: 'oldest', label: 'Oldest First' },

@@ -9,12 +9,13 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get('limit') || '9');
     const offset = parseInt(searchParams.get('offset') || '0');
+    const withImages = searchParams.get('withImages') === 'true';
 
     if (isNaN(limit) || isNaN(offset)) {
       return NextResponse.json({ error: 'Invalid limit or offset' }, { status: 400 });
     }
 
-    const cities = await getRecentCities(limit, offset);
+    const cities = await getRecentCities(limit, offset, withImages);
 
     return NextResponse.json({
       cities,

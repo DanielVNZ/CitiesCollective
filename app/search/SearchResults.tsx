@@ -78,10 +78,12 @@ export function SearchResults() {
   if (filters.query) activeFilters.push(`"${filters.query}"`);
   if (filters.theme) activeFilters.push(`Theme: ${filters.theme}`);
   if (filters.gameMode) activeFilters.push(`Mode: ${filters.gameMode}`);
+  if (filters.contentCreator) activeFilters.push(`Creator: ${filters.contentCreator}`);
   if (filters.minPopulation) activeFilters.push(`Min Population: ${filters.minPopulation.toLocaleString()}`);
   if (filters.maxPopulation) activeFilters.push(`Max Population: ${filters.maxPopulation.toLocaleString()}`);
   if (filters.minMoney) activeFilters.push(`Min Money: $${filters.minMoney.toLocaleString()}`);
   if (filters.maxMoney) activeFilters.push(`Max Money: $${filters.maxMoney.toLocaleString()}`);
+  if (filters.withImages) activeFilters.push(`Cities with images`);
 
   const generatePageUrl = (page: number) => {
     const params = new URLSearchParams(searchParams.toString());

@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 interface FilterOptions {
   themes: string[];
   gameModes: string[];
+  contentCreators: { value: string; label: string }[];
   sortOptions: { value: string; label: string }[];
 }
 
@@ -16,16 +17,19 @@ export function SearchBar() {
   const [query, setQuery] = useState(searchParams.get('query') || '');
   const [theme, setTheme] = useState(searchParams.get('theme') || '');
   const [gameMode, setGameMode] = useState(searchParams.get('gameMode') || '');
+  const [contentCreator, setContentCreator] = useState(searchParams.get('contentCreator') || '');
   const [sortBy, setSortBy] = useState(searchParams.get('sortBy') || 'newest');
   const [sortOrder, setSortOrder] = useState(searchParams.get('sortOrder') || 'desc');
   const [minPopulation, setMinPopulation] = useState(searchParams.get('minPopulation') || '');
   const [maxPopulation, setMaxPopulation] = useState(searchParams.get('maxPopulation') || '');
   const [minMoney, setMinMoney] = useState(searchParams.get('minMoney') || '');
   const [maxMoney, setMaxMoney] = useState(searchParams.get('maxMoney') || '');
+  const [withImages, setWithImages] = useState(searchParams.get('withImages') === 'true');
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [filterOptions, setFilterOptions] = useState<FilterOptions>({
     themes: [],
     gameModes: [],
+    contentCreators: [],
     sortOptions: []
   });
 
@@ -50,12 +54,14 @@ export function SearchBar() {
       query: query.trim() || undefined,
       theme: theme || undefined,
       gameMode: gameMode || undefined,
+      contentCreator: contentCreator || undefined,
       sortBy,
       sortOrder,
       minPopulation: minPopulation || undefined,
       maxPopulation: maxPopulation || undefined,
       minMoney: minMoney || undefined,
       maxMoney: maxMoney || undefined,
+      withImages: withImages ? 'true' : undefined,
     };
     const cleanFilters = Object.fromEntries(Object.entries(filters).filter(([, value]) => value !== undefined));
     router.push(`/search?${new URLSearchParams(cleanFilters as any).toString()}`);
@@ -65,12 +71,14 @@ export function SearchBar() {
     setQuery('');
     setTheme('');
     setGameMode('');
+    setContentCreator('');
     setSortBy('newest');
     setSortOrder('desc');
     setMinPopulation('');
     setMaxPopulation('');
     setMinMoney('');
     setMaxMoney('');
+    setWithImages(false);
     setShowAdvanced(false);
     router.push('/search');
   };
@@ -122,12 +130,16 @@ export function SearchBar() {
             {/* Quick Selects */}
             <FilterSelect label="Theme" value={theme} onChange={setTheme} options={filterOptions.themes} placeholder="All Themes" />
             <FilterSelect label="Game Mode" value={gameMode} onChange={setGameMode} options={filterOptions.gameModes} placeholder="All Modes" />
+            <FilterSelect label="Content Creator" value={contentCreator} onChange={setContentCreator} options={filterOptions.contentCreators} placeholder="All Creators" />
             <FilterSelect label="Sort By" value={sortBy} onChange={setSortBy} options={filterOptions.sortOptions.map(o => ({ value: o.value, label: o.label }))} />
             <FilterSelect label="Order" value={sortOrder} onChange={setSortOrder} options={[{ value: 'desc', label: 'High to Low' }, { value: 'asc', label: 'Low to High' }]} />
             
             {/* Range Filters */}
             <RangeInput label="Population" min={minPopulation} setMin={setMinPopulation} max={maxPopulation} setMax={setMaxPopulation} />
             <RangeInput label="Money ($)" min={minMoney} setMin={setMinMoney} max={maxMoney} setMax={setMaxMoney} />
+            
+            {/* Image Filter Toggle */}
+            <ImageToggle label="Cities with images" value={withImages} onChange={setWithImages} />
           </div>
 
           <div className="flex justify-between items-center mt-8">
@@ -174,6 +186,32 @@ function RangeInput({ label, min, setMin, max, setMax }: any) {
         <span className="text-gray-500 dark:text-gray-400">to</span>
         <input type="number" placeholder="Max" value={max} onChange={(e) => setMax(e.target.value)} className="w-full h-11 px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 transition-all" />
       </div>
+    </div>
+  );
+}
+
+function ImageToggle({ label, value, onChange }: { label: string; value: boolean; onChange: (value: boolean) => void }) {
+  return (
+    <div className="flex items-center justify-between">
+      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">{label}</label>
+      <button
+        type="button"
+        onClick={() => onChange(!value)}
+        className={`
+          relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
+          ${value 
+            ? 'bg-blue-600' 
+            : 'bg-gray-200 dark:bg-gray-700'
+          }
+        `}
+      >
+        <span
+          className={`
+            inline-block h-4 w-4 transform rounded-full bg-white transition-transform
+            ${value ? 'translate-x-6' : 'translate-x-1'}
+          `}
+        />
+      </button>
     </div>
   );
 } 

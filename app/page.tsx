@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import Link from 'next/link';
-import { getRecentCities, getTopCitiesWithImages, getContentCreatorCities, isUserAdmin, getTotalCityCount, getCommunityStats } from 'app/db';
+import { getRecentCities, getTopCitiesWithImages, getContentCreatorCities, isUserAdmin, getTotalCityCount, getCommunityStats, getCitiesWithImagesCount } from 'app/db';
 import { CityCard } from 'app/components/CityCard';
 import { QuickSearch } from 'app/components/QuickSearch';
 import { Header } from 'app/components/Header';
@@ -18,6 +18,7 @@ export default async function Page({ searchParams }: { searchParams?: { page?: s
   
   const cities = await getRecentCities(citiesPerPage, offset);
   const totalCities = await getTotalCityCount();
+  const citiesWithImages = await getCitiesWithImagesCount();
   const totalPages = Math.ceil(totalCities / citiesPerPage);
   
   const topCitiesWithImages = await getTopCitiesWithImages(25);
@@ -161,6 +162,7 @@ export default async function Page({ searchParams }: { searchParams?: { page?: s
                 totalItems={totalCities}
                 itemsPerPage={citiesPerPage}
                 offset={offset}
+                citiesWithImages={citiesWithImages}
               />
             </>
           )}
