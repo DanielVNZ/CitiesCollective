@@ -331,6 +331,11 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
 
   // Initialize Fancybox
   useEffect(() => {
+    // Check if Fancybox is available (client-side only)
+    if (typeof window === 'undefined' || !Fancybox) {
+      return;
+    }
+    
     // Use a unique identifier for this specific Hall of Fame gallery
     const galleryId = `hall-of-fame-${cityId}`;
     
@@ -492,10 +497,7 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
                 updateLikeButtonForCurrentImage();
 
                 // Add click handler
-                likeButton.addEventListener('click', (e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  
+                likeButton.onclick = (e) => {
                   // Get current image ID from Fancybox instance
                   const fancyboxInstance = Fancybox.getInstance();
                   if (fancyboxInstance) {
@@ -521,7 +523,7 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
                       }
                     }
                   }
-                });
+                };
 
                 // Listen for slide changes to update like button
                 const handleSlideChange = () => {
@@ -532,7 +534,6 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
 
                 // Add slide change listener
                 document.addEventListener('fancybox:slidechange', handleSlideChange);
-                document.addEventListener('fancybox:change', handleSlideChange);
               }
             }, 200);
           }
@@ -546,7 +547,7 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
       
       Fancybox.destroy();
     };
-  }, [cityId, handleFancyboxLike, imageLikeStates]);
+  }, [cityId, handleFancyboxLike]);
 
   // Track view when main image is displayed (larger format)
   useEffect(() => {

@@ -384,11 +384,20 @@ export function ImageGallery({ images, cityId, isOwner, onImagesChange, deepLink
 
   // Initialize Fancybox for screenshots
   useEffect(() => {
-    // Use a unique identifier for this specific gallery to avoid conflicts
+    // Check if Fancybox is available (client-side only)
+    if (typeof window === 'undefined' || !Fancybox) {
+      return;
+    }
+    
+        // Use a unique identifier for this specific gallery to avoid conflicts
     const galleryId = `screenshots-${cityId}`;
     
     // Destroy any existing Fancybox instances for this gallery
-    Fancybox.close();
+    try {
+      Fancybox.close();
+    } catch (error) {
+      // Ignore errors during cleanup
+    }
     
     // Simple function to update like button based on current image
     const updateLikeButtonForCurrentImage = () => {
@@ -475,10 +484,10 @@ export function ImageGallery({ images, cityId, isOwner, onImagesChange, deepLink
           // Update like button immediately
           setTimeout(() => {
             updateLikeButtonForCurrentImage();
-          }, 50);
+          }, 100);
         }
       }
-    }, 200); // Check every 200ms
+    }, 500); // Check every 500ms
     
     // Bind only to screenshots gallery with specific container
     const galleryContainer = document.getElementById(`screenshots-gallery-${cityId}`);
@@ -486,9 +495,6 @@ export function ImageGallery({ images, cityId, isOwner, onImagesChange, deepLink
       Fancybox.bind(galleryContainer, `[data-fancybox="${galleryId}"]`, {
         on: {
           init: (fancybox: any) => {
-            // Initial setup for first slide
-            updateLikeButtonForCurrentImage();
-            
             // Add like button after initialization
             setTimeout(() => {
               // Try multiple selectors and log what we find
@@ -547,21 +553,12 @@ export function ImageGallery({ images, cityId, isOwner, onImagesChange, deepLink
                 };
 
                 // Get current image data and update button
-                const currentSlide = document.querySelector('.fancybox__slide.is-selected, .fancybox__slide--current');
-                if (currentSlide) {
-                  // Get image ID from slide (should now be set by our slide change handler)
-                  const imageId = currentSlide.getAttribute('data-image-id');
-                
-                  if (imageId) {
-                    updateLikeButtonState(imageId);
-                  }
-                }
+                setTimeout(() => {
+                  updateLikeButtonForCurrentImage();
+                }, 300);
 
                 // Add click handler
-                likeButton.addEventListener('click', (e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  
+                likeButton.onclick = (e) => {
                   // Get current image ID from Fancybox instance
                   const fancyboxInstance = Fancybox.getInstance();
                   if (fancyboxInstance) {
@@ -587,7 +584,7 @@ export function ImageGallery({ images, cityId, isOwner, onImagesChange, deepLink
                       }
                     }
                   }
-                });
+                };
 
                 // Listen for slide changes to update like button
                 const handleSlideChange = () => {
@@ -598,7 +595,6 @@ export function ImageGallery({ images, cityId, isOwner, onImagesChange, deepLink
 
                 // Add slide change listener
                 document.addEventListener('fancybox:slidechange', handleSlideChange);
-                document.addEventListener('fancybox:change', handleSlideChange);
               }
             }, 200);
           }
@@ -612,7 +608,7 @@ export function ImageGallery({ images, cityId, isOwner, onImagesChange, deepLink
       
       Fancybox.destroy();
     };
-  }, [cityId, handleFancyboxLike, imageLikeStates]);
+  }, [cityId, handleFancyboxLike]);
 
 
 
