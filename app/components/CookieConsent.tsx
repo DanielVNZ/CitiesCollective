@@ -14,8 +14,37 @@ export function CookieConsent() {
     performance: false,
     marketing: false
   });
+  const [preferencesLoaded, setPreferencesLoaded] = useState(false);
   const { data: session } = useSession();
 
+  // Load preferences on component mount and session change
+  useEffect(() => {
+    const loadPreferences = async () => {
+      console.log('Loading preferences...', { session: !!session?.user });
+      
+      if (session?.user) {
+        // User is logged in - check database
+        const dbPreferences = await getCookiePreferencesFromDB();
+        console.log('DB preferences:', dbPreferences);
+        if (dbPreferences) {
+          setCookiePreferences(dbPreferences);
+        }
+      } else {
+        // User is not logged in - check localStorage
+        const localPreferences = getCookiePreferences();
+        console.log('Local preferences:', localPreferences);
+        if (localPreferences) {
+          setCookiePreferences(localPreferences);
+        }
+      }
+      
+      setPreferencesLoaded(true);
+    };
+
+    loadPreferences();
+  }, [session]);
+
+  // Check consent and show banner if needed
   useEffect(() => {
     const checkConsent = async () => {
       let hasConsent = false;
@@ -23,7 +52,6 @@ export function CookieConsent() {
       if (session?.user) {
         // User is logged in - check database
         const dbConsent = await getCookieConsentFromDB();
-        const dbPreferences = await getCookiePreferencesFromDB();
         hasConsent = dbConsent !== null;
         
         // Sync with localStorage for consistency
@@ -31,22 +59,10 @@ export function CookieConsent() {
           localStorage.setItem('cookie-consent', dbConsent);
           localStorage.setItem('cookie-consent-date', new Date().toISOString());
         }
-        
-        // Sync preferences if available
-        if (dbPreferences) {
-          localStorage.setItem('cookie-preferences', JSON.stringify(dbPreferences));
-          setCookiePreferences(dbPreferences);
-        }
       } else {
         // User is not logged in - check localStorage
         const localConsent = getCookieConsent();
-        const localPreferences = getCookiePreferences();
         hasConsent = localConsent !== null;
-        
-        // Restore preferences if available
-        if (localPreferences) {
-          setCookiePreferences(localPreferences);
-        }
       }
 
       if (!hasConsent) {
@@ -81,28 +97,46 @@ export function CookieConsent() {
   }
 
   const acceptAll = async () => {
+    const allPreferences: CookiePreferences = {
+      necessary: true,
+      analytics: true,
+      performance: true,
+      marketing: true
+    };
+
     if (session?.user) {
       // User is logged in - save to database
-      await updateCookieConsentInDB('all');
+      await updateCookiePreferencesInDB(allPreferences);
     }
     
     // Always update localStorage for consistency
-    updateCookieConsent('all');
+    updateCookiePreferences(allPreferences);
+    setCookiePreferences(allPreferences);
     setShowConsent(false);
   };
 
   const acceptNecessary = async () => {
+    const necessaryPreferences: CookiePreferences = {
+      necessary: true,
+      analytics: false,
+      performance: false,
+      marketing: false
+    };
+
     if (session?.user) {
       // User is logged in - save to database
-      await updateCookieConsentInDB('necessary');
+      await updateCookiePreferencesInDB(necessaryPreferences);
     }
     
     // Always update localStorage for consistency
-    updateCookieConsent('necessary');
+    updateCookiePreferences(necessaryPreferences);
+    setCookiePreferences(necessaryPreferences);
     setShowConsent(false);
   };
 
   const saveCustomPreferences = async () => {
+    console.log('Saving preferences:', cookiePreferences);
+    
     if (session?.user) {
       // User is logged in - save to database
       await updateCookiePreferencesInDB(cookiePreferences);
@@ -112,6 +146,26 @@ export function CookieConsent() {
     updateCookiePreferences(cookiePreferences);
     setShowConsent(false);
     setShowCustomize(false);
+  };
+
+  const loadCurrentPreferences = async () => {
+    console.log('Loading current preferences...');
+    
+    if (session?.user) {
+      // User is logged in - check database
+      const dbPreferences = await getCookiePreferencesFromDB();
+      console.log('Current DB preferences:', dbPreferences);
+      if (dbPreferences) {
+        setCookiePreferences(dbPreferences);
+      }
+    } else {
+      // User is not logged in - check localStorage
+      const localPreferences = getCookiePreferences();
+      console.log('Current local preferences:', localPreferences);
+      if (localPreferences) {
+        setCookiePreferences(localPreferences);
+      }
+    }
   };
 
   const handlePreferenceChange = (category: keyof typeof cookiePreferences) => {
@@ -149,7 +203,11 @@ export function CookieConsent() {
                 Necessary Only
               </button>
               <button
-                onClick={() => setShowCustomize(true)}
+                onClick={async () => {
+                  console.log('Opening customize view, current preferences:', cookiePreferences);
+                  await loadCurrentPreferences();
+                  setShowCustomize(true);
+                }}
                 className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-colors"
               >
                 Customize
