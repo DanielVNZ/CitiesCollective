@@ -1,23 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCityById, getUser } from 'app/db';
-import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { getDownloadUrl } from 'app/utils/r2';
 import { auth } from 'app/auth';
-
-// Initialize S3 client for R2
-const s3Client = new S3Client({
-  region: 'auto',
-  endpoint: process.env.R2_ENDPOINT!,
-  credentials: {
-    accessKeyId: process.env.R2_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
-  },
-});
 
 export async function GET(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
+    // Basic bot protection - check user agent
+    const userAgent = req.headers.get('User-Agent') || '';
+    const suspiciousPatterns = [
+      /bot/i,
+      /crawler/i,
+      /spider/i,
+      /scraper/i,
+      /curl/i,
+      /wget/i,
+      /python/i,
+      /requests/i,
+    ];
+    
+    const isSuspicious = suspiciousPatterns.some(pattern => pattern.test(userAgent));
+    if (isSuspicious) {
+      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+    }
+
     // Parse city ID
     const cityId = parseInt(params.id);
     if (isNaN(cityId)) {
@@ -50,64 +58,41 @@ export async function GET(
       return NextResponse.json({ error: 'This city is not available for download' }, { status: 403 });
     }
 
+    // Generate a signed URL that expires in 1 hour (3600 seconds)
+    const signedUrl = await getDownloadUrl(city.filePath, 3600);
+    
+    // Create a safe filename for download
+    const originalFileName = city.fileName || `${city.cityName || 'city'}.cok`;
+    let safeFileName = originalFileName;
+    
+    // Ensure it has .cok extension
+    if (!safeFileName.endsWith('.cok')) {
+      safeFileName = safeFileName.replace(/\.[^.]*$/, '') + '.cok';
+    }
+    
+    // Clean filename for safety
+    safeFileName = safeFileName.replace(/[^a-zA-Z0-9.-]/g, '_');
+
+    // Redirect to the signed R2 URL with proper filename
+    const response = NextResponse.redirect(signedUrl);
+    
+    // Set Content-Disposition header for proper filename
+    response.headers.set('Content-Disposition', `attachment; filename="${safeFileName}"`);
+    
+    // Optional: Track download analytics
     try {
-      // Fetch file from R2
-      const command = new GetObjectCommand({
-        Bucket: process.env.R2_BUCKET_NAME!,
-        Key: city.filePath,
-      });
-
-      const response = await s3Client.send(command);
-      
-      if (!response.Body) {
-        return NextResponse.json({ error: 'File not found on storage' }, { status: 404 });
-      }
-
-      // Convert stream to buffer
-      const chunks: Uint8Array[] = [];
-      const reader = response.Body.transformToWebStream().getReader();
-      
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          chunks.push(value);
-        }
-      } finally {
-        reader.releaseLock();
-      }
-
-      const buffer = Buffer.concat(chunks);
-      
-      // Create a safe filename for download
-      const originalFileName = city.fileName || `${city.cityName || 'city'}.cok`;
-      let safeFileName = originalFileName;
-      
-      // Ensure it has .cok extension
-      if (!safeFileName.endsWith('.cok')) {
-        safeFileName = safeFileName.replace(/\.[^.]*$/, '') + '.cok';
-      }
-      
-      // Clean filename for safety
-      safeFileName = safeFileName.replace(/[^a-zA-Z0-9.-]/g, '_');
-      
-      // Return the file with proper headers
-      return new NextResponse(buffer, {
-        status: 200,
+      await fetch(`${req.nextUrl.origin}/api/cities/${cityId}/download-track`, {
+        method: 'POST',
         headers: {
-          'Content-Type': 'application/octet-stream',
-          'Content-Disposition': `attachment; filename="${safeFileName}"`,
-          'Content-Length': buffer.length.toString(),
+          'Content-Type': 'application/json',
         },
       });
-      
-    } catch (fileError) {
-      console.error('R2 download error:', fileError);
-      return NextResponse.json({ 
-        error: 'File not found on storage',
-        details: 'The save file may have been moved or deleted'
-      }, { status: 404 });
+    } catch (trackError) {
+      // Don't fail the download if tracking fails
+      console.warn('Failed to track download:', trackError);
     }
+
+    return response;
 
   } catch (error) {
     console.error('Download error:', error);
