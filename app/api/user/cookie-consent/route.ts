@@ -18,7 +18,6 @@ export async function GET() {
     const consent = await getUserCookieConsent(userId);
     const preferences = await getUserCookiePreferences(userId);
 
-    console.log('API GET - User ID:', userId, 'Consent:', consent, 'Preferences:', preferences);
     return NextResponse.json({ consent, preferences });
   } catch (error) {
     console.error('Error getting cookie consent:', error);
@@ -44,20 +43,16 @@ export async function POST(request: NextRequest) {
 
     // Handle individual preferences if provided
     if (preferences) {
-      console.log('API received preferences:', preferences);
-      
       // Validate preferences structure
       if (typeof preferences !== 'object' || 
           typeof preferences.necessary !== 'boolean' ||
           typeof preferences.analytics !== 'boolean' ||
           typeof preferences.performance !== 'boolean' ||
           typeof preferences.marketing !== 'boolean') {
-        console.error('Invalid preferences structure:', preferences);
         return NextResponse.json({ error: 'Invalid preferences structure' }, { status: 400 });
       }
       
       await updateUserCookiePreferences(userId, preferences);
-      console.log('Preferences saved to DB for user:', userId);
       return NextResponse.json({ success: true, preferences });
     }
 

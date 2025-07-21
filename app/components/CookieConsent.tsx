@@ -20,19 +20,15 @@ export function CookieConsent() {
   // Load preferences on component mount and session change
   useEffect(() => {
     const loadPreferences = async () => {
-      console.log('Loading preferences...', { session: !!session?.user });
-      
       if (session?.user) {
         // User is logged in - check database
         const dbPreferences = await getCookiePreferencesFromDB();
-        console.log('DB preferences:', dbPreferences);
         if (dbPreferences) {
           setCookiePreferences(dbPreferences);
         }
       } else {
         // User is not logged in - check localStorage
         const localPreferences = getCookiePreferences();
-        console.log('Local preferences:', localPreferences);
         if (localPreferences) {
           setCookiePreferences(localPreferences);
         }
@@ -135,8 +131,6 @@ export function CookieConsent() {
   };
 
   const saveCustomPreferences = async () => {
-    console.log('Saving preferences:', cookiePreferences);
-    
     if (session?.user) {
       // User is logged in - save to database
       await updateCookiePreferencesInDB(cookiePreferences);
@@ -149,19 +143,15 @@ export function CookieConsent() {
   };
 
   const loadCurrentPreferences = async () => {
-    console.log('Loading current preferences...');
-    
     if (session?.user) {
       // User is logged in - check database
       const dbPreferences = await getCookiePreferencesFromDB();
-      console.log('Current DB preferences:', dbPreferences);
       if (dbPreferences) {
         setCookiePreferences(dbPreferences);
       }
     } else {
       // User is not logged in - check localStorage
       const localPreferences = getCookiePreferences();
-      console.log('Current local preferences:', localPreferences);
       if (localPreferences) {
         setCookiePreferences(localPreferences);
       }
@@ -204,7 +194,6 @@ export function CookieConsent() {
               </button>
               <button
                 onClick={async () => {
-                  console.log('Opening customize view, current preferences:', cookiePreferences);
                   await loadCurrentPreferences();
                   setShowCustomize(true);
                 }}

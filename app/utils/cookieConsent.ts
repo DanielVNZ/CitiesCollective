@@ -43,10 +43,9 @@ export async function getCookiePreferencesFromDB(): Promise<CookiePreferences | 
     const response = await fetch('/api/user/cookie-consent');
     if (response.ok) {
       const data = await response.json();
-      console.log('DB GET response:', data);
       return data.preferences;
     } else {
-      console.error('DB GET failed:', response.status, response.statusText);
+      console.error('Error fetching cookie preferences from DB:', response.status, response.statusText);
     }
   } catch (error) {
     console.error('Error fetching cookie preferences from DB:', error);
@@ -70,7 +69,6 @@ export async function updateCookieConsentInDB(consent: CookieConsentType): Promi
 
 export async function updateCookiePreferencesInDB(preferences: CookiePreferences): Promise<void> {
   try {
-    console.log('Sending preferences to DB:', preferences);
     const response = await fetch('/api/user/cookie-consent', {
       method: 'POST',
       headers: {
@@ -79,11 +77,8 @@ export async function updateCookiePreferencesInDB(preferences: CookiePreferences
       body: JSON.stringify({ preferences }),
     });
     
-    if (response.ok) {
-      const result = await response.json();
-      console.log('DB update response:', result);
-    } else {
-      console.error('DB update failed:', response.status, response.statusText);
+    if (!response.ok) {
+      console.error('Error updating cookie preferences in DB:', response.status, response.statusText);
     }
   } catch (error) {
     console.error('Error updating cookie preferences in DB:', error);
