@@ -1,8 +1,28 @@
 export type CookieConsentType = 'all' | 'necessary' | null;
 
+export interface CookiePreferences {
+  necessary: boolean;
+  analytics: boolean;
+  performance: boolean;
+  marketing: boolean;
+}
+
 export function getCookieConsent(): CookieConsentType {
   if (typeof window === 'undefined') return null;
   return localStorage.getItem('cookie-consent') as CookieConsentType;
+}
+
+export function getCookiePreferences(): CookiePreferences | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const stored = localStorage.getItem('cookie-preferences');
+    if (stored) {
+      return JSON.parse(stored) as CookiePreferences;
+    }
+  } catch (error) {
+    console.error('Error parsing cookie preferences from localStorage:', error);
+  }
+  return null;
 }
 
 export async function getCookieConsentFromDB(): Promise<CookieConsentType> {
@@ -18,6 +38,19 @@ export async function getCookieConsentFromDB(): Promise<CookieConsentType> {
   return null;
 }
 
+export async function getCookiePreferencesFromDB(): Promise<CookiePreferences | null> {
+  try {
+    const response = await fetch('/api/user/cookie-consent');
+    if (response.ok) {
+      const data = await response.json();
+      return data.preferences;
+    }
+  } catch (error) {
+    console.error('Error fetching cookie preferences from DB:', error);
+  }
+  return null;
+}
+
 export async function updateCookieConsentInDB(consent: CookieConsentType): Promise<void> {
   try {
     await fetch('/api/user/cookie-consent', {
@@ -29,6 +62,20 @@ export async function updateCookieConsentInDB(consent: CookieConsentType): Promi
     });
   } catch (error) {
     console.error('Error updating cookie consent in DB:', error);
+  }
+}
+
+export async function updateCookiePreferencesInDB(preferences: CookiePreferences): Promise<void> {
+  try {
+    await fetch('/api/user/cookie-consent', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ preferences }),
+    });
+  } catch (error) {
+    console.error('Error updating cookie preferences in DB:', error);
   }
 }
 
@@ -88,11 +135,35 @@ export function updateCookieConsent(consent: CookieConsentType): void {
   }
 }
 
+export function updateCookiePreferences(preferences: CookiePreferences): void {
+  if (typeof window === 'undefined') return;
+  
+  localStorage.setItem('cookie-preferences', JSON.stringify(preferences));
+  localStorage.setItem('cookie-consent-date', new Date().toISOString());
+  
+  // Determine consent level and update legacy consent
+  let consentLevel: CookieConsentType = 'necessary';
+  if (preferences.analytics || preferences.performance || preferences.marketing) {
+    consentLevel = 'all';
+  }
+  
+  localStorage.setItem('cookie-consent', consentLevel);
+  
+  // If user accepts analytics, load Cloudflare Insights
+  if (preferences.analytics) {
+    loadCloudflareInsights();
+  }
+  
+  // Load Turnstile regardless of consent (it's necessary for security)
+  loadCloudflareTurnstile();
+}
+
 export function clearCookieConsent(): void {
   if (typeof window === 'undefined') return;
   
   localStorage.removeItem('cookie-consent');
   localStorage.removeItem('cookie-consent-date');
+  localStorage.removeItem('cookie-preferences');
   
   // Dispatch a custom event to notify components that consent was cleared
   window.dispatchEvent(new CustomEvent('cookieConsentCleared'));

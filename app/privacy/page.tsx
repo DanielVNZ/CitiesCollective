@@ -158,8 +158,8 @@ export default async function PrivacyPolicy() {
                 We use cookies and similar technologies to:
               </p>
               <ul className="list-disc list-inside text-gray-700 dark:text-gray-300 mb-4 space-y-1">
-                <li><strong>Necessary cookies:</strong> Maintain your login session, remember your preferences (theme, etc.), provide bot protection (Cloudflare Turnstile), session tracking, and view counting</li>
-                <li><strong>Accept All cookies:</strong> Everything above plus website usage statistics (Cloudflare Insights), Hall of Fame view tracking, performance monitoring, and user behavior analytics</li>
+                <li><strong>Necessary cookies:</strong> Maintain your login session, remember your preferences (theme, etc.), provide bot protection (Cloudflare Turnstile), basic functionality</li>
+                <li><strong>Accept All cookies:</strong> Everything above plus website usage statistics (Cloudflare Insights), Hall of Fame view tracking, home page view tracking, session tracking, performance monitoring, and user behavior analytics</li>
               </ul>
               <p className="text-gray-700 dark:text-gray-300 mb-4">
                 We provide a cookie consent banner that allows you to choose between accepting only necessary cookies or all cookies. You can change your cookie preferences at any time by clearing your browser data and refreshing the page.

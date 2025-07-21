@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from 'app/auth';
-import { getUser, updateUserCookieConsent, getUserCookieConsent } from 'app/db';
+import { getUser, updateUserCookieConsent, getUserCookieConsent, getUserCookiePreferences, updateUserCookiePreferences, CookiePreferences } from 'app/db';
 
 export async function GET() {
   try {
@@ -16,8 +16,9 @@ export async function GET() {
 
     const userId = users[0].id;
     const consent = await getUserCookieConsent(userId);
+    const preferences = await getUserCookiePreferences(userId);
 
-    return NextResponse.json({ consent });
+    return NextResponse.json({ consent, preferences });
   } catch (error) {
     console.error('Error getting cookie consent:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -31,21 +32,41 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
-    const { consent } = await request.json();
+    const { consent, preferences } = await request.json();
     
-    if (!consent || !['all', 'necessary', null].includes(consent)) {
-      return NextResponse.json({ error: 'Invalid consent value' }, { status: 400 });
-    }
-
     const users = await getUser(session.user.email);
     if (!users || users.length === 0) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
     const userId = users[0].id;
-    await updateUserCookieConsent(userId, consent);
 
-    return NextResponse.json({ success: true, consent });
+    // Handle individual preferences if provided
+    if (preferences) {
+      // Validate preferences structure
+      if (typeof preferences !== 'object' || 
+          typeof preferences.necessary !== 'boolean' ||
+          typeof preferences.analytics !== 'boolean' ||
+          typeof preferences.performance !== 'boolean' ||
+          typeof preferences.marketing !== 'boolean') {
+        return NextResponse.json({ error: 'Invalid preferences structure' }, { status: 400 });
+      }
+      
+      await updateUserCookiePreferences(userId, preferences);
+      return NextResponse.json({ success: true, preferences });
+    }
+
+    // Handle legacy consent if provided
+    if (consent !== undefined) {
+      if (consent !== null && !['all', 'necessary'].includes(consent)) {
+        return NextResponse.json({ error: 'Invalid consent value' }, { status: 400 });
+      }
+      
+      await updateUserCookieConsent(userId, consent);
+      return NextResponse.json({ success: true, consent });
+    }
+
+    return NextResponse.json({ error: 'Either consent or preferences must be provided' }, { status: 400 });
   } catch (error) {
     console.error('Error updating cookie consent:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

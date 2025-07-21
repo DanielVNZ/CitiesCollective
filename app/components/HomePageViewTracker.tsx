@@ -1,9 +1,13 @@
 'use client';
 
 import { useEffect } from 'react';
+import { hasAnalyticsConsent } from '../utils/cookieConsent';
 
 export function HomePageViewTracker() {
   useEffect(() => {
+    // Only track if user has given analytics consent
+    if (!hasAnalyticsConsent()) return;
+
     const recordView = async () => {
       try {
         await fetch('/api/home-page-view', {

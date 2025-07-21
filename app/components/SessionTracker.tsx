@@ -1,12 +1,12 @@
 'use client';
 
 import { useEffect } from 'react';
-import { hasNecessaryConsent } from '../utils/cookieConsent';
+import { hasAnalyticsConsent } from '../utils/cookieConsent';
 
 export function SessionTracker() {
   useEffect(() => {
-    // Only track sessions if user has given necessary consent
-    if (!hasNecessaryConsent()) return;
+    // Only track sessions if user has given analytics consent
+    if (!hasAnalyticsConsent()) return;
 
     const recordView = async () => {
       try {

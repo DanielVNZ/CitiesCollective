@@ -24,8 +24,16 @@ let db = drizzle(client);
 // Export client for use in other files
 export { client };
 
-// Cookie consent type
+// Cookie consent types
 export type CookieConsentType = 'all' | 'necessary' | null;
+
+// Individual cookie preferences interface
+export interface CookiePreferences {
+  necessary: boolean;
+  analytics: boolean;
+  performance: boolean;
+  marketing: boolean;
+}
 
 // Cache to track which tables have been initialized to prevent repeated checks
 const tableInitCache = new Set<string>();
@@ -501,6 +509,7 @@ async function ensureTableExists() {
       hofCreatorId: varchar('hofCreatorId', { length: 100 }),
       cookieConsent: varchar('cookieConsent', { length: 20 }), // 'all', 'necessary', or null
       cookieConsentDate: timestamp('cookieConsentDate'),
+      cookiePreferences: json('cookiePreferences'), // Store individual cookie preferences
     });
   }
   
@@ -526,7 +535,8 @@ async function ensureTableExists() {
         "discordUsername" VARCHAR(50),
         "isAdmin" BOOLEAN DEFAULT FALSE,
         "cookieConsent" VARCHAR(20),
-        "cookieConsentDate" TIMESTAMP
+        "cookieConsentDate" TIMESTAMP,
+        "cookiePreferences" JSON
       );`;
   } else {
     // Check if username column exists, if not add it
@@ -744,6 +754,22 @@ async function ensureTableExists() {
         ALTER TABLE "User" ADD COLUMN "cookieConsentDate" TIMESTAMP;`;
       console.log('cookieConsentDate column added successfully');
     }
+
+    // Check if cookiePreferences column exists, if not add it
+    const cookiePreferencesColumnExists = await client`
+      SELECT EXISTS (
+        SELECT FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = 'User'
+        AND column_name = 'cookiePreferences'
+      );`;
+    
+    if (!cookiePreferencesColumnExists[0].exists) {
+      console.log('Adding cookiePreferences column to existing User table...');
+      await client`
+        ALTER TABLE "User" ADD COLUMN "cookiePreferences" JSON;`;
+      console.log('cookiePreferences column added successfully');
+    }
   }
 
   // Mark as initialized
@@ -765,6 +791,7 @@ async function ensureTableExists() {
     hofCreatorId: varchar('hofCreatorId', { length: 100 }),
     cookieConsent: varchar('cookieConsent', { length: 20 }),
     cookieConsentDate: timestamp('cookieConsentDate'),
+    cookiePreferences: json('cookiePreferences'),
   });
 
   return table;
@@ -4305,6 +4332,36 @@ export async function updateUserCookieConsent(userId: number, consent: CookieCon
     .set({ 
       cookieConsent: consent,
       cookieConsentDate: consent ? new Date() : null
+    })
+    .where(eq(users.id, userId));
+}
+
+// New functions for individual cookie preferences
+export async function getUserCookiePreferences(userId: number): Promise<CookiePreferences | null> {
+  const users = await ensureTableExists();
+  
+  const result = await db.select({ cookiePreferences: users.cookiePreferences })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  
+  return result[0]?.cookiePreferences as CookiePreferences || null;
+}
+
+export async function updateUserCookiePreferences(userId: number, preferences: CookiePreferences): Promise<void> {
+  const users = await ensureTableExists();
+  
+  // Also update the legacy consent field for backward compatibility
+  let consentLevel: CookieConsentType = 'necessary';
+  if (preferences.analytics || preferences.performance || preferences.marketing) {
+    consentLevel = 'all';
+  }
+  
+  await db.update(users)
+    .set({ 
+      cookiePreferences: preferences,
+      cookieConsent: consentLevel,
+      cookieConsentDate: new Date()
     })
     .where(eq(users.id, userId));
 }
