@@ -88,6 +88,15 @@ export function ResponsiveNavigation({ session, isAdmin }: ResponsiveNavigationP
                 <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-red-600 transition-all duration-200 group-hover:w-full"></span>
               </Link>
             )}
+            <Link
+              href="https://feedback.citiescollective.space"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="relative text-gray-700 hover:text-teal-600 dark:text-gray-300 dark:hover:text-teal-400 font-medium transition-colors duration-200 group"
+            >
+              Feedback
+              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-teal-600 transition-all duration-200 group-hover:w-full"></span>
+            </Link>
             <div className="flex items-center space-x-3 ml-4 pl-4 border-l border-gray-200 dark:border-gray-700">
               <NotificationsMenu />
               <SignOutButton />
@@ -115,6 +124,15 @@ export function ResponsiveNavigation({ session, isAdmin }: ResponsiveNavigationP
             >
               Sign Up
               <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-green-600 transition-all duration-200 group-hover:w-full"></span>
+            </Link>
+            <Link
+              href="https://feedback.citiescollective.space"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="relative text-gray-700 hover:text-teal-600 dark:text-gray-300 dark:hover:text-teal-400 font-medium transition-colors duration-200 group"
+            >
+              Feedback
+              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-teal-600 transition-all duration-200 group-hover:w-full"></span>
             </Link>
 
           </>
@@ -189,6 +207,15 @@ export function ResponsiveNavigation({ session, isAdmin }: ResponsiveNavigationP
                     Admin
                   </Link>
                 )}
+                <Link
+                  href="https://feedback.citiescollective.space"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block px-4 py-3 text-gray-700 hover:text-teal-600 hover:bg-teal-50 dark:text-gray-300 dark:hover:text-teal-400 dark:hover:bg-teal-900/20 transition-colors duration-200 font-medium"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  Feedback
+                </Link>
                 <div className="border-t border-gray-200 dark:border-gray-700 mt-2 pt-2">
                   <SignOutButton 
                     className="block w-full text-left px-4 py-3 text-gray-700 hover:text-gray-900 hover:bg-gray-50 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-700 transition-colors duration-200 font-medium"
@@ -217,6 +244,15 @@ export function ResponsiveNavigation({ session, isAdmin }: ResponsiveNavigationP
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
                   Sign Up
+                </Link>
+                <Link
+                  href="https://feedback.citiescollective.space"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block px-4 py-3 text-gray-700 hover:text-teal-600 hover:bg-teal-50 dark:text-gray-300 dark:hover:text-teal-400 dark:hover:bg-teal-900/20 transition-colors duration-200 font-medium"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  Feedback
                 </Link>
               </>
             )}
