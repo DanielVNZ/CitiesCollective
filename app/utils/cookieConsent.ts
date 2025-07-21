@@ -86,14 +86,27 @@ export async function updateCookiePreferencesInDB(preferences: CookiePreferences
 }
 
 export function hasAnalyticsConsent(): boolean {
+  // First check individual preferences
+  const preferences = getCookiePreferences();
+  if (preferences && preferences.analytics) {
+    return true;
+  }
+  
+  // Fallback to legacy consent check
   const consent = getCookieConsent();
   return consent === 'all';
 }
 
 export function hasNecessaryConsent(): boolean {
+  // First check individual preferences
+  const preferences = getCookiePreferences();
+  if (preferences && preferences.necessary) {
+    return true;
+  }
+  
+  // Fallback to legacy consent check
   const consent = getCookieConsent();
   // If no consent is stored, allow necessary functionality (default behavior)
-  // Necessary now includes session tracking and view counting
   return consent === 'all' || consent === 'necessary' || consent === null;
 }
 
