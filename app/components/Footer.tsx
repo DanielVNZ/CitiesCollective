@@ -122,7 +122,15 @@ export function Footer() {
         <div className="mt-8 pt-8 border-t border-gray-200 dark:border-gray-700">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              © {new Date().getFullYear()} Cities Collective. Made with ❤️ for the Cities: Skylines 2 community.
+              © {new Date().getFullYear()} Cities Collective. Made with ❤️ for the Cities: Skylines 2 community. Owned by{' '}
+              <a 
+                href="https://github.com/DanielVNZ" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
+              >
+                DanielVNZ
+              </a>
             </p>
             <div className="mt-4 md:mt-0 flex items-center space-x-4">
               <span className="text-xs text-gray-400 dark:text-gray-500">

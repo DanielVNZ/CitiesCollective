@@ -7,8 +7,9 @@ import { SessionProvider } from './components/SessionProvider';
 import { Footer } from './components/Footer';
 import { CookieConsent } from './components/CookieConsent';
 import { AnalyticsLoader } from './components/AnalyticsLoader';
-import { loadCloudflareTurnstile } from './utils/cookieConsent';
+
 import Script from 'next/script';
+import TurnstileScriptLoader from './components/TurnstileScriptLoader';
 
 let title = 'Cities Collective';
 let description =
@@ -59,7 +60,7 @@ export default function RootLayout({
             <Footer />
             <CookieConsent />
             <AnalyticsLoader />
-            <TurnstileLoader />
+            <TurnstileScriptLoader />
           </ThemeProvider>
         </SessionProvider>
       </body>
@@ -67,11 +68,4 @@ export default function RootLayout({
   );
 }
 
-// Component to load Turnstile (necessary for security)
-function TurnstileLoader() {
-  if (typeof window !== 'undefined') {
-    // Load Turnstile immediately as it's necessary for security
-    loadCloudflareTurnstile();
-  }
-  return null;
-}
+

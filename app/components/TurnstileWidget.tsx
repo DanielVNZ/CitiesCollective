@@ -63,20 +63,39 @@ export default function TurnstileWidget({ siteKey, theme = 'light', onVerify }: 
       }
     };
 
-    // Try to render immediately if turnstile is already loaded
-    if (typeof window !== 'undefined' && window.turnstile) {
-      renderTurnstile();
-    } else {
-      // Wait for turnstile to load
-      const checkTurnstile = () => {
-        if (typeof window !== 'undefined' && window.turnstile) {
-          renderTurnstile();
-        } else {
-          setTimeout(checkTurnstile, 100);
-        }
-      };
-      checkTurnstile();
-    }
+    // Function to check if Turnstile is loaded and render
+    const checkAndRenderTurnstile = () => {
+      if (typeof window !== 'undefined' && window.turnstile) {
+        renderTurnstile();
+      } else {
+        // Wait a bit longer and try again
+        setTimeout(checkAndRenderTurnstile, 200);
+      }
+    };
+
+    // Start checking for Turnstile
+    checkAndRenderTurnstile();
+
+    // Also listen for the script load event
+    const handleScriptLoad = () => {
+      if (typeof window !== 'undefined' && window.turnstile) {
+        renderTurnstile();
+      }
+    };
+
+    // Listen for when the Turnstile script loads
+    document.addEventListener('turnstile-loaded', handleScriptLoad);
+    
+    // Also check periodically for the first few seconds
+    const interval = setInterval(() => {
+      if (typeof window !== 'undefined' && window.turnstile) {
+        renderTurnstile();
+        clearInterval(interval);
+      }
+    }, 100);
+
+    // Clear interval after 5 seconds to avoid infinite checking
+    setTimeout(() => clearInterval(interval), 5000);
 
     // Cleanup function
     return () => {
@@ -87,6 +106,8 @@ export default function TurnstileWidget({ siteKey, theme = 'light', onVerify }: 
           console.error('Error resetting Turnstile:', error);
         }
       }
+      // Remove event listener
+      document.removeEventListener('turnstile-loaded', handleScriptLoad);
     };
   }, [siteKey, theme, onVerify]);
 
