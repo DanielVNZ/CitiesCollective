@@ -3,7 +3,11 @@ import 'leaflet/dist/leaflet.css';
 
 import { GeistSans } from 'geist/font/sans';
 import { ThemeProvider } from './components/ThemeProvider';
+import { SessionProvider } from './components/SessionProvider';
 import { Footer } from './components/Footer';
+import { CookieConsent } from './components/CookieConsent';
+import { AnalyticsLoader } from './components/AnalyticsLoader';
+import { loadCloudflareTurnstile } from './utils/cookieConsent';
 import Script from 'next/script';
 
 let title = 'Cities Collective';
@@ -43,23 +47,31 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <head>
-        <Script
-          src="https://challenges.cloudflare.com/turnstile/v0/api.js"
-          strategy="beforeInteractive"
-        />
-      </head>
       <body className={GeistSans.variable} suppressHydrationWarning>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem={true}
-          disableTransitionOnChange={false}
-        >
-          {children}
-          <Footer />
-        </ThemeProvider>
+        <SessionProvider>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem={true}
+            disableTransitionOnChange={false}
+          >
+            {children}
+            <Footer />
+            <CookieConsent />
+            <AnalyticsLoader />
+            <TurnstileLoader />
+          </ThemeProvider>
+        </SessionProvider>
       </body>
     </html>
   );
+}
+
+// Component to load Turnstile (necessary for security)
+function TurnstileLoader() {
+  if (typeof window !== 'undefined') {
+    // Load Turnstile immediately as it's necessary for security
+    loadCloudflareTurnstile();
+  }
+  return null;
 }

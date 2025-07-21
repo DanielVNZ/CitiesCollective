@@ -10,7 +10,7 @@ import { HeroCarousel } from 'app/components/HeroCarousel';
 import { CommunityFavorites } from 'app/components/CommunityFavorites';
 import { ClientPaginationWrapper } from 'app/components/ClientPaginationWrapper';
 import { StatsSection } from 'app/components/StatsSection';
-import { HomePageViewTracker } from 'app/components/HomePageViewTracker';
+import { SessionTracker } from 'app/components/SessionTracker';
 
 export default async function Page({ searchParams }: { searchParams?: { page?: string } }) {
   const currentPage = Math.max(1, parseInt(searchParams?.page || '1'));
@@ -64,8 +64,8 @@ export default async function Page({ searchParams }: { searchParams?: { page?: s
 
   return (
     <div className="min-h-screen min-w-[320px] bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200">
-      {/* Home Page View Tracker */}
-      <HomePageViewTracker />
+      {/* Session Tracker */}
+      <SessionTracker />
       
       {/* Header */}
       <Header session={session} isAdmin={isAdmin} />

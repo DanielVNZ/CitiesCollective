@@ -24,6 +24,9 @@ let db = drizzle(client);
 // Export client for use in other files
 export { client };
 
+// Cookie consent type
+export type CookieConsentType = 'all' | 'necessary' | null;
+
 // Cache to track which tables have been initialized to prevent repeated checks
 const tableInitCache = new Set<string>();
 
@@ -496,6 +499,8 @@ async function ensureTableExists() {
       isAdmin: boolean('isAdmin').default(false),
       isContentCreator: boolean('isContentCreator').default(false),
       hofCreatorId: varchar('hofCreatorId', { length: 100 }),
+      cookieConsent: varchar('cookieConsent', { length: 20 }), // 'all', 'necessary', or null
+      cookieConsentDate: timestamp('cookieConsentDate'),
     });
   }
   
@@ -519,7 +524,9 @@ async function ensureTableExists() {
         "githubId" VARCHAR(100) UNIQUE,
         "pdxUsername" VARCHAR(50),
         "discordUsername" VARCHAR(50),
-        "isAdmin" BOOLEAN DEFAULT FALSE
+        "isAdmin" BOOLEAN DEFAULT FALSE,
+        "cookieConsent" VARCHAR(20),
+        "cookieConsentDate" TIMESTAMP
       );`;
   } else {
     // Check if username column exists, if not add it
@@ -705,6 +712,38 @@ async function ensureTableExists() {
         ALTER TABLE "User" ADD COLUMN "hofCreatorId" VARCHAR(100);`;
       console.log('hofCreatorId column added successfully');
     }
+
+    // Check if cookieConsent column exists, if not add it
+    const cookieConsentColumnExists = await client`
+      SELECT EXISTS (
+        SELECT FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = 'User'
+        AND column_name = 'cookieConsent'
+      );`;
+    
+    if (!cookieConsentColumnExists[0].exists) {
+      console.log('Adding cookieConsent column to existing User table...');
+      await client`
+        ALTER TABLE "User" ADD COLUMN "cookieConsent" VARCHAR(20);`;
+      console.log('cookieConsent column added successfully');
+    }
+
+    // Check if cookieConsentDate column exists, if not add it
+    const cookieConsentDateColumnExists = await client`
+      SELECT EXISTS (
+        SELECT FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = 'User'
+        AND column_name = 'cookieConsentDate'
+      );`;
+    
+    if (!cookieConsentDateColumnExists[0].exists) {
+      console.log('Adding cookieConsentDate column to existing User table...');
+      await client`
+        ALTER TABLE "User" ADD COLUMN "cookieConsentDate" TIMESTAMP;`;
+      console.log('cookieConsentDate column added successfully');
+    }
   }
 
   // Mark as initialized
@@ -724,6 +763,8 @@ async function ensureTableExists() {
     isAdmin: boolean('isAdmin').default(false),
     isContentCreator: boolean('isContentCreator').default(false),
     hofCreatorId: varchar('hofCreatorId', { length: 100 }),
+    cookieConsent: varchar('cookieConsent', { length: 20 }),
+    cookieConsentDate: timestamp('cookieConsentDate'),
   });
 
   return table;
@@ -4239,8 +4280,31 @@ export async function recordHomePageView(sessionId: string) {
 export async function getTotalHomePageViews() {
   await ensureHomePageViewsTableExists();
   
-  const result = await db.select({ count: homePageViewsTable.id })
+  const result = await db.select({ count: sql<number>`count(*)` })
     .from(homePageViewsTable);
   
-  return result.length;
+  return result[0]?.count || 0;
+}
+
+// Cookie consent functions for logged-in users
+export async function getUserCookieConsent(userId: number): Promise<CookieConsentType> {
+  const users = await ensureTableExists();
+  
+  const result = await db.select({ cookieConsent: users.cookieConsent })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  
+  return (result[0]?.cookieConsent as CookieConsentType) || null;
+}
+
+export async function updateUserCookieConsent(userId: number, consent: CookieConsentType): Promise<void> {
+  const users = await ensureTableExists();
+  
+  await db.update(users)
+    .set({ 
+      cookieConsent: consent,
+      cookieConsentDate: consent ? new Date() : null
+    })
+    .where(eq(users.id, userId));
 }

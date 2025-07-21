@@ -3,10 +3,13 @@
 import { useTheme } from 'next-themes';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useSession } from 'next-auth/react';
+import { clearCookieConsent, clearCookieConsentForLoggedInUser } from '../utils/cookieConsent';
 
 export function Footer() {
   const [mounted, setMounted] = useState(false);
   const { theme, setTheme } = useTheme();
+  const { data: session } = useSession();
 
   useEffect(() => {
     setMounted(true);
@@ -44,6 +47,17 @@ export function Footer() {
               >
                 Terms of Service
               </Link>
+              <button
+                onClick={async () => {
+                  if (session?.user) {
+                    await clearCookieConsentForLoggedInUser();
+                  }
+                  clearCookieConsent();
+                }}
+                className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+              >
+                🍪 Cookie Settings
+              </button>
             </div>
           </div>
 

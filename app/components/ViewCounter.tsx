@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { EyeIcon } from '@heroicons/react/24/outline';
+import { hasNecessaryConsent } from '../utils/cookieConsent';
 
 interface ViewCounterProps {
   cityId: number;
@@ -18,8 +19,8 @@ export function ViewCounter({ cityId, initialViewCount = 0, className = '', isCo
   const [hasFetched, setHasFetched] = useState(false);
 
   useEffect(() => {
-    // Only track view if trackView prop is true (city details page) and not already tracked
-    if (trackView && !hasTracked) {
+    // Only track view if trackView prop is true (city details page), not already tracked, and has necessary consent
+    if (trackView && !hasTracked && hasNecessaryConsent()) {
       const recordView = async () => {
         try {
           const response = await fetch(`/api/cities/${cityId}/view`, {
@@ -45,7 +46,7 @@ export function ViewCounter({ cityId, initialViewCount = 0, className = '', isCo
       };
 
       recordView();
-    } else if (!trackView && initialViewCount === 0 && !hasFetched) {
+    } else if (!trackView && initialViewCount === 0 && !hasFetched && hasNecessaryConsent()) {
       // Only fetch view count if we don't have an initial count and haven't fetched yet
       const fetchViewCount = async () => {
         try {

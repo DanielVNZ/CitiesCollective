@@ -19,7 +19,7 @@ export default async function PrivacyPolicy() {
           
           <div className="prose dark:prose-invert max-w-none">
             <p className="text-gray-600 dark:text-gray-400 mb-6">
-              <strong>Last updated:</strong> {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+              <strong>Last updated: 21st July 2025</strong> 
             </p>
 
             <section className="mb-8">
@@ -42,7 +42,8 @@ export default async function PrivacyPolicy() {
               <ul className="list-disc list-inside text-gray-700 dark:text-gray-300 mb-4 space-y-1">
                 <li>Email address (required for account creation)</li>
                 <li>Username (chosen by you)</li>
-                <li>Password (encrypted and stored securely) - for email/password accounts</li>
+                <li>Password (encrypted and stored securely) - for accounts created directly with us which use an email address and password to log in</li>
+                <li>IP address (for security and fraud prevention)</li>
                 <li>Name and avatar (when using Google or GitHub OAuth login)</li>
                 <li>Google ID or GitHub ID (when using OAuth login)</li>
                 <li>Optional profile information (social media links, bio)</li>
@@ -63,10 +64,10 @@ export default async function PrivacyPolicy() {
 
               <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">2.3 Usage Information</h3>
               <ul className="list-disc list-inside text-gray-700 dark:text-gray-300 mb-4 space-y-1">
-                <li>IP address and device information</li>
-                <li>Browser type and version</li>
+                <li>Device information (browser type, version, operating system, screen resolution)</li>
                 <li>Pages visited and time spent on the site</li>
                 <li>Referral sources</li>
+                <li>User interactions (clicks, scrolls, form submissions)</li>
               </ul>
             </section>
 
@@ -95,10 +96,10 @@ export default async function PrivacyPolicy() {
                 <li>Passwords are encrypted using industry-standard bcrypt hashing</li>
                 <li>OAuth tokens are stored securely and encrypted</li>
                 <li>Save files (.cok), images, and OSM files are stored securely using Cloudflare R2</li>
-                <li>Images are automatically processed into optimized formats (WebP) and multiple sizes</li>
+                <li>Images are automatically processed into optimized formats (WebP) and multiple sizes for better performance</li>
                 <li>Our website uses SSL encryption for secure data transmission</li>
                 <li>Database access is restricted and monitored</li>
-                <li>File uploads are validated and scanned for security</li>
+                <li>File uploads are validated for file type, size, and format compliance</li>
               </ul>
               <p className="text-gray-700 dark:text-gray-300">
                 However, no method of transmission over the internet is 100% secure. We cannot guarantee absolute security of your information.
@@ -125,7 +126,6 @@ export default async function PrivacyPolicy() {
               </p>
               <ul className="list-disc list-inside text-gray-700 dark:text-gray-300 mb-4 space-y-1">
                 <li><strong>Cloudflare R2:</strong> File storage for save files, images, and OSM files</li>
-                <li><strong>Neon Database:</strong> Database hosting for user data and metadata</li>
                 <li><strong>NextAuth.js:</strong> Authentication service supporting email/password, Google OAuth, and GitHub OAuth</li>
                 <li><strong>Google OAuth:</strong> For Google account login (subject to Google&apos;s privacy policy)</li>
                 <li><strong>GitHub OAuth:</strong> For GitHub account login (subject to GitHub&apos;s privacy policy)</li>
@@ -158,12 +158,14 @@ export default async function PrivacyPolicy() {
                 We use cookies and similar technologies to:
               </p>
               <ul className="list-disc list-inside text-gray-700 dark:text-gray-300 mb-4 space-y-1">
-                <li>Maintain your login session</li>
-                <li>Remember your preferences (theme, etc.)</li>
-                <li>Analyze website usage and performance</li>
+                <li><strong>Necessary cookies:</strong> Maintain your login session, remember your preferences (theme, etc.), provide bot protection (Cloudflare Turnstile), session tracking, and view counting</li>
+                <li><strong>Accept All cookies:</strong> Everything above plus website usage statistics (Cloudflare Insights), Hall of Fame view tracking, performance monitoring, and user behavior analytics</li>
               </ul>
+              <p className="text-gray-700 dark:text-gray-300 mb-4">
+                We provide a cookie consent banner that allows you to choose between accepting only necessary cookies or all cookies. You can change your cookie preferences at any time by clearing your browser data and refreshing the page.
+              </p>
               <p className="text-gray-700 dark:text-gray-300">
-                You can control cookie settings through your browser preferences.
+                You can also control cookie settings through your browser preferences, though this may affect the functionality of our website.
               </p>
             </section>
 

@@ -3,6 +3,9 @@
 // Session storage key for viewed screenshots
 const VIEWED_SCREENSHOTS_KEY = 'hof_viewed_screenshots';
 
+// Import cookie consent check
+import { hasAnalyticsConsent } from './cookieConsent';
+
 // Debounce tracking to prevent rapid duplicate calls
 const trackingTimeouts = new Map<string, NodeJS.Timeout>();
 
@@ -53,6 +56,11 @@ export function extractScreenshotIdFromUrl(url: string): string | null {
  * Mark a Hall of Fame screenshot as viewed by calling the API
  */
 export async function markScreenshotAsViewed(screenshotId: string, creatorId: string): Promise<void> {
+  // Only track if user has given analytics consent
+  if (!hasAnalyticsConsent()) {
+    return;
+  }
+
   // Check if we've already marked this screenshot as viewed in this session
   const viewedScreenshots = getViewedScreenshots();
   if (viewedScreenshots.has(screenshotId)) {
