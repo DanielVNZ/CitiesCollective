@@ -51,10 +51,13 @@ export async function uploadToR2(
 /**
  * Generate a presigned URL for downloading a file
  */
-export async function getDownloadUrl(key: string, expiresIn = 3600): Promise<string> {
+export async function getDownloadUrl(key: string, expiresIn = 3600, filename?: string): Promise<string> {
   const command = new GetObjectCommand({
     Bucket: R2_BUCKET_NAME,
     Key: key,
+    ...(filename && {
+      ResponseContentDisposition: `attachment; filename="${filename}"`,
+    }),
   });
 
   return await getSignedUrl(s3Client, command, { expiresIn });

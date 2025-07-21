@@ -58,9 +58,6 @@ export async function GET(
       return NextResponse.json({ error: 'This city is not available for download' }, { status: 403 });
     }
 
-    // Generate a signed URL that expires in 1 hour (3600 seconds)
-    const signedUrl = await getDownloadUrl(city.filePath, 3600);
-    
     // Create a safe filename for download
     const originalFileName = city.fileName || `${city.cityName || 'city'}.cok`;
     let safeFileName = originalFileName;
@@ -73,11 +70,10 @@ export async function GET(
     // Clean filename for safety
     safeFileName = safeFileName.replace(/[^a-zA-Z0-9.-]/g, '_');
 
-    // Redirect to the signed R2 URL with proper filename
-    const response = NextResponse.redirect(signedUrl);
+    // Generate a signed URL that expires in 1 hour (3600 seconds) with proper filename
+    const signedUrl = await getDownloadUrl(city.filePath, 3600, safeFileName);
     
-    // Set Content-Disposition header for proper filename
-    response.headers.set('Content-Disposition', `attachment; filename="${safeFileName}"`);
+    const response = NextResponse.redirect(signedUrl);
     
     // Optional: Track download analytics
     try {
