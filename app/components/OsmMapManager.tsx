@@ -15,6 +15,7 @@ export function OsmMapManager({ cityId, initialOsmMapPath, isOwner }: OsmMapMana
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isMapLoaded, setIsMapLoaded] = useState(false);
   // Collapsible only if owner and no map
   const [isCollapsed, setIsCollapsed] = useState(true);
 
@@ -65,6 +66,7 @@ export function OsmMapManager({ cityId, initialOsmMapPath, isOwner }: OsmMapMana
         throw new Error(errorData.error || 'Failed to remove OSM map');
       }
       setOsmMapPath('');
+      setIsMapLoaded(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to remove OSM map');
     } finally {
@@ -72,19 +74,20 @@ export function OsmMapManager({ cityId, initialOsmMapPath, isOwner }: OsmMapMana
     }
   };
 
+  const handleLoadMap = () => {
+    setIsMapLoaded(true);
+  };
+
   // If not owner and no map, show nothing
   if (!isOwner && !osmMapPath) {
     return null;
   }
 
-  // If a map is uploaded, always expanded and not collapsible
+  // If a map is uploaded, show the map section with load button
   if (osmMapPath) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
         <div className="flex justify-between items-center mb-4">
-          <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
-            City Map
-          </h3>
           {isOwner && (
             <div className="flex items-center space-x-2">
               <button
@@ -116,7 +119,30 @@ export function OsmMapManager({ cityId, initialOsmMapPath, isOwner }: OsmMapMana
             <p className="text-red-700 dark:text-red-400 text-sm">{error}</p>
           </div>
         )}
-        <OsmMapViewer osmMapPath={osmMapPath} cityId={cityId} />
+        
+        {!isMapLoaded ? (
+          <div className="text-center py-8">
+            <div className="text-4xl mb-4">🗺️</div>
+            <p className="text-gray-600 dark:text-gray-400 font-medium mb-4">
+              OSM Map Available
+            </p>
+            <p className="text-sm text-gray-500 dark:text-gray-500 mb-6">
+              Click the button below to load and view the city map
+            </p>
+            <button
+              onClick={handleLoadMap}
+              className="inline-flex items-center px-6 py-3 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-1.447-.894L15 4m0 13V4m-6 3l6-3" />
+              </svg>
+              Load OSM Map
+            </button>
+          </div>
+        ) : (
+          <OsmMapViewer osmMapPath={osmMapPath} cityId={cityId} />
+        )}
+        
         {isOwner && (
           <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">
             Upload a new OSM file to replace the current one
