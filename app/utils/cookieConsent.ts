@@ -4,7 +4,6 @@ export interface CookiePreferences {
   necessary: boolean;
   analytics: boolean;
   performance: boolean;
-  marketing: boolean;
 }
 
 export function getCookieConsent(): CookieConsentType {
@@ -162,7 +161,7 @@ export function updateCookiePreferences(preferences: CookiePreferences): void {
   
   // Determine consent level and update legacy consent
   let consentLevel: CookieConsentType = 'necessary';
-  if (preferences.analytics || preferences.performance || preferences.marketing) {
+  if (preferences.analytics || preferences.performance) {
     consentLevel = 'all';
   }
   

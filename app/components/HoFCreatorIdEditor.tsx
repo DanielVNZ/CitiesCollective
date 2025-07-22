@@ -46,6 +46,12 @@ export default function HoFCreatorIdEditor({ currentHoFCreatorId }: HoFCreatorId
         setMessage('HoF Creator ID updated successfully!');
         setMessageType('success');
         setIsEditing(false);
+        
+        // Trigger a page refresh to update the binding status component
+        // This is a simple way to ensure the status updates immediately
+        setTimeout(() => {
+          window.location.reload();
+        }, 1000);
       } else {
         setMessage(data.error || 'Failed to update HoF Creator ID');
         setMessageType('error');

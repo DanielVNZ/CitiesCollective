@@ -11,8 +11,7 @@ export function CookieConsent() {
   const [cookiePreferences, setCookiePreferences] = useState({
     necessary: true, // Always required
     analytics: false,
-    performance: false,
-    marketing: false
+    performance: false
   });
   const [preferencesLoaded, setPreferencesLoaded] = useState(false);
   const { data: session } = useSession();
@@ -75,8 +74,7 @@ export function CookieConsent() {
       setCookiePreferences({
         necessary: true,
         analytics: false,
-        performance: false,
-        marketing: false
+        performance: false
       });
     };
 
@@ -96,8 +94,7 @@ export function CookieConsent() {
     const allPreferences: CookiePreferences = {
       necessary: true,
       analytics: true,
-      performance: true,
-      marketing: true
+      performance: true
     };
 
     if (session?.user) {
@@ -115,8 +112,7 @@ export function CookieConsent() {
     const necessaryPreferences: CookiePreferences = {
       necessary: true,
       analytics: false,
-      performance: false,
-      marketing: false
+      performance: false
     };
 
     if (session?.user) {
@@ -168,7 +164,7 @@ export function CookieConsent() {
   };
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-lg">
+    <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-lg" style={{ zIndex: 999999 }}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
         {!showCustomize ? (
           // Main consent view
@@ -280,23 +276,7 @@ export function CookieConsent() {
                 </div>
               </div>
 
-              {/* Marketing Cookies */}
-              <div className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={cookiePreferences.marketing}
-                      onChange={() => handlePreferenceChange('marketing')}
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded"
-                    />
-                    <span className="font-medium text-gray-900 dark:text-white">Marketing Cookies</span>
-                  </div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                    Used to track visitors across websites to display relevant advertisements
-                  </p>
-                </div>
-              </div>
+
             </div>
 
             <div className="flex flex-col sm:flex-row gap-2 pt-2">

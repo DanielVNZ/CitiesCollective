@@ -7,6 +7,7 @@ import { CityManagementCard } from './CityManagementCard';
 import { UserProfileSection } from 'app/components/UserProfileSection';
 import ProfileEditor from 'app/components/ProfileEditor';
 import HoFCreatorIdEditor from 'app/components/HoFCreatorIdEditor';
+import HoFBindingStatus from 'app/components/HoFBindingStatus';
 import { SignOutButton } from 'app/components/SignOutButton';
 import { Header } from 'app/components/Header';
 
@@ -59,6 +60,14 @@ export default async function ProtectedPage() {
         <div className="mb-8">
           <HoFCreatorIdEditor 
             currentHoFCreatorId={user.hofCreatorId} 
+          />
+        </div>
+
+        {/* HoF Binding Status */}
+        <div className="mb-8">
+          <HoFBindingStatus 
+            hofCreatorId={user.hofCreatorId}
+            userId={user.id}
           />
         </div>
 
