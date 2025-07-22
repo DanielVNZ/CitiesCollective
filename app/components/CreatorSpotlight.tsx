@@ -69,7 +69,7 @@ export function CreatorSpotlight({ cities }: CreatorSpotlightProps) {
         {citiesWithImages.length > 0 && (
           <div className="mt-6 flex justify-center">
             <div className="flex items-center gap-2">
-              <span className="text-sm text-white/80">Sort images:</span>
+              <span className="text-sm text-white/80">Sort cities:</span>
               <ImageSortSelector
                 currentSort={currentSort}
                 onSortChange={handleSortChange}

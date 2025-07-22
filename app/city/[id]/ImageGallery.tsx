@@ -45,7 +45,7 @@ export function ImageGallery({ images, cityId, isOwner, onImagesChange, deepLink
   const searchParams = useSearchParams();
   const hasHandledDeepLink = useRef(false);
 
-  // Filter out images with missing required data
+  // Filter out images with missing required data and use the sorted images from props
   const validImages = images.filter(image => 
     image.mediumPath && image.largePath && image.originalName && image.thumbnailPath && image.originalPath
   );
@@ -187,6 +187,12 @@ export function ImageGallery({ images, cityId, isOwner, onImagesChange, deepLink
   const hasMoreImages = validImages.length > thumbnailsPerPage;
   const canScrollLeft = thumbnailStartIndex > 0;
   const canScrollRight = thumbnailStartIndex + thumbnailsPerPage < validImages.length;
+
+  // Reset thumbnail state when images change (due to sorting)
+  useEffect(() => {
+    setThumbnailStartIndex(0);
+    setMainGalleryIndex(0);
+  }, [images]);
 
   const nextMainImage = () => {
     const currentGlobalIndex = thumbnailStartIndex + mainGalleryIndex;
@@ -713,6 +719,23 @@ export function ImageGallery({ images, cityId, isOwner, onImagesChange, deepLink
                 data-liked={(imageLikeStates[displayedThumbnails[mainGalleryIndex].id.toString()]?.liked || false).toString()}
                 data-like-count={(imageLikeStates[displayedThumbnails[mainGalleryIndex].id.toString()]?.count || 0).toString()}
                 className="block w-full h-full cursor-pointer"
+                onClick={async () => {
+                  // Track view when main image is clicked to open fullscreen
+                  try {
+                    await fetch(`/api/images/${displayedThumbnails[mainGalleryIndex].id}/view`, {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                      },
+                      body: JSON.stringify({
+                        type: 'screenshot',
+                        cityId: cityId
+                      }),
+                    });
+                  } catch (error) {
+                    console.error('Error tracking view:', error);
+                  }
+                }}
               >
                 <Image
                   src={displayedThumbnails[mainGalleryIndex].originalPath!}
@@ -878,9 +901,24 @@ export function ImageGallery({ images, cityId, isOwner, onImagesChange, deepLink
                     data-liked={(imageLikeStates[image.id.toString()]?.liked || false).toString()}
                     data-like-count={(imageLikeStates[image.id.toString()]?.count || 0).toString()}
                     className="block w-full h-full absolute inset-0 z-10"
-                    onClick={(e) => {
+                    onClick={async (e) => {
                       e.preventDefault(); // Prevent default link behavior
                       e.stopPropagation(); // Prevent the div onClick from firing
+                      // Track view when thumbnail is clicked to open fullscreen
+                      try {
+                        await fetch(`/api/images/${image.id}/view`, {
+                          method: 'POST',
+                          headers: {
+                            'Content-Type': 'application/json',
+                          },
+                          body: JSON.stringify({
+                            type: 'screenshot',
+                            cityId: cityId
+                          }),
+                        });
+                      } catch (error) {
+                        console.error('Error tracking view:', error);
+                      }
                       // Find the corresponding hidden Fancybox link and click it
                       const hiddenLink = document.querySelector(`[data-fancybox="screenshots-${cityId}"][href="${image.originalPath}"]`) as HTMLElement;
                       if (hiddenLink) {

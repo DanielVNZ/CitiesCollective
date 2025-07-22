@@ -181,6 +181,12 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
   const canScrollLeft = thumbnailStartIndex > 0;
   const canScrollRight = thumbnailStartIndex + thumbnailsPerPage < images.length;
 
+  // Reset thumbnail state when images change (due to sorting)
+  useEffect(() => {
+    setThumbnailStartIndex(0);
+    setMainGalleryIndex(0);
+  }, [images]);
+
   const nextMainImage = () => {
     const currentGlobalIndex = thumbnailStartIndex + mainGalleryIndex;
     if (currentGlobalIndex < images.length - 1) {
@@ -657,10 +663,25 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
               data-image-id={displayedThumbnails[mainGalleryIndex].hofImageId}
               data-liked={(imageLikeStates[displayedThumbnails[mainGalleryIndex].hofImageId]?.liked || false).toString()}
               data-like-count={(imageLikeStates[displayedThumbnails[mainGalleryIndex].hofImageId]?.count || 0).toString()}
-              onClick={() => {
+              onClick={async () => {
                 // Track view when main image is clicked to open fullscreen
                 if (hofCreatorId && displayedThumbnails[mainGalleryIndex].imageUrl4K) {
                   trackHallOfFameImageView(displayedThumbnails[mainGalleryIndex].imageUrl4K, hofCreatorId);
+                }
+                // Track view in our new API
+                try {
+                  await fetch(`/api/images/${displayedThumbnails[mainGalleryIndex].hofImageId}/view`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                      type: 'hall_of_fame',
+                      cityId: cityId
+                    }),
+                  });
+                } catch (error) {
+                  console.error('Error tracking view:', error);
                 }
               }}
             >
@@ -827,12 +848,27 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
                     data-liked={(imageLikeStates[image.hofImageId]?.liked || false).toString()}
                     data-like-count={(imageLikeStates[image.hofImageId]?.count || 0).toString()}
                     className="block w-full h-full absolute inset-0 z-10"
-                    onClick={(e) => {
+                    onClick={async (e) => {
                       e.preventDefault(); // Prevent default link behavior
                       e.stopPropagation(); // Prevent the div onClick from firing
                       // Track view when thumbnail is clicked to open fullscreen
                       if (hofCreatorId && image.imageUrl4K) {
                         trackHallOfFameImageView(image.imageUrl4K, hofCreatorId);
+                      }
+                      // Track view in our new API
+                      try {
+                        await fetch(`/api/images/${image.hofImageId}/view`, {
+                          method: 'POST',
+                          headers: {
+                            'Content-Type': 'application/json',
+                          },
+                          body: JSON.stringify({
+                            type: 'hall_of_fame',
+                            cityId: cityId
+                          }),
+                        });
+                      } catch (error) {
+                        console.error('Error tracking view:', error);
                       }
                       // Find the index of this image in the full images array
                       const imageIndex = images.findIndex(img => img.hofImageId === image.hofImageId);

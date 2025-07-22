@@ -144,7 +144,7 @@ export function SearchResults() {
           {/* Image Sort Selector */}
           {citiesWithImages.length > 0 && (
             <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600 dark:text-gray-400">Sort images:</span>
+              <span className="text-sm text-gray-600 dark:text-gray-400">Sort cities:</span>
               <ImageSortSelector
                 currentSort={currentSort}
                 onSortChange={handleSortChange}
