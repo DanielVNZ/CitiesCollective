@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
       if (!creatorResponse.ok) {
         return NextResponse.json({
           error: `Failed to authenticate with Hall of Fame. Status: ${creatorResponse.status}`,
-          details: 'Please check your Creator ID and try again.'
+          details: 'Please check your Hall of Fame ID and try again.'
         }, { status: 400 });
       }
 
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
       if (!screenshotsResponse.ok) {
         return NextResponse.json({
           error: `Failed to fetch screenshots. Status: ${screenshotsResponse.status}`,
-          details: 'Creator ID is valid but could not fetch images.'
+          details: 'Hall of Fame ID is valid but could not fetch images.'
         }, { status: 400 });
       }
 
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        message: `Successfully connected to Hall of Fame! Creator ID is valid and working.`,
+        message: `Successfully connected to Hall of Fame! Your Hall of Fame ID is valid and working.`,
         hasImages: imageCount > 0,
         imageCount: imageCount,
         creatorId: creatorId
