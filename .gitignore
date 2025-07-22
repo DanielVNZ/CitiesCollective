@@ -50,3 +50,4 @@ public/uploads/cities/*
 package-lock.json
 yarn.lock
 update-osm-urls.js
+download-social-icons.js
