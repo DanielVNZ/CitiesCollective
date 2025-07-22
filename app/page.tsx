@@ -8,6 +8,7 @@ import { Header } from 'app/components/Header';
 import { auth } from 'app/auth';
 import { HeroCarousel } from 'app/components/HeroCarousel';
 import { CommunityFavorites } from 'app/components/CommunityFavorites';
+import { CreatorSpotlight } from 'app/components/CreatorSpotlight';
 import { ClientPaginationWrapper } from 'app/components/ClientPaginationWrapper';
 import { StatsSection } from 'app/components/StatsSection';
 import { SessionTracker } from 'app/components/SessionTracker';
@@ -15,12 +16,29 @@ import { SessionTracker } from 'app/components/SessionTracker';
 export default async function Page({ searchParams }: { searchParams?: { page?: string } }) {
   const currentPage = Math.max(1, parseInt(searchParams?.page || '1'));
   const citiesPerPage = 9;
-  const offset = (currentPage - 1) * citiesPerPage;
   
-  const cities = await getRecentCities(citiesPerPage, offset);
-  const totalCities = await getTotalCityCount();
-  const citiesWithImages = await getCitiesWithImagesCount();
-  const totalPages = Math.ceil(totalCities / citiesPerPage);
+  // Use search API to get the 30 most recent cities (same as search page logic)
+  const searchResponse = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/search?limit=30&sortBy=newest&sortOrder=desc`, {
+    cache: 'no-store'
+  });
+  
+  let cities: any[] = [];
+  let totalCities = 0;
+  let citiesWithImages = 0;
+  
+  if (searchResponse.ok) {
+    const searchData = await searchResponse.json();
+    cities = searchData.cities || [];
+    totalCities = searchData.pagination?.totalCount || 0;
+    citiesWithImages = cities.filter(city => city.images && city.images.length > 0).length;
+  } else {
+    // Fallback to original method if search fails
+    cities = await getRecentCities(30, 0);
+    totalCities = await getTotalCityCount();
+    citiesWithImages = await getCitiesWithImagesCount();
+  }
+  
+  const totalPages = Math.ceil(Math.min(30, totalCities) / citiesPerPage);
   
   const topCitiesWithImages = await getTopCitiesWithImages(25);
   const contentCreatorCities = await getContentCreatorCities(6);
@@ -119,19 +137,7 @@ export default async function Page({ searchParams }: { searchParams?: { page?: s
         </section>
 
         {/* Creator Spotlight Section */}
-        <section className="mb-16 sm:mb-24 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-2xl p-10 shadow-lg">
-          <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold mb-2">Creator Spotlight</h2>
-            <p className="text-lg max-w-3xl mx-auto">We&apos;ll be featuring your favourite creators&apos; cities here, encourage them to upload their cities! *cough cough* Biffa and City Planner Plays...</p>
-          </div>
-          {contentCreatorCities.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {contentCreatorCities.map((city) => (
-                <CityCard key={city.id} city={city} />
-              ))}
-            </div>
-          )}
-        </section>
+        <CreatorSpotlight cities={contentCreatorCities} />
 
         {/* Recently Shared Cities Section */}
         <section>
@@ -163,9 +169,9 @@ export default async function Page({ searchParams }: { searchParams?: { page?: s
                 initialCities={cities}
                 currentPage={currentPage}
                 totalPages={totalPages}
-                totalItems={totalCities}
+                totalItems={Math.min(30, totalCities)}
                 itemsPerPage={citiesPerPage}
-                offset={offset}
+                offset={0}
                 citiesWithImages={citiesWithImages}
               />
             </>

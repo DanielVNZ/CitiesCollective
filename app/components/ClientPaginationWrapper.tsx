@@ -1,9 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { CityCard } from 'app/components/CityCard';
 import { ImageFilterToggle } from 'app/components/ImageFilterToggle';
+import ImageSortSelector from 'app/components/ImageSortSelector';
+import { useImageSorting } from 'app/hooks/useImageSorting';
+import { sortImages } from 'app/utils/imageSorting';
 
 interface City {
   id: number;
@@ -15,6 +18,8 @@ interface City {
   xp: number | null;
   unlimitedMoney: boolean | null;
   uploadedAt: Date | null;
+  likeCount?: number;
+  viewCount?: number;
   user: {
     id: number;
     username: string | null;
@@ -53,81 +58,30 @@ export function ClientPaginationWrapper({
   const searchParams = useSearchParams();
   const [page, setPage] = useState(currentPage);
   const [cities, setCities] = useState<City[]>(initialCities);
-  const [isLoading, setIsLoading] = useState(false);
   const [showOnlyWithImages, setShowOnlyWithImages] = useState(searchParams.get('withImages') === 'true');
+  const { currentSort, handleSortChange } = useImageSorting('most-recent');
 
-  const navigateToPage = useCallback(async (newPage: number) => {
-    if (newPage < 1 || newPage > totalPages || newPage === page || isLoading) return;
-    
-    setIsLoading(true);
-    setPage(newPage);
-    
-    try {
-      const newOffset = (newPage - 1) * itemsPerPage;
-      const response = await fetch(`/api/cities/recent?limit=${itemsPerPage}&offset=${newOffset}&withImages=${showOnlyWithImages}`);
-      
-      if (response.ok) {
-        const data = await response.json();
-        setCities(data.cities || []);
-      } else {
-        console.error('Failed to fetch cities');
-      }
-    } catch (error) {
-      console.error('Error fetching cities:', error);
-    } finally {
-      setIsLoading(false);
-    }
-    
-    // Update URL without causing navigation
-    const params = new URLSearchParams(searchParams.toString());
-    params.set('page', newPage.toString());
-    if (showOnlyWithImages) {
-      params.set('withImages', 'true');
-    } else {
-      params.delete('withImages');
-    }
-    window.history.replaceState({}, '', `/?${params.toString()}`);
-  }, [page, totalPages, isLoading, itemsPerPage, searchParams, showOnlyWithImages]);
-
-  // Update local state when URL changes (e.g., browser back/forward)
+  // Update local state when URL changes
   useEffect(() => {
     const urlPage = parseInt(searchParams.get('page') || '1');
     const urlWithImages = searchParams.get('withImages') === 'true';
     
-    // Only update page if different
-    if (urlPage !== page) {
-      setPage(urlPage);
-    }
-  }, [searchParams, page]);
+    setPage(urlPage);
+    setShowOnlyWithImages(urlWithImages);
+  }, [searchParams]);
 
-  const newOffset = (page - 1) * itemsPerPage;
+  // Force re-render when sort changes
+  useEffect(() => {
+    // This effect will run whenever currentSort changes
+    // The component will re-render and re-sort the cities
+  }, [currentSort]);
 
-  const handleToggleImages = useCallback(async (showOnly: boolean) => {
-    // Update state immediately for visual feedback
+  // Handle toggle - just filter the existing data
+  const handleToggleImages = (showOnly: boolean) => {
     setShowOnlyWithImages(showOnly);
-    setPage(1); // Reset to first page when filtering
-    setIsLoading(true);
+    setPage(1); // Reset to first page
     
-    try {
-      const response = await fetch(`/api/cities/recent?limit=${itemsPerPage}&offset=0&withImages=${showOnly}`);
-      
-      if (response.ok) {
-        const data = await response.json();
-        setCities(data.cities || []);
-      } else {
-        console.error('Failed to fetch cities');
-        // Revert state if fetch failed
-        setShowOnlyWithImages(!showOnly);
-      }
-    } catch (error) {
-      console.error('Error fetching cities:', error);
-      // Revert state if fetch failed
-      setShowOnlyWithImages(!showOnly);
-    } finally {
-      setIsLoading(false);
-    }
-    
-    // Update URL without causing navigation
+    // Update URL
     const params = new URLSearchParams(searchParams.toString());
     params.set('page', '1');
     if (showOnly) {
@@ -136,111 +90,172 @@ export function ClientPaginationWrapper({
       params.delete('withImages');
     }
     window.history.replaceState({}, '', `/?${params.toString()}`);
-  }, [itemsPerPage, searchParams]);
+  };
 
-  // Filter cities based on toggle
+  // Handle page change
+  const handlePageChange = (newPage: number) => {
+    setPage(newPage);
+    
+    // Update URL
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('page', newPage.toString());
+    if (showOnlyWithImages) {
+      params.set('withImages', 'true');
+    } else {
+      params.delete('withImages');
+    }
+    window.history.replaceState({}, '', `/?${params.toString()}`);
+  };
+
+  // 1. Filter cities based on toggle
   const filteredCities = showOnlyWithImages 
     ? cities.filter(city => city.images && city.images.length > 0)
     : cities;
 
+  // 2. Sort all cities by upload date (most recent first) - NEVER separate them
+  const sortedCities = filteredCities.sort((a, b) => {
+    const aDate = typeof a.uploadedAt === 'string' ? new Date(a.uploadedAt) : a.uploadedAt || new Date(0);
+    const bDate = typeof b.uploadedAt === 'string' ? new Date(b.uploadedAt) : b.uploadedAt || new Date(0);
+    return bDate.getTime() - aDate.getTime();
+  });
+
+  // 3. Cap at 30 cities
+  const maxCities = 30;
+  const cappedCities = sortedCities.slice(0, maxCities);
+
+  // 4. Sort ALL cities together (no separation)
+  
+  // Prepare ALL cities for sorting (cities with images use image data, cities without use city data)
+  const citiesForSorting = cappedCities.map(city => {
+    if (city.images && city.images.length > 0) {
+      // Cities with images - use image data for sorting
+      const primaryImage = city.images?.find((img: any) => img.isPrimary) || city.images?.[0];
+      return {
+        city,
+        sortableImage: {
+          id: primaryImage.id,
+          uploadedAt: typeof city.uploadedAt === 'string' ? city.uploadedAt : city.uploadedAt?.toISOString() || new Date().toISOString(),
+          likeCount: city.likeCount || 0,
+          viewCount: city.viewCount || 0
+        }
+      };
+    } else {
+      // Cities without images - use city data for sorting
+      return {
+        city,
+        sortableImage: {
+          id: city.id,
+          uploadedAt: typeof city.uploadedAt === 'string' ? city.uploadedAt : city.uploadedAt?.toISOString() || new Date().toISOString(),
+          likeCount: city.likeCount || 0,
+          viewCount: city.viewCount || 0
+        }
+      };
+    }
+  });
+
+  // Sort ALL cities together
+  const sortedImages = sortImages(citiesForSorting.map(item => item.sortableImage), currentSort);
+  const finalSortedCities = sortedImages.map(sortedImage => {
+    return citiesForSorting.find(item => item.sortableImage.id === sortedImage.id)?.city;
+  }).filter(Boolean) as City[];
+
+  // 5. Calculate pagination
+  const actualTotalItems = finalSortedCities.length;
+  const actualTotalPages = Math.ceil(actualTotalItems / itemsPerPage);
+  const currentPageNum = Math.min(page, actualTotalPages || 1);
+  const startIndex = (currentPageNum - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const displayCities = finalSortedCities.slice(startIndex, endIndex);
+
   return (
     <>
-      {/* Image Filter Toggle */}
-      <ImageFilterToggle
-        showOnlyWithImages={showOnlyWithImages}
-        onToggle={handleToggleImages}
-        citiesWithImages={citiesWithImages}
-        totalCities={totalItems}
-      />
+      {/* Controls */}
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-8">
+        <ImageFilterToggle
+          showOnlyWithImages={showOnlyWithImages}
+          onToggle={handleToggleImages}
+          citiesWithImages={citiesWithImages}
+          totalCities={actualTotalItems}
+        />
+        
+        {cappedCities.filter(city => city.images && city.images.length > 0).length > 0 && (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600 dark:text-gray-400">Sort images:</span>
+            <ImageSortSelector
+              currentSort={currentSort}
+              onSortChange={handleSortChange}
+              size="sm"
+            />
+          </div>
+        )}
+      </div>
 
       {/* Cities Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        {isLoading ? (
-          // Loading skeleton
-          Array.from({ length: itemsPerPage }, (_, i) => (
-            <div key={i} className="bg-white dark:bg-gray-800 rounded-2xl shadow-md border border-gray-200 dark:border-gray-700 overflow-hidden animate-pulse">
-              <div className="h-48 bg-gray-200 dark:bg-gray-700"></div>
-              <div className="p-6">
-                <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded mb-2"></div>
-                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded mb-4"></div>
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded"></div>
-                  <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded"></div>
-                  <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded"></div>
-                </div>
-              </div>
-            </div>
-          ))
-        ) : (
-          filteredCities.map((city) => (
-            <CityCard key={city.id} city={city} />
-          ))
-        )}
+        {displayCities.map((city) => (
+          <CityCard key={city.id} city={city} />
+        ))}
       </div>
       
       {/* Pagination */}
-      {totalPages > 1 && (
+      {actualTotalPages > 1 && (
         <div className="mt-12 flex justify-center items-center space-x-2">
-          {/* Previous Button */}
           <button
-            onClick={() => navigateToPage(page - 1)}
-            disabled={page === 1 || isLoading}
+            onClick={() => handlePageChange(Math.max(1, currentPageNum - 1))}
+            disabled={currentPageNum === 1}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              page === 1 || isLoading
+              currentPageNum === 1
                 ? 'bg-gray-100 text-gray-400 cursor-not-allowed dark:bg-gray-800 dark:text-gray-600'
                 : 'bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600'
             }`}
           >
-            {isLoading ? 'Loading...' : 'Previous'}
+            Previous
           </button>
 
-          {/* Page Numbers */}
-          {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+          {Array.from({ length: Math.min(5, actualTotalPages) }, (_, i) => {
             let pageNumber: number;
-            if (totalPages <= 5) {
+            if (actualTotalPages <= 5) {
               pageNumber = i + 1;
-            } else if (page <= 3) {
+            } else if (currentPageNum <= 3) {
               pageNumber = i + 1;
-            } else if (page >= totalPages - 2) {
-              pageNumber = totalPages - 4 + i;
+            } else if (currentPageNum >= actualTotalPages - 2) {
+              pageNumber = actualTotalPages - 4 + i;
             } else {
-              pageNumber = page - 2 + i;
+              pageNumber = currentPageNum - 2 + i;
             }
 
             return (
               <button
                 key={pageNumber}
-                onClick={() => navigateToPage(pageNumber)}
-                disabled={isLoading}
+                onClick={() => handlePageChange(pageNumber)}
                 className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  page === pageNumber
+                  currentPageNum === pageNumber
                     ? 'bg-blue-600 text-white'
                     : 'bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600'
-                } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                }`}
               >
                 {pageNumber}
               </button>
             );
           })}
 
-          {/* Next Button */}
           <button
-            onClick={() => navigateToPage(page + 1)}
-            disabled={page === totalPages || isLoading}
+            onClick={() => handlePageChange(Math.min(actualTotalPages, currentPageNum + 1))}
+            disabled={currentPageNum === actualTotalPages}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              page === totalPages || isLoading
+              currentPageNum === actualTotalPages
                 ? 'bg-gray-100 text-gray-400 cursor-not-allowed dark:bg-gray-800 dark:text-gray-600'
                 : 'bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600'
             }`}
           >
-            {isLoading ? 'Loading...' : 'Next'}
+            Next
           </button>
         </div>
       )}
 
       {/* Page Info */}
       <div className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
-        Showing {newOffset + 1} to {Math.min(newOffset + itemsPerPage, totalItems)} of {totalItems} cities
+        Showing {startIndex + 1} to {Math.min(endIndex, actualTotalItems)} of {actualTotalItems} cities
       </div>
     </>
   );

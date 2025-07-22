@@ -18,20 +18,24 @@ export function useImageSorting(defaultSort: ImageSortOption = 'most-recent') {
     return defaultSort;
   });
 
-  // Update sort when URL changes
+  // Only update from URL on initial load, not on every searchParams change
   useEffect(() => {
     const urlSort = getSortOptionFromUrl(new URLSearchParams(searchParams.toString()));
-    if (urlSort !== currentSort) {
+    if (urlSort !== currentSort && currentSort === defaultSort) {
       setCurrentSort(urlSort);
     }
-  }, [searchParams, currentSort]);
+  }, []); // Only run once on mount
 
   const handleSortChange = (newSort: ImageSortOption) => {
     setCurrentSort(newSort);
     
-    // Update URL without page refresh
-    const newUrl = updateUrlWithSort(newSort, window.location.href);
-    router.push(newUrl, { scroll: false });
+    // Update URL without page refresh using replaceState
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('sort', newSort);
+    window.history.replaceState({}, '', `${pathname}?${params.toString()}`);
+    
+    // Force the component to re-render immediately
+    // The URL change might not trigger searchParams update immediately
   };
 
   return {

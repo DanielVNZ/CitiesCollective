@@ -1685,6 +1685,7 @@ export async function searchCities(
   await ensureCityTableExists();
   await ensureCityImagesTableExists();
   await ensureHallOfFameCacheTableExists();
+  await ensureLikesTableExists();
   const userTable = await ensureTableExists();
   const conditions = [];
 
@@ -1814,6 +1815,8 @@ export async function searchCities(
       `,
       // Subquery for comment count
       commentCount: sql<number>`(SELECT COUNT(*) FROM "comments" WHERE "cityId" = "City".id)`.as('commentCount'),
+      // Subquery for like count
+      likeCount: sql<number>`(SELECT COUNT(*) FROM "likes" WHERE "cityId" = "City".id)`.as('likeCount'),
       // Subquery for view count
       viewCount: sql<number>`(SELECT COUNT(*) FROM "cityViews" WHERE "cityId" = "City".id)`.as('viewCount'),
     })
@@ -1904,6 +1907,8 @@ export async function searchCities(
         `,
         // Subquery for comment count
         commentCount: sql<number>`(SELECT COUNT(*) FROM "comments" WHERE "cityId" = "City".id)`.as('commentCount'),
+        // Subquery for like count
+        likeCount: sql<number>`(SELECT COUNT(*) FROM "likes" WHERE "cityId" = "City".id)`.as('likeCount'),
         // Subquery for view count
         viewCount: sql<number>`(SELECT COUNT(*) FROM "cityViews" WHERE "cityId" = "City".id)`.as('viewCount'),
       })

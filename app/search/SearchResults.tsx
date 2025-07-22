@@ -3,6 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { CityCard } from 'app/components/CityCard';
+import ImageSortSelector from 'app/components/ImageSortSelector';
+import { useImageSorting } from 'app/hooks/useImageSorting';
+import { sortImages } from 'app/utils/imageSorting';
 import Link from 'next/link';
 
 interface SearchResult {
@@ -23,6 +26,7 @@ export function SearchResults() {
   const [results, setResults] = useState<SearchResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { currentSort, handleSortChange } = useImageSorting('most-recent');
 
   useEffect(() => {
     const fetchResults = async () => {
@@ -85,6 +89,25 @@ export function SearchResults() {
   if (filters.maxMoney) activeFilters.push(`Max Money: $${filters.maxMoney.toLocaleString()}`);
   if (filters.withImages) activeFilters.push(`Cities with images`);
 
+  // Prepare cities with their primary images for sorting
+  const citiesWithImages = cities.map(city => {
+    const primaryImage = city.images?.find((img: any) => img.isPrimary) || city.images?.[0];
+    return {
+      ...city,
+      primaryImage: primaryImage ? {
+        ...primaryImage,
+        uploadedAt: city.uploadedAt, // Use city upload date for sorting
+        likeCount: city.likeCount || 0, // Use city-level like count
+        viewCount: city.viewCount || 0  // Use city-level view count
+      } : null
+    };
+  }).filter(city => city.primaryImage); // Only include cities with images
+
+  // Sort cities by their primary images
+  const sortedCities = sortImages(citiesWithImages.map(city => city.primaryImage), currentSort).map((sortedImage) => {
+    return citiesWithImages.find(c => c.primaryImage?.id === sortedImage.id);
+  }).filter(Boolean);
+
   const generatePageUrl = (page: number) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set('page', page.toString());
@@ -117,11 +140,25 @@ export function SearchResults() {
           )}
         </div>
         
-        {pagination.totalCount > 0 && (
-          <div className="text-sm text-gray-600 dark:text-gray-400">
-            Showing {((pagination.page - 1) * pagination.limit) + 1}-{Math.min(pagination.page * pagination.limit, pagination.totalCount)} of {pagination.totalCount}
-          </div>
-        )}
+        <div className="flex flex-col md:flex-row items-center gap-4">
+          {/* Image Sort Selector */}
+          {citiesWithImages.length > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600 dark:text-gray-400">Sort images:</span>
+              <ImageSortSelector
+                currentSort={currentSort}
+                onSortChange={handleSortChange}
+                size="sm"
+              />
+            </div>
+          )}
+          
+          {pagination.totalCount > 0 && (
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              Showing {((pagination.page - 1) * pagination.limit) + 1}-{Math.min(pagination.page * pagination.limit, pagination.totalCount)} of {pagination.totalCount}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Results Grid */}
@@ -143,7 +180,7 @@ export function SearchResults() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {cities.map((city) => (
+          {(sortedCities.length > 0 ? sortedCities : cities).map((city) => (
             <CityCard key={city.id} city={city} />
           ))}
         </div>

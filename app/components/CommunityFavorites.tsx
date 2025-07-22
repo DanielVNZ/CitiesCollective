@@ -14,6 +14,7 @@ interface CommunityFavoritesProps {
     unlimitedMoney: boolean | null;
     uploadedAt: Date | null;
     likeCount: number;
+    viewCount?: number;
     user: {
       id: number;
       username: string | null;
