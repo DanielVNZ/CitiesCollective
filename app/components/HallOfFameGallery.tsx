@@ -784,14 +784,14 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
             
             {/* Primary Badge */}
             {displayedThumbnails[mainGalleryIndex].isPrimary && (
-              <div className="absolute top-4 left-4 bg-yellow-500 text-white px-3 py-1 rounded-full text-sm font-medium">
+              <div className="absolute top-4 left-4 bg-blue-500 text-white px-3 py-1 rounded-full text-sm font-medium">
                 Primary
               </div>
             )}
 
             {/* Hall of Fame Icon */}
             <div className="absolute top-4 right-4">
-              <div className="bg-yellow-400 rounded-full p-1 shadow-lg">
+              <div className="rounded-full p-1 shadow-lg" style={{ backgroundColor: 'transparent' }}>
                 <img
                   src="/logo/hof-icon.svg"
                   alt="Hall of Fame"
@@ -997,14 +997,14 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
                 
                 {/* Primary Badge */}
                 {image.isPrimary && (
-                  <div className="absolute top-1 left-1 bg-yellow-500 text-white px-1 py-0.5 rounded-full text-xs font-medium">
+                  <div className="absolute top-1 left-1 bg-blue-500 text-white px-1 py-0.5 rounded-full text-xs font-medium">
                     Primary
                   </div>
                 )}
 
                 {/* Hall of Fame Icon */}
                 <div className="absolute top-1 right-1">
-                  <div className="bg-yellow-400 rounded-full p-0.5 shadow-lg">
+                  <div className="rounded-full p-0.5 shadow-lg" style={{ backgroundColor: 'transparent' }}>
                     <img
                       src="/logo/hof-icon.svg"
                       alt="Hall of Fame"
@@ -1036,7 +1036,7 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
                     }}
                     className={`w-6 h-6 rounded-full text-xs font-medium transition-all duration-200 flex items-center justify-center ${
                       image.isPrimary 
-                        ? 'bg-yellow-500 text-white' 
+                        ? 'bg-blue-500 text-white' 
                         : isOwner 
                           ? 'bg-black bg-opacity-50 text-white hover:bg-opacity-70' 
                           : 'bg-black bg-opacity-30 text-white'

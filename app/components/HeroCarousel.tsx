@@ -166,7 +166,7 @@ export function HeroCarousel({ topCities }: HeroCarouselProps) {
               {/* Hall of Fame Icon */}
               {primaryImage?.isHallOfFame && (
                 <div className="absolute bottom-4 right-4 z-10">
-                  <div className="bg-yellow-400 rounded-full p-1 shadow-lg">
+                  <div className="rounded-full p-1 shadow-lg" style={{ backgroundColor: 'transparent' }}>
                     <img
                       src="/logo/hof-icon.svg"
                       alt="Hall of Fame"
