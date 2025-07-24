@@ -41,6 +41,9 @@ export function ImageGallery({ images, cityId, isOwner, onImagesChange, deepLink
   const [showComments, setShowComments] = useState(false);
   const [isClosingComments, setIsClosingComments] = useState(false);
   const [imageLikeStates, setImageLikeStates] = useState<Record<string, { liked: boolean; count: number }>>({});
+  const [isLoading, setIsLoading] = useState(false);
+  const [isImageLoading, setIsImageLoading] = useState(false);
+  const [preloadedImages, setPreloadedImages] = useState<Set<string>>(new Set());
   const mainImageRef = useRef<HTMLDivElement>(null);
   const searchParams = useSearchParams();
   const hasHandledDeepLink = useRef(false);
@@ -49,6 +52,48 @@ export function ImageGallery({ images, cityId, isOwner, onImagesChange, deepLink
   const validImages = images.filter(image => 
     image.mediumPath && image.largePath && image.originalName && image.thumbnailPath && image.originalPath
   );
+
+  // Preload adjacent images
+  const preloadAdjacentImages = useCallback((currentIndex: number) => {
+    const imagesToPreload = [];
+    
+    // Preload previous image
+    if (currentIndex > 0) {
+      const prevImage = validImages[currentIndex - 1];
+      if (prevImage?.originalPath) {
+        imagesToPreload.push(prevImage.originalPath);
+      }
+    }
+    
+    // Preload next image
+    if (currentIndex < validImages.length - 1) {
+      const nextImage = validImages[currentIndex + 1];
+      if (nextImage?.originalPath) {
+        imagesToPreload.push(nextImage.originalPath);
+      }
+    }
+    
+    // Preload images
+    imagesToPreload.forEach(imagePath => {
+      if (!preloadedImages.has(imagePath)) {
+        const img = new window.Image();
+        img.onload = () => {
+          setPreloadedImages(prev => new Set(Array.from(prev).concat([imagePath])));
+        };
+        img.src = imagePath;
+      }
+    });
+  }, [validImages, preloadedImages]);
+
+  // Preload current image and adjacent images on mount and when images change
+  useEffect(() => {
+    if (validImages.length > 0) {
+      const currentImage = validImages[mainGalleryIndex];
+      if (currentImage?.originalPath) {
+        preloadAdjacentImages(mainGalleryIndex);
+      }
+    }
+  }, [validImages, mainGalleryIndex, preloadAdjacentImages]);
 
   // Fetch like states for all images
   useEffect(() => {
@@ -194,8 +239,13 @@ export function ImageGallery({ images, cityId, isOwner, onImagesChange, deepLink
     setMainGalleryIndex(0);
   }, [images]);
 
-  const nextMainImage = () => {
+  const nextMainImage = async () => {
+    if (isLoading) return;
+    
+    setIsLoading(true);
+    setIsImageLoading(true);
     const currentGlobalIndex = thumbnailStartIndex + mainGalleryIndex;
+    
     if (currentGlobalIndex < validImages.length - 1) {
       // Move to next image in the same page
       if (mainGalleryIndex < displayedThumbnails.length - 1) {
@@ -209,10 +259,22 @@ export function ImageGallery({ images, cityId, isOwner, onImagesChange, deepLink
       setThumbnailStartIndex(0);
       setMainGalleryIndex(0);
     }
+    
+    // Preload adjacent images for the new position
+    setTimeout(() => {
+      const newGlobalIndex = thumbnailStartIndex + mainGalleryIndex;
+      preloadAdjacentImages(newGlobalIndex);
+      setIsLoading(false);
+    }, 100);
   };
 
-  const prevMainImage = () => {
+  const prevMainImage = async () => {
+    if (isLoading) return;
+    
+    setIsLoading(true);
+    setIsImageLoading(true);
     const currentGlobalIndex = thumbnailStartIndex + mainGalleryIndex;
+    
     if (currentGlobalIndex > 0) {
       // Move to previous image in the same page
       if (mainGalleryIndex > 0) {
@@ -227,6 +289,13 @@ export function ImageGallery({ images, cityId, isOwner, onImagesChange, deepLink
       setThumbnailStartIndex(lastPageStart);
       setMainGalleryIndex(validImages.length - lastPageStart - 1);
     }
+    
+    // Preload adjacent images for the new position
+    setTimeout(() => {
+      const newGlobalIndex = thumbnailStartIndex + mainGalleryIndex;
+      preloadAdjacentImages(newGlobalIndex);
+      setIsLoading(false);
+    }, 100);
   };
 
   const scrollThumbnailsLeft = () => {
@@ -253,7 +322,7 @@ export function ImageGallery({ images, cityId, isOwner, onImagesChange, deepLink
   };
 
   const handleTouchEnd = () => {
-    if (!touchStart || !touchEnd) return;
+    if (!touchStart || !touchEnd || isLoading) return;
     
     const distance = touchStart - touchEnd;
     const isLeftSwipe = distance > 50;
@@ -737,15 +806,27 @@ export function ImageGallery({ images, cityId, isOwner, onImagesChange, deepLink
                   }
                 }}
               >
-                <Image
-                  src={displayedThumbnails[mainGalleryIndex].originalPath!}
-                  alt={displayedThumbnails[mainGalleryIndex].originalName!}
-                  width={1200}
-                  height={675}
-                  className="w-full h-full object-contain transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-2xl"
-                  quality={100}
-                  data-image-id={displayedThumbnails[mainGalleryIndex].id.toString()}
-                />
+                <div className="relative w-full h-full">
+                  <Image
+                    src={displayedThumbnails[mainGalleryIndex].originalPath!}
+                    alt={displayedThumbnails[mainGalleryIndex].originalName!}
+                    width={1200}
+                    height={675}
+                    className="w-full h-full object-contain transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-2xl"
+                    quality={100}
+                    data-image-id={displayedThumbnails[mainGalleryIndex].id.toString()}
+                    priority={true}
+                    onLoad={() => setIsImageLoading(false)}
+                    onError={() => setIsImageLoading(false)}
+                  />
+                  
+                  {/* Loading overlay */}
+                  {isImageLoading && (
+                    <div className="absolute inset-0 flex items-center justify-center z-20">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
+                    </div>
+                  )}
+                </div>
               </a>
             )}
             
@@ -804,21 +885,39 @@ export function ImageGallery({ images, cityId, isOwner, onImagesChange, deepLink
                 {/* Previous Button */}
                 <button
                   onClick={prevMainImage}
-                  className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 hover:bg-opacity-70 text-white p-2 rounded-full transition-all duration-200 z-10"
+                  disabled={isLoading}
+                  className={`absolute left-4 top-1/2 transform -translate-y-1/2 p-2 rounded-full transition-all duration-200 z-10 ${
+                    isLoading 
+                      ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
+                      : 'bg-black bg-opacity-50 hover:bg-opacity-70 text-white hover:scale-110'
+                  }`}
                 >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
+                  {isLoading ? (
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+                  ) : (
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                  )}
                 </button>
 
                 {/* Next Button */}
                 <button
                   onClick={nextMainImage}
-                  className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 hover:bg-opacity-70 text-white p-2 rounded-full transition-all duration-200 z-10"
+                  disabled={isLoading}
+                  className={`absolute right-4 top-1/2 transform -translate-y-1/2 p-2 rounded-full transition-all duration-200 z-10 ${
+                    isLoading 
+                      ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
+                      : 'bg-black bg-opacity-50 hover:bg-opacity-70 text-white hover:scale-110'
+                  }`}
                 >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
+                  {isLoading ? (
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+                  ) : (
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  )}
                 </button>
 
                 {/* Image Counter */}
@@ -876,7 +975,6 @@ export function ImageGallery({ images, cityId, isOwner, onImagesChange, deepLink
               </svg>
             </button>
           )}
-
 
 
 

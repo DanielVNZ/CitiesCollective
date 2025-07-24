@@ -40,8 +40,53 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
   const [showComments, setShowComments] = useState(false);
   const [isClosingComments, setIsClosingComments] = useState(false);
   const [imageLikeStates, setImageLikeStates] = useState<Record<string, { liked: boolean; count: number }>>({});
+  const [isLoading, setIsLoading] = useState(false);
+  const [isImageLoading, setIsImageLoading] = useState(false);
+  const [preloadedImages, setPreloadedImages] = useState<Set<string>>(new Set());
   const mainImageRef = useRef<HTMLDivElement>(null);
   const hasHandledDeepLink = useRef(false);
+
+  // Preload adjacent images
+  const preloadAdjacentImages = useCallback((currentIndex: number) => {
+    const imagesToPreload = [];
+    
+    // Preload previous image
+    if (currentIndex > 0) {
+      const prevImage = images[currentIndex - 1];
+      if (prevImage?.imageUrlFHD) {
+        imagesToPreload.push(prevImage.imageUrlFHD);
+      }
+    }
+    
+    // Preload next image
+    if (currentIndex < images.length - 1) {
+      const nextImage = images[currentIndex + 1];
+      if (nextImage?.imageUrlFHD) {
+        imagesToPreload.push(nextImage.imageUrlFHD);
+      }
+    }
+    
+    // Preload images
+    imagesToPreload.forEach(imagePath => {
+      if (!preloadedImages.has(imagePath)) {
+        const img = new window.Image();
+        img.onload = () => {
+          setPreloadedImages(prev => new Set(Array.from(prev).concat([imagePath])));
+        };
+        img.src = imagePath;
+      }
+    });
+  }, [images, preloadedImages]);
+
+  // Preload current image and adjacent images on mount and when images change
+  useEffect(() => {
+    if (images.length > 0) {
+      const currentImage = images[mainGalleryIndex];
+      if (currentImage?.imageUrlFHD) {
+        preloadAdjacentImages(mainGalleryIndex);
+      }
+    }
+  }, [images, mainGalleryIndex, preloadAdjacentImages]);
 
   // Fetch like states for all images
   useEffect(() => {
@@ -187,8 +232,13 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
     setMainGalleryIndex(0);
   }, [images]);
 
-  const nextMainImage = () => {
+  const nextMainImage = async () => {
+    if (isLoading) return;
+    
+    setIsLoading(true);
+    setIsImageLoading(true);
     const currentGlobalIndex = thumbnailStartIndex + mainGalleryIndex;
+    
     if (currentGlobalIndex < images.length - 1) {
       // Move to next image in the same page
       if (mainGalleryIndex < displayedThumbnails.length - 1) {
@@ -202,10 +252,22 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
       setThumbnailStartIndex(0);
       setMainGalleryIndex(0);
     }
+    
+    // Preload adjacent images for the new position
+    setTimeout(() => {
+      const newGlobalIndex = thumbnailStartIndex + mainGalleryIndex;
+      preloadAdjacentImages(newGlobalIndex);
+      setIsLoading(false);
+    }, 100);
   };
 
-  const prevMainImage = () => {
+  const prevMainImage = async () => {
+    if (isLoading) return;
+    
+    setIsLoading(true);
+    setIsImageLoading(true);
     const currentGlobalIndex = thumbnailStartIndex + mainGalleryIndex;
+    
     if (currentGlobalIndex > 0) {
       // Move to previous image in the same page
       if (mainGalleryIndex > 0) {
@@ -220,6 +282,13 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
       setThumbnailStartIndex(lastPageStart);
       setMainGalleryIndex(images.length - lastPageStart - 1);
     }
+    
+    // Preload adjacent images for the new position
+    setTimeout(() => {
+      const newGlobalIndex = thumbnailStartIndex + mainGalleryIndex;
+      preloadAdjacentImages(newGlobalIndex);
+      setIsLoading(false);
+    }, 100);
   };
 
   const scrollThumbnailsLeft = () => {
@@ -246,7 +315,7 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
   };
 
   const handleTouchEnd = () => {
-    if (!touchStart || !touchEnd) return;
+    if (!touchStart || !touchEnd || isLoading) return;
     
     const distance = touchStart - touchEnd;
     const isLeftSwipe = distance > 50;
@@ -685,12 +754,23 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
                 }
               }}
             >
-                              <img
+              <div className="relative w-full h-full">
+                <img
                   src={displayedThumbnails[mainGalleryIndex].imageUrlFHD}
                   alt={`${displayedThumbnails[mainGalleryIndex].cityName} - Hall of Fame Image`}
                   className="w-full h-full object-contain transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-2xl"
                   data-image-id={displayedThumbnails[mainGalleryIndex].hofImageId}
+                  onLoad={() => setIsImageLoading(false)}
+                  onError={() => setIsImageLoading(false)}
                 />
+                
+                {/* Loading overlay */}
+                {isImageLoading && (
+                  <div className="absolute inset-0 flex items-center justify-center z-20">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
+                  </div>
+                )}
+              </div>
             </a>
             
             {/* Hover overlay */}
@@ -757,21 +837,39 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
                 {/* Previous Button */}
                 <button
                   onClick={prevMainImage}
-                  className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 hover:bg-opacity-70 text-white p-2 rounded-full transition-all duration-200 z-10"
+                  disabled={isLoading}
+                  className={`absolute left-4 top-1/2 transform -translate-y-1/2 p-2 rounded-full transition-all duration-200 z-10 ${
+                    isLoading 
+                      ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
+                      : 'bg-black bg-opacity-50 hover:bg-opacity-70 text-white hover:scale-110'
+                  }`}
                 >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
+                  {isLoading ? (
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+                  ) : (
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                  )}
                 </button>
 
                 {/* Next Button */}
                 <button
                   onClick={nextMainImage}
-                  className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 hover:bg-opacity-70 text-white p-2 rounded-full transition-all duration-200 z-10"
+                  disabled={isLoading}
+                  className={`absolute right-4 top-1/2 transform -translate-y-1/2 p-2 rounded-full transition-all duration-200 z-10 ${
+                    isLoading 
+                      ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
+                      : 'bg-black bg-opacity-50 hover:bg-opacity-70 text-white hover:scale-110'
+                  }`}
                 >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
+                  {isLoading ? (
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+                  ) : (
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  )}
                 </button>
 
                 {/* Image Counter */}
