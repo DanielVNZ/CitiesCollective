@@ -4057,11 +4057,12 @@ export async function getHallOfFameImagesForCity(cityId: number) {
     
     const cityName = city[0].cityName;
     
-    // Only return Hall of Fame images that are explicitly assigned to this city
-    // (not just matching by name from external API)
+    // Return Hall of Fame images that are either:
+    // 1. Explicitly assigned to this city (cityId matches)
+    // 2. Auto-assigned by name matching (cityName matches and cityId is null)
     const images = await client`
       SELECT * FROM "hallOfFameCache" 
-      WHERE "cityId" = ${cityId}
+      WHERE ("cityId" = ${cityId}) OR (LOWER("cityName") = LOWER(${cityName}) AND "cityId" IS NULL)
       ORDER BY "createdAt" DESC
     `;
     
