@@ -82,7 +82,13 @@ export async function GET(request: NextRequest) {
         };
       });
 
-      return NextResponse.json({ images });
+      return NextResponse.json({ images }, {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      });
 
     } catch (apiError) {
       console.error('External Hall of Fame API error:', apiError);
