@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cityTable, getUser, db } from 'app/db';
 import { auth } from 'app/auth';
 import { eq, and } from 'drizzle-orm';
+import { invalidateCityCache } from 'app/utils/cache-invalidation';
 
 export async function PUT(
   request: NextRequest,
@@ -61,6 +62,9 @@ export async function PUT(
       .set(updateData)
       .where(eq(cityTable.id, cityId))
       .returning();
+
+    // Invalidate cache for this city
+    await invalidateCityCache(cityId);
 
     return NextResponse.json({ 
       success: true, 

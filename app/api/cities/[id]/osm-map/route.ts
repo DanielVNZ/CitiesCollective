@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from 'app/auth';
 import { getUser, updateCityOsmMap, getCityById } from 'app/db';
 import { uploadToR2, generateFileKey } from 'app/utils/r2';
+import { invalidateCityCache } from 'app/utils/cache-invalidation';
 
 export async function POST(
   request: NextRequest,
@@ -77,6 +78,9 @@ export async function POST(
       return NextResponse.json({ error: 'Failed to update city' }, { status: 500 });
     }
 
+    // Invalidate cache for this city
+    await invalidateCityCache(cityId);
+
     return NextResponse.json({ 
       success: true,
       osmMapPath: uploadResult.url
@@ -130,6 +134,9 @@ export async function DELETE(
     if (!updatedCity) {
       return NextResponse.json({ error: 'Failed to update city' }, { status: 500 });
     }
+
+    // Invalidate cache for this city
+    await invalidateCityCache(cityId);
 
     return NextResponse.json({ 
       success: true,

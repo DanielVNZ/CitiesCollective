@@ -2,8 +2,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:unsafe": "NODE_TLS_REJECT_UNAUTHORIZED=0 next dev",
+    "dev:insecure": "next dev --experimental-https",
     "build": "next build",
     "start": "next start",
+    "start:unsafe": "NODE_TLS_REJECT_UNAUTHORIZED=0 next start",
     "start:prod": "NODE_ENV=production next start",
     "lint": "next lint",
     "db:generate": "drizzle-kit generate",

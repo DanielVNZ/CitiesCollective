@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from 'app/auth';
 import { getUser, updateCityDownloadable, getCityById } from 'app/db';
+import { invalidateCityCache } from 'app/utils/cache-invalidation';
 
 export async function PUT(
   request: NextRequest,
@@ -47,6 +48,9 @@ export async function PUT(
     if (!updatedCity) {
       return NextResponse.json({ error: 'Failed to update city' }, { status: 500 });
     }
+
+    // Invalidate cache for this city
+    await invalidateCityCache(cityId);
 
     return NextResponse.json({ 
       message: 'City updated successfully',

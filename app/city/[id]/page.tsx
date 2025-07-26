@@ -22,8 +22,8 @@ import { SaveGameSection } from './SaveGameSection';
 import { CityNameEditor } from './CityNameEditor';
 import { ViewCounter } from 'app/components/ViewCounter';
 
-// Force dynamic rendering to prevent caching
-export const dynamic = 'force-dynamic';
+// Enable ISR with 10-minute revalidation for city detail pages
+export const revalidate = 600; // 10 minutes
 
 interface CityDetailPageProps {
   params: {

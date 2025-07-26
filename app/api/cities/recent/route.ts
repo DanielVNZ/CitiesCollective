@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getRecentCities } from 'app/db';
+import { withCache, CacheConfigs } from 'app/utils/api-cache-middleware';
 
-// Force dynamic rendering for this API route
-export const dynamic = 'force-dynamic';
-
-export async function GET(request: NextRequest) {
+export const GET = withCache({
+  ...CacheConfigs.MEDIUM,
+  tags: ['cities', 'recent-cities']
+})(async function(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get('limit') || '9');
@@ -31,4 +32,4 @@ export async function GET(request: NextRequest) {
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
   }
-} 
+}); 

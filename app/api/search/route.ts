@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { searchCities, getSearchCitiesCount, getUniqueThemes, getUniqueGameModes, getContentCreators, SearchFilters } from 'app/db';
+import { withCache, CacheConfigs } from 'app/utils/api-cache-middleware';
 
-export async function GET(req: NextRequest) {
+export const GET = withCache({
+  ...CacheConfigs.MEDIUM,
+  tags: ['cities', 'search']
+})(async function(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     
@@ -68,10 +72,13 @@ export async function GET(req: NextRequest) {
       { status: 500 }
     );
   }
-}
+});
 
 // Endpoint to get filter options
-export async function POST(req: NextRequest) {
+export const POST = withCache({
+  ...CacheConfigs.LONG,
+  tags: ['filter-options']
+})(async function(req: NextRequest) {
   try {
     const body = await req.json();
     
@@ -109,4 +116,4 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
-} 
+}); 

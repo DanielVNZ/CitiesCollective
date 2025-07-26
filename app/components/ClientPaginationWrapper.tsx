@@ -169,8 +169,8 @@ export function ClientPaginationWrapper({
 
   return (
     <>
-      {/* Controls */}
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-8">
+      {/* Enhanced Controls */}
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-6 mb-12 p-6 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm">
         <ImageFilterToggle
           showOnlyWithImages={showOnlyWithImages}
           onToggle={handleToggleImages}
@@ -179,8 +179,8 @@ export function ClientPaginationWrapper({
         />
         
         {cappedCities.filter(city => city.images && city.images.length > 0).length > 0 && (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600 dark:text-gray-400">Sort cities:</span>
+          <div className="flex items-center gap-3 bg-gray-100 dark:bg-gray-700 rounded-full px-4 py-2 border border-gray-200 dark:border-gray-600">
+            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Sort cities:</span>
             <ImageSortSelector
               currentSort={currentSort}
               onSortChange={handleSortChange}
@@ -190,73 +190,93 @@ export function ClientPaginationWrapper({
         )}
       </div>
 
-      {/* Cities Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        {displayCities.map((city) => (
-          <CityCard key={city.id} city={city} />
+      {/* Enhanced Cities Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
+        {displayCities.map((city, index) => (
+          <div 
+            key={city.id}
+            className="animate-scale-in image-container"
+            style={{ 
+              animationDelay: `${index * 50}ms`,
+              contentVisibility: 'auto',
+              containIntrinsicSize: '300px 400px'
+            }}
+          >
+            <CityCard city={city} />
+          </div>
         ))}
       </div>
       
-      {/* Pagination */}
+      {/* Enhanced Pagination */}
       {actualTotalPages > 1 && (
-        <div className="mt-12 flex justify-center items-center space-x-2">
-          <button
-            onClick={() => handlePageChange(Math.max(1, currentPageNum - 1))}
-            disabled={currentPageNum === 1}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              currentPageNum === 1
-                ? 'bg-gray-100 text-gray-400 cursor-not-allowed dark:bg-gray-800 dark:text-gray-600'
-                : 'bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600'
-            }`}
-          >
-            Previous
-          </button>
+        <div className="flex flex-col items-center gap-6 animate-fade-in">
+          <div className="flex justify-center items-center gap-2">
+            <button
+              onClick={() => handlePageChange(Math.max(1, currentPageNum - 1))}
+              disabled={currentPageNum === 1}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
+                currentPageNum === 1
+                  ? 'opacity-50 cursor-not-allowed bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600'
+                  : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 hover:shadow-md'
+              } focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2`}
+            >
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              Previous
+            </button>
 
-          {Array.from({ length: Math.min(5, actualTotalPages) }, (_, i) => {
-            let pageNumber: number;
-            if (actualTotalPages <= 5) {
-              pageNumber = i + 1;
-            } else if (currentPageNum <= 3) {
-              pageNumber = i + 1;
-            } else if (currentPageNum >= actualTotalPages - 2) {
-              pageNumber = actualTotalPages - 4 + i;
-            } else {
-              pageNumber = currentPageNum - 2 + i;
-            }
+            <div className="flex items-center gap-1 mx-4">
+              {Array.from({ length: Math.min(5, actualTotalPages) }, (_, i) => {
+                let pageNumber: number;
+                if (actualTotalPages <= 5) {
+                  pageNumber = i + 1;
+                } else if (currentPageNum <= 3) {
+                  pageNumber = i + 1;
+                } else if (currentPageNum >= actualTotalPages - 2) {
+                  pageNumber = actualTotalPages - 4 + i;
+                } else {
+                  pageNumber = currentPageNum - 2 + i;
+                }
 
-            return (
-              <button
-                key={pageNumber}
-                onClick={() => handlePageChange(pageNumber)}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                  currentPageNum === pageNumber
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600'
-                }`}
-              >
-                {pageNumber}
-              </button>
-            );
-          })}
+                return (
+                  <button
+                    key={pageNumber}
+                    onClick={() => handlePageChange(pageNumber)}
+                    className={`w-10 h-10 rounded-lg text-sm font-medium transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                      currentPageNum === pageNumber
+                        ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg transform scale-105'
+                        : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-600 hover:shadow-md'
+                    }`}
+                  >
+                    {pageNumber}
+                  </button>
+                );
+              })}
+            </div>
 
-          <button
-            onClick={() => handlePageChange(Math.min(actualTotalPages, currentPageNum + 1))}
-            disabled={currentPageNum === actualTotalPages}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              currentPageNum === actualTotalPages
-                ? 'bg-gray-100 text-gray-400 cursor-not-allowed dark:bg-gray-800 dark:text-gray-600'
-                : 'bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600'
-            }`}
-          >
-            Next
-          </button>
+            <button
+              onClick={() => handlePageChange(Math.min(actualTotalPages, currentPageNum + 1))}
+              disabled={currentPageNum === actualTotalPages}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
+                currentPageNum === actualTotalPages
+                  ? 'opacity-50 cursor-not-allowed bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600'
+                  : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 hover:shadow-md'
+              } focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2`}
+            >
+              Next
+              <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Enhanced Page Info */}
+          <div className="text-center text-sm text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 rounded-full px-4 py-2 border border-gray-200 dark:border-gray-600">
+            Showing <span className="font-medium text-gray-900 dark:text-white">{startIndex + 1}</span> to <span className="font-medium text-gray-900 dark:text-white">{Math.min(endIndex, actualTotalItems)}</span> of <span className="font-medium text-gray-900 dark:text-white">{actualTotalItems}</span> cities
+          </div>
         </div>
       )}
-
-      {/* Page Info */}
-      <div className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
-        Showing {startIndex + 1} to {Math.min(endIndex, actualTotalItems)} of {actualTotalItems} cities
-      </div>
     </>
   );
 } 

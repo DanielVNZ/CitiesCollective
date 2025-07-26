@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from 'app/auth';
 import { getUser, updateCityDescription, getCityById } from 'app/db';
+import { invalidateCityCache } from 'app/utils/cache-invalidation';
 
 // Function to strip image markdown from text
 function stripImageMarkdown(text: string): string {
@@ -47,6 +48,9 @@ export async function PUT(
     if (!updatedCity) {
       return NextResponse.json({ error: 'City not found or unauthorized' }, { status: 404 });
     }
+
+    // Invalidate cache for this city
+    await invalidateCityCache(cityId);
 
     return NextResponse.json({ 
       success: true, 

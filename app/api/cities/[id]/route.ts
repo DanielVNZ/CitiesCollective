@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from 'app/auth';
 import { deleteCityById, getUser } from 'app/db';
+import { invalidateHomePageCache } from 'app/utils/cache-invalidation';
 
 export async function DELETE(
   req: NextRequest,
@@ -35,6 +36,9 @@ export async function DELETE(
         error: 'City not found or you do not have permission to delete it' 
       }, { status: 404 });
     }
+
+    // Invalidate home page cache since city listings will change
+    await invalidateHomePageCache();
 
     return NextResponse.json({ 
       message: 'City deleted successfully',

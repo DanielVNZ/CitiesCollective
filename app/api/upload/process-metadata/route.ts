@@ -3,6 +3,7 @@ import { auth } from 'app/auth';
 import { cityTable, getUser, db, ensureCityTableExists, generateUniqueId, getCityCountByUser, notifyFollowersOfNewCity, upsertModCompatibility, getModCompatibility, updateCitiesWithModNotes } from 'app/db';
 import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import AdmZip from 'adm-zip';
+import { invalidateHomePageCache } from 'app/utils/cache-invalidation';
 
 // Initialize S3 client for R2
 const s3Client = new S3Client({
@@ -197,6 +198,9 @@ export async function POST(request: NextRequest) {
     console.log('Inserting city into database...');
     const inserted = await db.insert(cityTable).values(cityData).returning();
     console.log('City inserted successfully:', inserted[0].id);
+
+    // Invalidate home page cache since new city was added
+    await invalidateHomePageCache();
 
     // Notify followers of the new city upload
     try {

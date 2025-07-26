@@ -4,25 +4,287 @@ import { eq, desc, and, ilike, gte, lte, or, asc, sql, exists } from 'drizzle-or
 import postgres from 'postgres';
 import { genSaltSync, hashSync } from 'bcrypt-ts';
 import { getDownloadUrl } from 'app/utils/r2';
+import { cachedQuery, invalidateCityCache, invalidateUserCache, invalidateCommunityCache } from './utils/query-cache';
 
-// Optionally, if not using email/pass login, you can
-// use the Drizzle adapter for Auth.js / NextAuth
-// https://authjs.dev/reference/adapter/drizzle
-let client = postgres(process.env.POSTGRES_URL!, {
-  ssl: false, // Keep SSL disabled for local development
-  max: process.env.NODE_ENV === 'production' ? 10 : 10, // Reduced for local
-  idle_timeout: 20,
-  connect_timeout: 10,
-  // Add connection pooling optimizations
-  prepare: true, // Enable prepared statements
-  max_lifetime: 60 * 30, // 30 minutes
-  // Better error handling
+// Database connection configuration with optimized pooling
+interface DatabaseConnectionConfig {
+  ssl: boolean | { rejectUnauthorized: boolean };
+  max: number;
+  idle_timeout: number;
+  connect_timeout: number;
+  statement_timeout: number;
+  query_timeout: number;
+  max_lifetime: number;
+  prepare: boolean;
+  transform: any;
+  onnotice: () => void;
+  onparameter: (key: string, value: any) => void;
+  debug: boolean;
+}
+
+// Connection health monitoring
+let connectionHealthMetrics = {
+  totalConnections: 0,
+  activeConnections: 0,
+  idleConnections: 0,
+  failedConnections: 0,
+  lastHealthCheck: new Date(),
+  reconnectAttempts: 0
+};
+
+// Optimized connection pool configuration
+const connectionConfig: DatabaseConnectionConfig = {
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  max: process.env.NODE_ENV === 'production' ? 20 : 5, // Increased for production
+  idle_timeout: 30, // 30 seconds idle timeout
+  connect_timeout: 10, // 10 seconds connection timeout
+  statement_timeout: 30000, // 30 seconds statement timeout
+  query_timeout: 25000, // 25 seconds query timeout
+  max_lifetime: 60 * 60, // 1 hour connection lifetime
+  prepare: true, // Enable prepared statements for better performance
+  transform: {
+    undefined: null, // Transform undefined to null
+  },
   onnotice: () => {}, // Suppress notice messages
-});
+  onparameter: (key: string, value: any) => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`DB Parameter: ${key} = ${value}`);
+    }
+  },
+  debug: process.env.NODE_ENV === 'development' && process.env.DB_DEBUG === 'true'
+};
+
+// Create postgres client with enhanced configuration
+let client = postgres(process.env.POSTGRES_URL!, connectionConfig);
+// Connection health monitoring functions
+async function checkConnectionHealth(): Promise<boolean> {
+  try {
+    const result = await client`SELECT 1 as health_check`;
+    connectionHealthMetrics.lastHealthCheck = new Date();
+    return result.length > 0;
+  } catch (error) {
+    console.error('Database health check failed:', error);
+    connectionHealthMetrics.failedConnections++;
+    return false;
+  }
+}
+
+// Automatic reconnection with exponential backoff
+async function reconnectWithBackoff(maxRetries: number = 5): Promise<void> {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      connectionHealthMetrics.reconnectAttempts++;
+      
+      // Exponential backoff: 1s, 2s, 4s, 8s, 16s
+      const delay = Math.min(1000 * Math.pow(2, attempt - 1), 16000);
+      
+      if (attempt > 1) {
+        console.log(`Reconnection attempt ${attempt}/${maxRetries} after ${delay}ms delay`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+      
+      // Test connection
+      const isHealthy = await checkConnectionHealth();
+      if (isHealthy) {
+        console.log(`Database reconnection successful on attempt ${attempt}`);
+        return;
+      }
+    } catch (error) {
+      console.error(`Reconnection attempt ${attempt} failed:`, error);
+      
+      if (attempt === maxRetries) {
+        throw new Error(`Failed to reconnect to database after ${maxRetries} attempts`);
+      }
+    }
+  }
+}
+
+// Prepared statement cache for frequently used queries
+const preparedStatementCache = new Map<string, any>();
+
+// Enhanced database client with connection monitoring
+const createEnhancedClient = () => {
+  const originalClient = client;
+  
+  // Wrap client methods to add monitoring
+  const enhancedClient = new Proxy(originalClient, {
+    get(target, prop) {
+      const originalMethod = (target as any)[prop];
+      
+      if (typeof originalMethod === 'function' && prop === 'query') {
+        return async function(...args: any[]) {
+          try {
+            connectionHealthMetrics.activeConnections++;
+            const result = await originalMethod.apply(target, args);
+            connectionHealthMetrics.totalConnections++;
+            return result;
+          } catch (error) {
+            connectionHealthMetrics.failedConnections++;
+            
+            // Check if it's a connection error and attempt reconnection
+            if ((error as any).code === 'ECONNRESET' || (error as any).code === 'ENOTFOUND' || (error as any).code === 'ECONNREFUSED') {
+              console.warn('Connection error detected, attempting reconnection...');
+              await reconnectWithBackoff();
+              // Retry the original query after reconnection
+              return await originalMethod.apply(target, args);
+            }
+            
+            throw error;
+          } finally {
+            connectionHealthMetrics.activeConnections--;
+            connectionHealthMetrics.idleConnections = connectionConfig.max - connectionHealthMetrics.activeConnections;
+          }
+        };
+      }
+      
+      return originalMethod;
+    }
+  });
+  
+  return enhancedClient;
+};
+
+// Use enhanced client
+client = createEnhancedClient();
 let db = drizzle(client);
 
-// Export client for use in other files
-export { client };
+// Periodic health check (runs every 5 minutes)
+let healthCheckInterval: NodeJS.Timeout | null = null;
+
+export function startHealthMonitoring() {
+  if (healthCheckInterval) {
+    clearInterval(healthCheckInterval);
+  }
+  
+  healthCheckInterval = setInterval(async () => {
+    try {
+      const isHealthy = await checkConnectionHealth();
+      if (!isHealthy) {
+        console.warn('Periodic health check failed, attempting reconnection...');
+        await reconnectWithBackoff();
+      }
+    } catch (error) {
+      console.error('Health monitoring error:', error);
+    }
+  }, 5 * 60 * 1000); // 5 minutes
+}
+
+export function stopHealthMonitoring() {
+  if (healthCheckInterval) {
+    clearInterval(healthCheckInterval);
+    healthCheckInterval = null;
+  }
+}
+
+// Connection timeout wrapper for queries
+export async function executeWithTimeout<T>(
+  queryFn: () => Promise<T>,
+  timeoutMs: number = 25000
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      reject(new Error(`Query timeout after ${timeoutMs}ms`));
+    }, timeoutMs);
+
+    queryFn()
+      .then(result => {
+        clearTimeout(timeoutId);
+        resolve(result);
+      })
+      .catch(error => {
+        clearTimeout(timeoutId);
+        reject(error);
+      });
+  });
+}
+
+// Initialize database performance optimizations
+async function initializeDatabaseOptimizations() {
+  try {
+    // Import migrations dynamically to avoid circular dependencies
+    const { runPerformanceMigrations } = await import('./utils/database-migrations');
+    await runPerformanceMigrations();
+  } catch (error) {
+    console.error('Failed to run database optimizations:', error);
+    // Don't throw error to prevent app startup failure
+  }
+}
+
+// Run optimizations on startup (with delay to ensure tables exist)
+setTimeout(async () => {
+  initializeDatabaseOptimizations();
+  initializePreparedStatements();
+  
+  // Warm cache with frequently accessed data
+  try {
+    const { warmCache } = await import('./utils/query-cache');
+    await warmCache();
+  } catch (error) {
+    console.error('Cache warming failed:', error);
+  }
+}, 5000); // 5 second delay
+
+// Start health monitoring in production
+if (process.env.NODE_ENV === 'production') {
+  startHealthMonitoring();
+}
+
+// Graceful shutdown handling
+process.on('SIGTERM', () => {
+  console.log('Received SIGTERM, closing database connections...');
+  stopHealthMonitoring();
+  client.end();
+});
+
+process.on('SIGINT', () => {
+  console.log('Received SIGINT, closing database connections...');
+  stopHealthMonitoring();
+  client.end();
+});
+
+// Prepared statement utility functions
+export function getPreparedStatement(key: string, queryFn: () => any): any {
+  if (!preparedStatementCache.has(key)) {
+    preparedStatementCache.set(key, queryFn());
+  }
+  return preparedStatementCache.get(key);
+}
+
+export function clearPreparedStatements(): void {
+  preparedStatementCache.clear();
+}
+
+// Initialize commonly used prepared statements
+export function initializePreparedStatements(): void {
+  // Note: postgres.js automatically prepares statements when the same query is used multiple times
+  // We'll use the prepared statement cache for query templates instead
+  
+  // Store commonly used query templates for reuse
+  getPreparedStatement('user_by_id_template', () => 
+    'SELECT id, email, username, name, avatar, "isAdmin", "isContentCreator", "hofCreatorId" FROM "User" WHERE id = $1'
+  );
+  
+  getPreparedStatement('city_count_by_user_template', () => 
+    'SELECT COUNT(*)::integer as count FROM "City" WHERE "userId" = $1'
+  );
+  
+  getPreparedStatement('recent_cities_template', () => 
+    'SELECT * FROM "City" ORDER BY "uploadedAt" DESC LIMIT $1 OFFSET $2'
+  );
+  
+  getPreparedStatement('city_likes_count_template', () => 
+    'SELECT COUNT(*)::integer as count FROM "likes" WHERE "cityId" = $1'
+  );
+  
+  getPreparedStatement('city_comments_count_template', () => 
+    'SELECT COUNT(*)::integer as count FROM "comments" WHERE "cityId" = $1'
+  );
+  
+  console.log('Prepared statement templates initialized');
+}
+
+// Export client and health monitoring functions
+export { client, connectionHealthMetrics, checkConnectionHealth, reconnectWithBackoff };
 
 // Cookie consent types
 export type CookieConsentType = 'all' | 'necessary' | null;
@@ -389,7 +651,9 @@ export async function getAllUsersWithStats() {
   const users = await ensureTableExists();
   await ensureCityTableExists();
   
-  const userStats = await db.select({
+  return await cachedQuery(
+    async () => {
+      const userStats = await db.select({
     id: users.id,
     email: users.email,
     username: users.username,
@@ -406,16 +670,27 @@ export async function getAllUsersWithStats() {
     .groupBy(users.id, users.email, users.username, users.isAdmin, users.isContentCreator)
     .orderBy(desc(sql`COALESCE(COUNT(CASE WHEN ${cityTable.id} IS NOT NULL THEN 1 END), 0)`));
   
-  return userStats;
+      return userStats;
+    },
+    'all_users_with_stats',
+    [],
+    10 * 60 * 1000 // 10 minutes cache
+  );
 }
 
 export async function getTotalCityCount() {
   await ensureCityTableExists();
   
-  const result = await db.select({ count: sql<number>`COUNT(*)` })
-    .from(cityTable);
-  
-  return result[0]?.count || 0;
+  return await cachedQuery(
+    async () => {
+      const result = await db.select({ count: sql<number>`COUNT(*)` })
+        .from(cityTable);
+      return result[0]?.count || 0;
+    },
+    'total_city_count',
+    [],
+    10 * 60 * 1000 // 10 minutes cache
+  );
 }
 
 export async function getCitiesWithImagesCount() {
@@ -434,10 +709,16 @@ export async function getCitiesWithImagesCount() {
 export async function getTotalUserCount() {
   const users = await ensureTableExists();
   
-  const result = await db.select({ count: sql<number>`COUNT(*)` })
-    .from(users);
-  
-  return result[0]?.count || 0;
+  return await cachedQuery(
+    async () => {
+      const result = await db.select({ count: sql<number>`COUNT(*)` })
+        .from(users);
+      return result[0]?.count || 0;
+    },
+    'total_user_count',
+    [],
+    15 * 60 * 1000 // 15 minutes cache
+  );
 }
 
 export async function getTotalLikesCount() {
@@ -471,21 +752,28 @@ export async function getTotalCommentsCount() {
 }
 
 export async function getCommunityStats() {
-  const [totalUsers, totalCities, totalLikes, totalComments, totalViews] = await Promise.all([
-    getTotalUserCount(),
-    getTotalCityCount(),
-    getTotalLikesCount(),
-    getTotalCommentsCount(),
-    getTotalHomePageViews()
-  ]);
+  return await cachedQuery(
+    async () => {
+      const [totalUsers, totalCities, totalLikes, totalComments, totalViews] = await Promise.all([
+        getTotalUserCount(),
+        getTotalCityCount(),
+        getTotalLikesCount(),
+        getTotalCommentsCount(),
+        getTotalHomePageViews()
+      ]);
 
-  return {
-    totalUsers,
-    totalCities,
-    totalLikes,
-    totalComments,
-    totalViews
-  };
+      return {
+        totalUsers,
+        totalCities,
+        totalLikes,
+        totalComments,
+        totalViews
+      };
+    },
+    'community_stats',
+    [],
+    5 * 60 * 1000 // 5 minutes cache
+  );
 }
 
 async function ensureTableExists() {
@@ -938,6 +1226,9 @@ export async function getRecentCities(limit: number = 12, offset: number = 0, wi
   await ensureHallOfFameCacheTableExists();
   const users = await ensureTableExists();
 
+  return await cachedQuery(
+    async () => {
+
   // Get ALL cities with their images (if any) and sort by upload date
   const allCities = await db
     .select({
@@ -1041,6 +1332,11 @@ export async function getRecentCities(limit: number = 12, offset: number = 0, wi
   }
 
   return allCitiesWithHof;
+    },
+    `recent_cities_${limit}_${offset}_${withImages}`,
+    [limit, offset, withImages],
+    3 * 60 * 1000 // 3 minutes cache
+  );
 }
 
 export async function getTopCitiesByMoney(limit: number = 3) {
@@ -1048,6 +1344,9 @@ export async function getTopCitiesByMoney(limit: number = 3) {
   await ensureCityImagesTableExists();
   await ensureHallOfFameCacheTableExists();
   const users = await ensureTableExists();
+
+  return await cachedQuery(
+    async () => {
   
   // Get cities with primary screenshots
   const citiesWithScreenshots = await db
@@ -1124,11 +1423,19 @@ export async function getTopCitiesByMoney(limit: number = 3) {
   allCities.sort((a, b) => (b.money || 0) - (a.money || 0));
 
   return allCities.slice(0, limit);
+    },
+    `top_cities_by_money_${limit}`,
+    [limit],
+    5 * 60 * 1000 // 5 minutes cache
+  );
 }
 
 export async function getTopCitiesByLikes(limit: number = 3) {
   await ensureCityTableExists();
   await ensureLikesTableExists();
+
+  return await cachedQuery(
+    async () => {
   await ensureCityImagesTableExists();
   await ensureHallOfFameCacheTableExists();
   const users = await ensureTableExists();
@@ -1214,6 +1521,11 @@ export async function getTopCitiesByLikes(limit: number = 3) {
   allCities.sort((a, b) => (b.likeCount || 0) - (a.likeCount || 0));
 
   return allCities.slice(0, limit);
+    },
+    `top_cities_by_likes_${limit}`,
+    [limit],
+    5 * 60 * 1000 // 5 minutes cache
+  );
 }
 
 export async function getTopCitiesWithImages(limit: number = 25) {
@@ -1329,6 +1641,9 @@ export async function getContentCreatorCities(limit: number = 6) {
   // Get current date as seed for daily randomization
   const today = new Date();
   const dateSeed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
+
+  return await cachedQuery(
+    async () => {
   
   // Get cities with primary screenshots
   const citiesWithScreenshots = await db
@@ -1433,6 +1748,11 @@ export async function getContentCreatorCities(limit: number = 6) {
   });
 
   return allCities.slice(0, limit);
+    },
+    `content_creator_cities_${limit}_${dateSeed}`,
+    [limit, dateSeed],
+    60 * 60 * 1000 // 1 hour cache (refreshes daily due to dateSeed)
+  );
 }
 
 export async function getCitiesByUser(userId: number) {
@@ -1441,6 +1761,9 @@ export async function getCitiesByUser(userId: number) {
   await ensureHallOfFameCacheTableExists();
   await ensureCommentsTableExists();
   const users = await ensureTableExists();
+
+  return await cachedQuery(
+    async () => {
   
   // Get cities with primary screenshots
   const citiesWithScreenshots = await db.select({
@@ -1541,18 +1864,30 @@ export async function getCitiesByUser(userId: number) {
     const dateB = b.uploadedAt ? new Date(b.uploadedAt).getTime() : 0;
     return dateB - dateA;
   });
+    },
+    'cities_by_user',
+    [userId],
+    5 * 60 * 1000 // 5 minutes cache for user cities
+  );
 }
 
 export async function getCityCountByUser(userId: number) {
   await ensureCityTableExists();
   
-  const result = await db.select({
-    count: sql<number>`cast(count(*) as integer)`
-  })
-    .from(cityTable)
-    .where(eq(cityTable.userId, userId));
-  
-  return result[0]?.count || 0;
+  return await cachedQuery(
+    async () => {
+      const result = await db.select({
+        count: sql<number>`cast(count(*) as integer)`
+      })
+        .from(cityTable)
+        .where(eq(cityTable.userId, userId));
+      
+      return result[0]?.count || 0;
+    },
+    'city_count_by_user',
+    [userId],
+    5 * 60 * 1000 // 5 minutes cache for user city count
+  );
 }
 
 export async function getCityById(id: number) {
@@ -1602,17 +1937,25 @@ export async function getCityById(id: number) {
 
 export async function getUserById(id: number) {
   const users = await ensureTableExists();
-  const result = await db.select({
-    id: users.id,
-    email: users.email,
-    username: users.username,
-    name: users.name,
-    avatar: users.avatar,
-    isAdmin: users.isAdmin,
-    isContentCreator: users.isContentCreator,
-    hofCreatorId: users.hofCreatorId,
-  }).from(users).where(eq(users.id, id)).limit(1);
-  return result[0] || null;
+  
+  return await cachedQuery(
+    async () => {
+      const result = await db.select({
+        id: users.id,
+        email: users.email,
+        username: users.username,
+        name: users.name,
+        avatar: users.avatar,
+        isAdmin: users.isAdmin,
+        isContentCreator: users.isContentCreator,
+        hofCreatorId: users.hofCreatorId,
+      }).from(users).where(eq(users.id, id)).limit(1);
+      return result[0] || null;
+    },
+    'user_by_id',
+    [id],
+    10 * 60 * 1000 // 10 minutes cache for user data
+  );
 }
 
 export async function deleteCityById(cityId: number, userId: number) {
@@ -1621,6 +1964,14 @@ export async function deleteCityById(cityId: number, userId: number) {
   const result = await db.delete(cityTable)
     .where(and(eq(cityTable.id, cityId), eq(cityTable.userId, userId)))
     .returning();
+  
+  // Invalidate relevant caches
+  if (result[0]) {
+    invalidateCityCache(cityId);
+    invalidateUserCache(userId);
+    invalidateCommunityCache();
+  }
+  
   return result[0] || null;
 }
 
@@ -1630,6 +1981,16 @@ export async function adminDeleteCityById(cityId: number) {
   const result = await db.delete(cityTable)
     .where(eq(cityTable.id, cityId))
     .returning();
+  
+  // Invalidate relevant caches
+  if (result[0]) {
+    invalidateCityCache(cityId);
+    if (result[0].userId) {
+      invalidateUserCache(result[0].userId);
+    }
+    invalidateCommunityCache();
+  }
+  
   return result[0] || null;
 }
 
@@ -1640,6 +2001,12 @@ export async function updateCityDownloadable(cityId: number, userId: number, dow
     .set({ downloadable, updatedAt: new Date() })
     .where(and(eq(cityTable.id, cityId), eq(cityTable.userId, userId)))
     .returning();
+  
+  // Invalidate relevant caches
+  if (result[0]) {
+    invalidateCityCache(cityId);
+  }
+  
   return result[0] || null;
 }
 
@@ -1650,6 +2017,12 @@ export async function updateCityDescription(cityId: number, userId: number, desc
     .set({ description, updatedAt: new Date() })
     .where(and(eq(cityTable.id, cityId), eq(cityTable.userId, userId)))
     .returning();
+  
+  // Invalidate relevant caches
+  if (result[0]) {
+    invalidateCityCache(cityId);
+  }
+  
   return result[0] || null;
 }
 
@@ -1687,7 +2060,11 @@ export async function searchCities(
   await ensureHallOfFameCacheTableExists();
   await ensureLikesTableExists();
   const userTable = await ensureTableExists();
-  const conditions = [];
+
+  // Use caching for search results with shorter TTL for dynamic content
+  return await cachedQuery(
+    async () => {
+      const conditions = [];
 
   // Build filter conditions
   if (filters.query) {
@@ -1921,12 +2298,20 @@ export async function searchCities(
   }
   
   return results;
+    },
+    'search_cities',
+    [filters, limit, offset],
+    2 * 60 * 1000 // 2 minutes cache for search results
+  );
 }
 
 export async function getSearchCitiesCount(filters: SearchFilters = {}) {
   await ensureCityTableExists();
   
   const userTable = await ensureTableExists();
+
+  return await cachedQuery(
+    async () => {
   
   const conditions = [];
   
@@ -2015,24 +2400,45 @@ export async function getSearchCitiesCount(filters: SearchFilters = {}) {
       .leftJoin(userTable, eq(cityTable.userId, userTable.id));
     return result.length;
   }
+    },
+    `search_cities_count_${JSON.stringify(filters)}`,
+    [filters],
+    2 * 60 * 1000 // 2 minutes cache for search results
+  );
 }
 
 export async function getUniqueThemes() {
   await ensureCityTableExists();
-  const result = await db.select({ theme: cityTable.theme })
-    .from(cityTable)
-    .groupBy(cityTable.theme)
-    .orderBy(asc(cityTable.theme));
-  return result.map(row => row.theme).filter(theme => theme);
+  
+  return await cachedQuery(
+    async () => {
+      const result = await db.select({ theme: cityTable.theme })
+        .from(cityTable)
+        .groupBy(cityTable.theme)
+        .orderBy(asc(cityTable.theme));
+      return result.map(row => row.theme).filter(theme => theme);
+    },
+    'unique_themes',
+    [],
+    30 * 60 * 1000 // 30 minutes cache
+  );
 }
 
 export async function getUniqueGameModes() {
   await ensureCityTableExists();
-  const result = await db.select({ gameMode: cityTable.gameMode })
-    .from(cityTable)
-    .groupBy(cityTable.gameMode)
-    .orderBy(asc(cityTable.gameMode));
-  return result.map(row => row.gameMode).filter(gameMode => gameMode);
+  
+  return await cachedQuery(
+    async () => {
+      const result = await db.select({ gameMode: cityTable.gameMode })
+        .from(cityTable)
+        .groupBy(cityTable.gameMode)
+        .orderBy(asc(cityTable.gameMode));
+      return result.map(row => row.gameMode).filter(gameMode => gameMode);
+    },
+    'unique_game_modes',
+    [],
+    30 * 60 * 1000 // 30 minutes cache
+  );
 }
 
 export async function getContentCreators() {
@@ -2394,11 +2800,21 @@ export async function toggleLike(userId: number, cityId: number) {
     // Unlike
     await db.delete(likesTable)
       .where(and(eq(likesTable.userId, userId), eq(likesTable.cityId, cityId)));
+    
+    // Invalidate relevant caches
+    invalidateCityCache(cityId);
+    invalidateCommunityCache();
+    
     return { liked: false };
   } else {
     // Like
     const likeId = await generateUniqueId(likesTable, likesTable.id);
     await db.insert(likesTable).values({ id: likeId, userId, cityId });
+    
+    // Invalidate relevant caches
+    invalidateCityCache(cityId);
+    invalidateCommunityCache();
+    
     return { liked: true };
   }
 }
@@ -2432,6 +2848,10 @@ export async function addComment(userId: number, cityId: number, content: string
   const comment = await db.insert(commentsTable)
     .values({ id: commentId, userId, cityId, content })
     .returning();
+  
+  // Invalidate relevant caches
+  invalidateCityCache(cityId);
+  invalidateCommunityCache();
   
   return comment[0];
 }
@@ -2690,11 +3110,19 @@ export async function toggleFavorite(userId: number, cityId: number) {
     // Remove from favorites
     await db.delete(favoritesTable)
       .where(and(eq(favoritesTable.userId, userId), eq(favoritesTable.cityId, cityId)));
+    
+    // Invalidate relevant caches
+    invalidateCommunityCache();
+    
     return { favorited: false };
   } else {
     // Add to favorites
     const favoriteId = await generateUniqueId(favoritesTable, favoritesTable.id);
     await db.insert(favoritesTable).values({ id: favoriteId, userId, cityId });
+    
+    // Invalidate relevant caches
+    invalidateCommunityCache();
+    
     return { favorited: true };
   }
 }

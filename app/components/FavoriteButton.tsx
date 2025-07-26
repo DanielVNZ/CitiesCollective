@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { TouchOptimizedButton } from './TouchOptimizedButton';
 
 interface FavoriteButtonProps {
   cityId: number;
@@ -74,7 +75,7 @@ export function FavoriteButton({ cityId, initialFavorited = false, size = 'md' }
   };
 
   return (
-    <button
+    <TouchOptimizedButton
       onClick={handleFavorite}
       disabled={loading}
       className={`flex items-center justify-center px-2.5 py-1.5 rounded-lg transition-all duration-200 ${
@@ -82,7 +83,13 @@ export function FavoriteButton({ cityId, initialFavorited = false, size = 'md' }
           ? 'text-yellow-600 hover:text-yellow-700 bg-yellow-50 hover:bg-yellow-100 shadow-sm' 
           : 'text-gray-700 hover:text-yellow-600 hover:bg-yellow-50 bg-white/80 dark:bg-gray-800/80 dark:text-gray-300 dark:hover:text-yellow-400'
       } ${loading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:shadow-md'} ${sizeClasses[size]}`}
-      title={favorited ? 'Remove from favorites' : 'Add to favorites'}
+      ariaLabel={favorited ? 'Remove from favorites' : 'Add to favorites'}
+      feedback={{
+        haptic: true,
+        visual: true,
+        intensity: favorited ? 'medium' : 'light',
+      }}
+      minTouchTarget={44}
     >
       <svg 
         className={`${iconSizes[size]} ${favorited ? 'fill-current' : 'fill-none'}`}
@@ -92,6 +99,6 @@ export function FavoriteButton({ cityId, initialFavorited = false, size = 'md' }
       >
         <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path>
       </svg>
-    </button>
+    </TouchOptimizedButton>
   );
 } 

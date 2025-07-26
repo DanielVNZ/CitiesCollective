@@ -1,8 +1,12 @@
 import { NextRequest } from 'next/server';
 import { authenticateApiKey, createApiResponse, createApiErrorResponse } from 'app/utils/apiAuth';
 import { getCitiesByUser, getUserByUsernameOrEmail, getCityImages, getCityLikes, getCityCommentCount } from 'app/db';
+import { withCache, CacheConfigs } from 'app/utils/api-cache-middleware';
 
-export async function GET(request: NextRequest) {
+export const GET = withCache({
+  ...CacheConfigs.PRIVATE,
+  tags: ['api-v1', 'user-cities']
+})(async function(request: NextRequest) {
   try {
     // Authenticate API key
     const authUser = await authenticateApiKey(request);
@@ -95,7 +99,7 @@ export async function GET(request: NextRequest) {
     console.error('API Error:', error);
     return createApiErrorResponse('Internal server error', 500);
   }
-}
+});
 
 // Handle CORS preflight requests
 export async function OPTIONS() {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from 'app/auth';
 import { isUserAdmin, adminDeleteCityById, getCityById } from 'app/db';
+import { invalidateHomePageCache } from 'app/utils/cache-invalidation';
 
 export async function DELETE(
   request: NextRequest,
@@ -33,6 +34,9 @@ export async function DELETE(
     const deletedCity = await adminDeleteCityById(cityId);
     
     if (deletedCity) {
+      // Invalidate home page cache since city listings will change
+      await invalidateHomePageCache();
+      
       return NextResponse.json({ 
         message: 'City deleted successfully', 
         cityId: cityId 

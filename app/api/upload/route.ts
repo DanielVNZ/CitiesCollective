@@ -4,6 +4,7 @@ import AdmZip from 'adm-zip';
 import { cityTable, getUser, db, ensureCityTableExists, generateUniqueId, getCityCountByUser, notifyFollowersOfNewCity } from 'app/db';
 import { auth } from 'app/auth';
 import { uploadToR2, generateFileKey } from 'app/utils/r2';
+import { invalidateHomePageCache } from 'app/utils/cache-invalidation';
 
 // Configure the maximum body size for this route
 export const maxDuration = 60; // 60 seconds
@@ -152,6 +153,9 @@ export async function POST(req: NextRequest) {
     console.log('Inserting city into database...');
     const inserted = await db.insert(cityTable).values(cityData).returning();
     console.log('City inserted successfully:', inserted[0].id);
+
+    // Invalidate home page cache since new city was added
+    await invalidateHomePageCache();
 
     // Notify followers of the new city upload
     try {

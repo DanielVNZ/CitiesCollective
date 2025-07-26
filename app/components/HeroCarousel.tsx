@@ -5,7 +5,7 @@ import 'slick-carousel/slick/slick-theme.css';
 import Slider from 'react-slick';
 import Image from 'next/image';
 import Link from 'next/link';
-import { QuickSearch } from 'app/components/QuickSearch';
+
 import { useEffect, useRef } from 'react';
 
 // Custom CSS to fix accessibility issues with Slick Carousel
@@ -205,9 +205,7 @@ export function HeroCarousel({ topCities }: HeroCarouselProps) {
         <p className="text-xl text-gray-200 max-w-3xl mx-auto mb-8">
           The ultimate hub for Cities: Skylines 2 creators. Upload your save files, showcase your work, and explore masterpieces from the community.
         </p>
-        <div className="max-w-xl mx-auto pointer-events-auto">
-          <QuickSearch />
-        </div>
+
       </div>
     </div>
   );
