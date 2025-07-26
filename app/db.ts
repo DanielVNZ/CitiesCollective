@@ -8,7 +8,7 @@ import { cachedQuery, invalidateCityCache, invalidateUserCache, invalidateCommun
 
 // Database connection configuration with optimized pooling
 interface DatabaseConnectionConfig {
-  ssl: boolean | { rejectUnauthorized: boolean };
+  ssl: boolean | object | "require" | "allow" | "prefer" | "verify-full" | undefined;
   max: number;
   idle_timeout: number;
   connect_timeout: number;
@@ -34,14 +34,14 @@ let connectionHealthMetrics = {
 
 // Optimized connection pool configuration
 const connectionConfig: DatabaseConnectionConfig = {
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-  max: process.env.NODE_ENV === 'production' ? 20 : 5, // Increased for production
-  idle_timeout: 30, // 30 seconds idle timeout
-  connect_timeout: 10, // 10 seconds connection timeout
+  ssl: false, // Temporarily disable SSL for local production testing
+  max: process.env.NODE_ENV === 'production' ? 10 : 5, // Reduced for stability
+  idle_timeout: 20, // Reduced idle timeout
+  connect_timeout: 60, // Further increased connection timeout
   statement_timeout: 30000, // 30 seconds statement timeout
   query_timeout: 25000, // 25 seconds query timeout
-  max_lifetime: 60 * 60, // 1 hour connection lifetime
-  prepare: true, // Enable prepared statements for better performance
+  max_lifetime: 60 * 30, // 30 minutes connection lifetime
+  prepare: false, // Disable prepared statements for compatibility
   transform: {
     undefined: null, // Transform undefined to null
   },
@@ -55,6 +55,7 @@ const connectionConfig: DatabaseConnectionConfig = {
 };
 
 // Create postgres client with enhanced configuration
+console.log('Connecting to database:', process.env.POSTGRES_URL?.replace(/:[^:@]*@/, ':****@'));
 let client = postgres(process.env.POSTGRES_URL!, connectionConfig);
 // Connection health monitoring functions
 async function checkConnectionHealth(): Promise<boolean> {
