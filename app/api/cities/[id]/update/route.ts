@@ -25,7 +25,7 @@ const upload = multer({
     }
   },
   limits: {
-    fileSize: 100 * 1024 * 1024, // 100MB limit
+    fileSize: 3 * 1024 * 1024 * 1024, // 3GB limit
   },
 });
 
@@ -94,11 +94,11 @@ export async function POST(
     const relativePath = `/uploads/saves/${uniqueFileName}`;
     
     // Save the original .cok file
-    await fs.writeFile(kokFilePath, buffer);
+    await fs.writeFile(kokFilePath, new Uint8Array(buffer));
     
     // Also create a temporary zip file for processing
     const tempZipPath = path.join(uploadsDir, `temp-${uuidv4()}.zip`);
-    await fs.writeFile(tempZipPath, buffer);
+    await fs.writeFile(tempZipPath, new Uint8Array(buffer));
 
     // Extract the zip to read metadata
     const zip = new AdmZip(tempZipPath);

@@ -10,6 +10,8 @@ import HoFCreatorIdEditor from 'app/components/HoFCreatorIdEditor';
 import HoFBindingStatus from 'app/components/HoFBindingStatus';
 import { SignOutButton } from 'app/components/SignOutButton';
 import { Header } from 'app/components/Header';
+import { UserHallOfFameImageManagement } from 'app/components/UserHallOfFameImageManagement';
+import { CollapsibleSection } from 'app/components/CollapsibleSection';
 
 export default async function ProtectedPage() {
   const session = await auth();
@@ -56,55 +58,69 @@ export default async function ProtectedPage() {
           <ProfileEditor user={user} />
         </div>
 
-        {/* HoF Creator ID Settings */}
+        {/* Hall of Fame Section */}
         <div className="mb-8">
-          <HoFCreatorIdEditor 
-            currentHoFCreatorId={user.hofCreatorId} 
-          />
-        </div>
+          <CollapsibleSection title="Hall of Fame" defaultExpanded={true}>
+            <div className="space-y-6">
+              {/* HoF Creator ID Settings */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Creator ID</h3>
+                <HoFCreatorIdEditor 
+                  currentHoFCreatorId={user.hofCreatorId} 
+                />
+              </div>
 
-        {/* HoF Binding Status */}
-        <div className="mb-8">
-          <HoFBindingStatus 
-            hofCreatorId={user.hofCreatorId}
-            userId={user.id}
-          />
+              {/* HoF Binding Status */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Connection</h3>
+                <HoFBindingStatus 
+                  hofCreatorId={user.hofCreatorId}
+                  userId={user.id}
+                />
+              </div>
+
+              {/* Hall of Fame Image Management */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Images</h3>
+                <UserHallOfFameImageManagement userId={user.id} cities={cities} hofCreatorId={user.hofCreatorId} />
+              </div>
+            </div>
+          </CollapsibleSection>
         </div>
 
         {/* Cities Management */}
         <div className="mb-8">
-          <div className="flex justify-between items-center mb-6">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">My Cities</h2>
+          <CollapsibleSection title="My Cities" defaultExpanded={true}>
+            <div className="mb-6">
               <p className="text-gray-600 dark:text-gray-400">
                 Manage your uploaded cities - view details, share links, or remove cities
               </p>
             </div>
-          </div>
 
-          {cities.length === 0 ? (
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-12 text-center">
-              <div className="text-gray-400 text-6xl mb-4">🏙️</div>
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                No cities uploaded yet!
-              </h3>
-              <p className="text-gray-600 dark:text-gray-400 mb-6">
-                Start sharing your amazing Cities: Skylines 2 creations with the Cities Collective.
-              </p>
-              <Link
-                href="/upload"
-                className="bg-blue-600 text-white px-6 py-3 rounded-md hover:bg-blue-700 transition-colors inline-block"
-              >
-                Upload Your First City
-              </Link>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {cities.map((city: any) => (
-                <CityManagementCard key={city.id} city={city} />
-              ))}
-            </div>
-          )}
+            {cities.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="text-gray-400 text-6xl mb-4">🏙️</div>
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                  No cities uploaded yet!
+                </h3>
+                <p className="text-gray-600 dark:text-gray-400 mb-6">
+                  Start sharing your amazing Cities: Skylines 2 creations with the Cities Collective.
+                </p>
+                <Link
+                  href="/upload"
+                  className="bg-blue-600 text-white px-6 py-3 rounded-md hover:bg-blue-700 transition-colors inline-block"
+                >
+                  Upload Your First City
+                </Link>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {cities.map((city: any) => (
+                  <CityManagementCard key={city.id} city={city} />
+                ))}
+              </div>
+            )}
+          </CollapsibleSection>
         </div>
       </main>
     </div>

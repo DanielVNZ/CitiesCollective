@@ -113,7 +113,7 @@ export function SaveGameSection({ cityId, initialFilePath, initialFileName, isOw
                 file:cursor-pointer"
             />
             <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              Supported format: .cok files. Max size: 100MB
+              Supported format: .cok files. Max size: 3GB
             </p>
           </div>
           {selectedFile && (

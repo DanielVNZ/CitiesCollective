@@ -105,19 +105,6 @@ export default function HoFBindingStatus({ hofCreatorId, userId }: HoFBindingSta
       </div>
 
       <div className="space-y-4">
-        {/* Current Creator ID Display */}
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-            Hall of Fame ID:
-          </span>
-          <span className="text-sm text-gray-900 dark:text-white font-mono bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
-            {hofCreatorId 
-              ? `${hofCreatorId.substring(0, 8)}...${hofCreatorId.substring(hofCreatorId.length - 4)}`
-              : 'Not set'
-            }
-          </span>
-        </div>
-
         {/* Test Results */}
         {testResult && (
           <div className={`p-3 rounded-md text-sm ${

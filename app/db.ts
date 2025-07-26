@@ -4048,7 +4048,7 @@ export async function getHallOfFameImagesForCity(cityId: number) {
   try {
     await ensureHallOfFameCacheTableExists();
     
-    // First get the city name
+    // Get the city details
     const city = await db.select().from(cityTable).where(eq(cityTable.id, cityId)).limit(1);
     
     if (city.length === 0) {
@@ -4057,10 +4057,11 @@ export async function getHallOfFameImagesForCity(cityId: number) {
     
     const cityName = city[0].cityName;
     
-    // Then find Hall of Fame images that match the city name
+    // Only return Hall of Fame images that are explicitly assigned to this city
+    // (not just matching by name from external API)
     const images = await client`
       SELECT * FROM "hallOfFameCache" 
-      WHERE LOWER("cityName") = LOWER(${cityName})
+      WHERE "cityId" = ${cityId}
       ORDER BY "createdAt" DESC
     `;
     
@@ -4266,6 +4267,161 @@ export async function getAllUsersWithHoFCreatorId() {
     return users;
   } catch (error) {
     console.error('Error fetching users with HoF Creator ID:', error);
+    return [];
+  }
+}
+
+export async function getAllHallOfFameImages() {
+  try {
+    await ensureHallOfFameCacheTableExists();
+    
+    const images = await client`
+      SELECT 
+        id,
+        "cityId",
+        "hofImageId",
+        "cityName",
+        "cityPopulation",
+        "cityMilestone",
+        "imageUrlThumbnail",
+        "imageUrlFHD",
+        "imageUrl4K",
+        "isPrimary",
+        "createdAt",
+        "lastUpdated"
+      FROM "hallOfFameCache"
+      ORDER BY "createdAt" DESC
+    `;
+    
+    return images;
+  } catch (error) {
+    console.error('Error fetching all Hall of Fame images:', error);
+    return [];
+  }
+}
+
+export async function getHallOfFameImagesForUser(userId: number) {
+  try {
+    await ensureHallOfFameCacheTableExists();
+    
+    // First get the user's HOF Creator ID
+    const user = await client`
+      SELECT "hofCreatorId" FROM "User" WHERE id = ${userId}
+    `;
+    
+    if (user.length === 0 || !user[0].hofCreatorId) {
+      return [];
+    }
+    
+    // Get ALL hall of fame images (both assigned and unassigned)
+    // We'll filter them on the frontend to show only those relevant to the user
+    const allImages = await client`
+      SELECT 
+        h.id,
+        h."cityId",
+        h."hofImageId",
+        h."cityName",
+        h."cityPopulation",
+        h."cityMilestone",
+        h."imageUrlThumbnail",
+        h."imageUrlFHD",
+        h."imageUrl4K",
+        h."isPrimary",
+        h."createdAt",
+        h."lastUpdated"
+      FROM "hallOfFameCache" h
+      ORDER BY h."createdAt" DESC
+    `;
+    
+    // Get the user's cities to filter images
+    const userCities = await client`
+      SELECT id, "cityName" FROM "City" WHERE "userId" = ${userId}
+    `;
+    
+    const userCityIds = userCities.map((city: any) => city.id);
+    const userCityNames = userCities.map((city: any) => city.cityName?.toLowerCase());
+    
+    // Filter images to show:
+    // 1. Images assigned to user's cities
+    // 2. Unassigned images (cityId is null)
+    // 3. Images that match user's city names (for automatic assignment)
+    const filteredImages = allImages.filter((image: any) => {
+      // If assigned to user's city
+      if (image.cityId && userCityIds.includes(image.cityId)) {
+        return true;
+      }
+      
+      // If unassigned
+      if (!image.cityId) {
+        return true;
+      }
+      
+      // If city name matches one of user's cities (for automatic assignment)
+      if (image.cityName && userCityNames.includes(image.cityName.toLowerCase())) {
+        return true;
+      }
+      
+      return false;
+    });
+    
+    return filteredImages;
+  } catch (error) {
+    console.error('Error fetching Hall of Fame images for user:', error);
+    return [];
+  }
+}
+
+export async function assignHallOfFameImageToCity(imageId: number, cityId: number) {
+  try {
+    await ensureHallOfFameCacheTableExists();
+    
+    // Check if city exists and get its name
+    const city = await client`
+      SELECT "cityName" FROM "City" WHERE id = ${cityId}
+    `;
+    
+    if (city.length === 0) {
+      throw new Error('City not found');
+    }
+    
+    // Update the hall of fame image
+    await client`
+      UPDATE "hallOfFameCache"
+      SET "cityId" = ${cityId}, "cityName" = ${city[0].cityName}, "lastUpdated" = NOW()
+      WHERE id = ${imageId}
+    `;
+    
+    return true;
+  } catch (error) {
+    console.error('Error assigning Hall of Fame image to city:', error);
+    throw error;
+  }
+}
+
+export async function getAllCitiesForAdmin() {
+  try {
+    await ensureCityTableExists();
+    
+    const cities = await client`
+      SELECT 
+        c.id,
+        c."cityName",
+        c."mapName",
+        c."population",
+        c."money",
+        c."xp",
+        c."uploadedAt",
+        u.id as "userId",
+        u.username,
+        u.email
+      FROM "City" c
+      LEFT JOIN "User" u ON c."userId" = u.id
+      ORDER BY c."uploadedAt" DESC
+    `;
+    
+    return cities;
+  } catch (error) {
+    console.error('Error fetching cities for admin:', error);
     return [];
   }
 }
