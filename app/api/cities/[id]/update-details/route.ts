@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cityTable, getUser, db } from 'app/db';
 import { auth } from 'app/auth';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import { invalidateCityCache } from 'app/utils/cache-invalidation';
 
 export async function PUT(
@@ -57,11 +57,27 @@ export async function PUT(
       updateData.mapName = mapName.trim() || null;
     }
 
+    // Get the old city name before updating
+    const oldCityName = existingCity[0].cityName;
+
     // Update the city
     const updatedCity = await db.update(cityTable)
       .set(updateData)
       .where(eq(cityTable.id, cityId))
       .returning();
+
+    // Update Hall of Fame cache entries that reference the old city name
+    if (oldCityName && oldCityName !== cityName.trim()) {
+      try {
+        await db.execute(sql`
+          UPDATE "hallOfFameCache" 
+          SET "cityName" = ${cityName.trim()}
+          WHERE LOWER("cityName") = LOWER(${oldCityName})
+        `);
+      } catch (error) {
+        console.error('Failed to update Hall of Fame cache for city name change:', error);
+      }
+    }
 
     // Invalidate cache for this city
     await invalidateCityCache(cityId);

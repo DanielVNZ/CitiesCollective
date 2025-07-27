@@ -53,16 +53,16 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
     // Preload previous image
     if (currentIndex > 0) {
       const prevImage = images[currentIndex - 1];
-      if (prevImage?.imageUrlFHD) {
-        imagesToPreload.push(prevImage.imageUrlFHD);
+      if (prevImage?.imageUrl4K) {
+        imagesToPreload.push(prevImage.imageUrl4K);
       }
     }
     
     // Preload next image
     if (currentIndex < images.length - 1) {
       const nextImage = images[currentIndex + 1];
-      if (nextImage?.imageUrlFHD) {
-        imagesToPreload.push(nextImage.imageUrlFHD);
+      if (nextImage?.imageUrl4K) {
+        imagesToPreload.push(nextImage.imageUrl4K);
       }
     }
     
@@ -82,7 +82,7 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
   useEffect(() => {
     if (images.length > 0) {
       const currentImage = images[mainGalleryIndex];
-      if (currentImage?.imageUrlFHD) {
+      if (currentImage?.imageUrl4K) {
         preloadAdjacentImages(mainGalleryIndex);
       }
     }
@@ -626,9 +626,9 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
 
   // Track view when main image is displayed (larger format)
   useEffect(() => {
-    if (hofCreatorId && displayedThumbnails[mainGalleryIndex]?.imageUrlFHD) {
+    if (hofCreatorId && displayedThumbnails[mainGalleryIndex]?.imageUrl4K) {
       // Only track if this is a different image than the last one tracked
-      const currentImageUrl = displayedThumbnails[mainGalleryIndex].imageUrlFHD;
+      const currentImageUrl = displayedThumbnails[mainGalleryIndex].imageUrl4K;
       trackHallOfFameImageView(currentImageUrl, hofCreatorId);
     }
   }, [mainGalleryIndex, hofCreatorId, displayedThumbnails]);
@@ -756,7 +756,7 @@ export function HallOfFameGallery({ images, cityId, isOwner, isFeaturedOnHomePag
             >
               <div className="relative w-full h-full">
                 <img
-                  src={displayedThumbnails[mainGalleryIndex].imageUrlFHD}
+                  src={displayedThumbnails[mainGalleryIndex].imageUrl4K}
                   alt={`${displayedThumbnails[mainGalleryIndex].cityName} - Hall of Fame Image`}
                   className="w-full h-full object-contain transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-2xl"
                   data-image-id={displayedThumbnails[mainGalleryIndex].hofImageId}

@@ -219,12 +219,38 @@ export function UserHallOfFameImageManagement({ userId, cities, hofCreatorId }: 
             Assign your hall of fame images to your cities
           </p>
         </div>
-        <button
-          onClick={fetchImages}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          Refresh
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={async () => {
+              // Show warning popup
+              const confirmed = window.confirm(
+                '⚠️ WARNING: This will clear ALL manually assigned images and reset to auto-assignment based on city names. This action cannot be undone.\n\nAre you sure you want to continue?'
+              );
+              
+              if (!confirmed) {
+                return;
+              }
+              
+              try {
+                await fetch('/api/user/hall-of-fame-images/refresh-assignments', {
+                  method: 'POST',
+                });
+                await fetchImages();
+              } catch (error) {
+                console.error('Failed to clear assignments:', error);
+              }
+            }}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+          >
+            Clear All
+          </button>
+          <button
+            onClick={fetchImages}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Refresh
+          </button>
+        </div>
       </div>
 
       {/* Filter Controls */}

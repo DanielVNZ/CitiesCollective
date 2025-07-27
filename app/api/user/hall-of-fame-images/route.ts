@@ -52,6 +52,14 @@ export async function GET(request: NextRequest) {
       const userCities = await client`
         SELECT id, "cityName" FROM "City" WHERE "userId" = ${user.id}
       `;
+
+      // Clear any existing auto-assigned images for this user to refresh assignments
+      // This ensures that when city names change, we re-evaluate auto-assignments
+      await client`
+        UPDATE "hallOfFameCache" 
+        SET "cityId" = NULL 
+        WHERE "cityId" IN (SELECT id FROM "City" WHERE "userId" = ${user.id})
+      `;
       
       const userCityMap = new Map();
       userCities.forEach((city: any) => {
@@ -61,12 +69,40 @@ export async function GET(request: NextRequest) {
       });
 
       // Transform the external API data to match our internal format
-      const images = screenshotsData.map((screenshot: any, index: number) => {
+      // Deduplicate by hofImageId to ensure we only have one record per unique image
+      const uniqueImages = new Map();
+      
+      for (let index = 0; index < screenshotsData.length; index++) {
+        const screenshot = screenshotsData[index];
         const cityName = screenshot.cityName || 'Unknown City';
         const cityId = userCityMap.get(cityName.toLowerCase()) || null;
         
-        return {
-          id: index, // Use index as temporary ID since we don't have a real ID
+        // If we already have this image, skip it (deduplication)
+        if (uniqueImages.has(screenshot.id)) {
+          continue;
+        }
+        
+        // Save image to the cache (with or without cityId)
+        try {
+          // Import the upsert function
+          const { upsertHallOfFameImage } = await import('app/db');
+          
+          // Save the image to cache (with or without cityId)
+          await upsertHallOfFameImage(cityId, {
+            hofImageId: screenshot.id,
+            cityName: cityName,
+            cityPopulation: screenshot.cityPopulation || null,
+            cityMilestone: screenshot.cityMilestone || null,
+            imageUrlThumbnail: screenshot.imageUrlThumbnail || screenshot.thumbnailUrl || screenshot.thumbnail || screenshot.imageUrl || screenshot.url || screenshot.image,
+            imageUrlFHD: screenshot.imageUrlFHD || screenshot.hdUrl || screenshot.hd || screenshot.imageUrl || screenshot.url || screenshot.image,
+            imageUrl4K: screenshot.imageUrl4K || screenshot.uhdUrl || screenshot.uhd || screenshot.imageUrl || screenshot.url || screenshot.image,
+          });
+        } catch (error) {
+          console.error('Failed to save image to cache:', error);
+        }
+        
+        const imageData = {
+          id: uniqueImages.size, // Use unique count as ID
           cityId: cityId, // Auto-assign if city name matches
           hofImageId: screenshot.id,
           cityName: cityName,
@@ -75,12 +111,16 @@ export async function GET(request: NextRequest) {
           imageUrlThumbnail: screenshot.imageUrlThumbnail || screenshot.thumbnailUrl || screenshot.thumbnail || screenshot.imageUrl || screenshot.url || screenshot.image,
           imageUrlFHD: screenshot.imageUrlFHD || screenshot.hdUrl || screenshot.hd || screenshot.imageUrl || screenshot.url || screenshot.image,
           imageUrl4K: screenshot.imageUrl4K || screenshot.uhdUrl || screenshot.uhd || screenshot.imageUrl || screenshot.url || screenshot.image,
-          isPrimary: index === 0, // First image is primary
+          isPrimary: uniqueImages.size === 0, // First unique image is primary
           createdAt: screenshot.createdAt || new Date().toISOString(),
           lastUpdated: screenshot.updatedAt || new Date().toISOString(),
           externalData: true // Flag to indicate this is from external API
         };
-      });
+        
+        uniqueImages.set(screenshot.id, imageData);
+      }
+      
+      const images = Array.from(uniqueImages.values());
 
       return NextResponse.json({ images }, {
         headers: {

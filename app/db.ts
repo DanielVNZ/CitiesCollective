@@ -4060,10 +4060,11 @@ export async function getHallOfFameImagesForCity(cityId: number) {
     // Return Hall of Fame images that are either:
     // 1. Explicitly assigned to this city (cityId matches)
     // 2. Auto-assigned by name matching (cityName matches and cityId is null)
+    // Deduplicate by hofImageId to ensure we only get one record per unique image
     const images = await client`
-      SELECT * FROM "hallOfFameCache" 
+      SELECT DISTINCT ON ("hofImageId") * FROM "hallOfFameCache" 
       WHERE ("cityId" = ${cityId}) OR (LOWER("cityName") = LOWER(${cityName}) AND "cityId" IS NULL)
-      ORDER BY "createdAt" DESC
+      ORDER BY "hofImageId", "createdAt" DESC
     `;
     
     // If there are Hall of Fame images but no primary is set, set the first one as primary
@@ -4071,6 +4072,11 @@ export async function getHallOfFameImagesForCity(cityId: number) {
       const hasPrimary = images.some((img: any) => img.isPrimary);
       
       if (!hasPrimary) {
+        // First, ensure no other images for this city are marked as primary
+        await db.update(hallOfFameCacheTable)
+          .set({ isPrimary: false })
+          .where(eq(hallOfFameCacheTable.cityId, cityId));
+        
         // Set the first image (most recent) as primary
         const firstImage = images[0];
         await db.update(hallOfFameCacheTable)
@@ -4089,7 +4095,7 @@ export async function getHallOfFameImagesForCity(cityId: number) {
   }
 }
 
-export async function upsertHallOfFameImage(cityId: number, imageData: {
+export async function upsertHallOfFameImage(cityId: number | null, imageData: {
   hofImageId: string;
   cityName: string;
   cityPopulation?: number;
@@ -4101,18 +4107,16 @@ export async function upsertHallOfFameImage(cityId: number, imageData: {
   try {
     await ensureHallOfFameCacheTableExists();
     
-    // Check if image already exists
+    // Check if image already exists by hofImageId (not cityId since it can be null)
     const existing = await db.select().from(hallOfFameCacheTable)
-      .where(and(
-        eq(hallOfFameCacheTable.cityId, cityId),
-        eq(hallOfFameCacheTable.hofImageId, imageData.hofImageId)
-      ))
+      .where(eq(hallOfFameCacheTable.hofImageId, imageData.hofImageId))
       .limit(1);
     
     if (existing.length > 0) {
       // Update existing image
       await db.update(hallOfFameCacheTable)
         .set({
+          cityId: cityId, // Update cityId (can be null for unassigned)
           cityName: imageData.cityName,
           cityPopulation: imageData.cityPopulation,
           cityMilestone: imageData.cityMilestone,
@@ -4121,11 +4125,11 @@ export async function upsertHallOfFameImage(cityId: number, imageData: {
           imageUrl4K: imageData.imageUrl4K,
           lastUpdated: new Date()
         })
-        .where(eq(hallOfFameCacheTable.id, existing[0].id));
+        .where(eq(hallOfFameCacheTable.hofImageId, imageData.hofImageId));
     } else {
       // Insert new image
       await db.insert(hallOfFameCacheTable).values({
-        cityId,
+        cityId: cityId, // Can be null for unassigned images
         hofImageId: imageData.hofImageId,
         cityName: imageData.cityName,
         cityPopulation: imageData.cityPopulation,
@@ -4168,23 +4172,22 @@ export async function setPrimaryHallOfFameImage(hofImageId: string, cityId: numb
       throw new Error('Unauthorized');
     }
     
-    const cityName = cityOwner[0].cityName;
-    
-    // Verify the image belongs to this city by matching city name
-    const imageOwner = await db.select({ cityName: hallOfFameCacheTable.cityName })
+    // Verify the image belongs to this city by checking cityId assignment
+    const imageOwner = await db.select({ cityId: hallOfFameCacheTable.cityId })
       .from(hallOfFameCacheTable)
       .where(eq(hallOfFameCacheTable.hofImageId, hofImageId))
       .limit(1);
     
-    if (!imageOwner[0] || imageOwner[0].cityName !== cityName) {
+    if (!imageOwner[0] || imageOwner[0].cityId !== cityId) {
       throw new Error('Image not found or does not belong to this city');
     }
     
-    // Remove primary status from ALL images (both screenshots and Hall of Fame) for this city
+    // Remove primary status from ALL Hall of Fame images for this specific city
     await db.update(hallOfFameCacheTable)
       .set({ isPrimary: false })
-      .where(eq(hallOfFameCacheTable.cityName, cityName));
+      .where(eq(hallOfFameCacheTable.cityId, cityId));
     
+    // Also remove primary status from regular city images for this city
     await db.update(cityImagesTable)
       .set({ isPrimary: false })
       .where(eq(cityImagesTable.cityId, cityId));
@@ -4209,6 +4212,63 @@ export async function clearHallOfFameCacheForCity(cityId: number) {
       .where(eq(hallOfFameCacheTable.cityId, cityId));
   } catch (error) {
     console.error('Error clearing Hall of Fame cache for city:', error);
+  }
+}
+
+export async function removeDuplicateHallOfFameImages() {
+  try {
+    await ensureHallOfFameCacheTableExists();
+    
+    // Remove duplicate records, keeping only the most recent one for each hofImageId
+    await client`
+      DELETE FROM "hallOfFameCache" 
+      WHERE id NOT IN (
+        SELECT DISTINCT ON ("hofImageId") id 
+        FROM "hallOfFameCache" 
+        ORDER BY "hofImageId", "createdAt" DESC
+      )
+    `;
+  } catch (error) {
+    console.error('Error removing duplicate Hall of Fame images:', error);
+  }
+}
+
+export async function fixDuplicatePrimaryImages() {
+  try {
+    await ensureHallOfFameCacheTableExists();
+    
+    // For each city, ensure only one Hall of Fame image is marked as primary
+    const citiesWithMultiplePrimary = await client`
+      SELECT "cityId", COUNT(*) as primary_count
+      FROM "hallOfFameCache"
+      WHERE "isPrimary" = true AND "cityId" IS NOT NULL
+      GROUP BY "cityId"
+      HAVING COUNT(*) > 1
+    `;
+    
+    for (const city of citiesWithMultiplePrimary) {
+      // Get all primary images for this city, ordered by creation date
+      const primaryImages = await client`
+        SELECT id, "hofImageId", "createdAt"
+        FROM "hallOfFameCache"
+        WHERE "cityId" = ${city.cityId} AND "isPrimary" = true
+        ORDER BY "createdAt" DESC
+      `;
+      
+      // Keep only the first (most recent) one as primary, remove primary from others
+      if (primaryImages.length > 1) {
+        const keepPrimaryId = primaryImages[0].id;
+        const removePrimaryIds = primaryImages.slice(1).map(img => img.id);
+        
+        await client`
+          UPDATE "hallOfFameCache"
+          SET "isPrimary" = false
+          WHERE id = ANY(${removePrimaryIds})
+        `;
+      }
+    }
+  } catch (error) {
+    console.error('Error fixing duplicate primary images:', error);
   }
 }
 

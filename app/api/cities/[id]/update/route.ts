@@ -5,7 +5,7 @@ import multer from 'multer';
 import AdmZip from 'adm-zip';
 import { cityTable, getUser, db, ensureCityTableExists } from 'app/db';
 import { auth } from 'app/auth';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 
 // Configure multer for file upload
@@ -63,6 +63,7 @@ export async function POST(
     }
 
     const city = existingCity[0];
+    const oldCityName = city.cityName;
 
     // Parse the multipart form data
     const formData = await request.formData();
@@ -173,6 +174,19 @@ export async function POST(
       })
       .where(eq(cityTable.id, cityId))
       .returning();
+
+    // Update Hall of Fame cache entries that reference the old city name
+    if (oldCityName && oldCityName !== metadata.cityName) {
+      try {
+        await db.execute(sql`
+          UPDATE "hallOfFameCache" 
+          SET "cityName" = ${metadata.cityName}
+          WHERE LOWER("cityName") = LOWER(${oldCityName})
+        `);
+      } catch (error) {
+        console.error('Failed to update Hall of Fame cache for city name change:', error);
+      }
+    }
 
     return NextResponse.json({ 
       success: true, 
